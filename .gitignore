@@ -27,3 +27,11 @@
 *.exe
 *.out
 *.app
+
+*.sdf
+/Debug
+/Release
+/x64
+/VKraft/Debug
+/VKraft/Release
+/VKraft/x64
