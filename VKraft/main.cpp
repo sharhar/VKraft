@@ -1,6 +1,4 @@
-#include "VLKUtils.h"
-#include "Cube.h"
-#include "Utils.h"
+#include "master.h"
 #include <chrono>
 #include <thread>
 
@@ -36,8 +34,10 @@ int main() {
 	vlkCreateDeviceAndSwapchain(window, context, device, swapChain);
 
 	CubeUniformBuffer uniformBuffer;
-
 	memcpy(uniformBuffer.proj, getPerspective(), sizeof(float) * 16);
+
+	VLKShader shader = vlkCreateShader(device, "vert.spv", "geom.spv", "frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
+	VLKPipeline pipeline = vlkCreatePipeline(device, swapChain, shader);
 
 	Vec3 pos = {0, 0, 1};
 	Vec3 rot = {0, 0, 0};
@@ -56,12 +56,21 @@ int main() {
 	double cts = glfwGetTime();
 	double dts = 0;
 
-	PlayerInfo* playerInfo = (PlayerInfo*)malloc(sizeof(PlayerInfo));
-	playerInfo->pos = {0, 0, 0};
+	Camera::init(window, uniformBuffer.view);
+
+	VulkanRenderContext renderContext = {};
+	renderContext.device = device;
+	renderContext.swapChain = swapChain;
+	renderContext.uniformBuffer = &uniformBuffer;
+	renderContext.shader = shader;
+	renderContext.pipeline = pipeline;
 
 	Cube::init();
-	Chunk::init(245325, window, device, swapChain, &uniformBuffer, playerInfo);
-	
+	Chunk::init(245325, window, &renderContext);
+
+	VLKTexture texture = vlkCreateTexture(device, "pack.png");
+	vlkBindTexture(device, shader, texture);
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
@@ -74,85 +83,7 @@ int main() {
 		dt = glfwGetTime() - ct;
 		ct = glfwGetTime();
 
-		bool focused = glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
-
-		double xpos, ypos;
-		glfwGetCursorPos(window, &xpos, &ypos);
-
-		if (focused) {
-			float speed = 3.5f;
-
-			if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-				speed *= 2;
-			}
-
-			float xVel = 0;
-			float yVel = 0;
-			float zVel = 0;
-
-			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-				zVel -= speed * cos(rot.y*DEG_TO_RAD) * dt;
-				xVel += speed * sin(rot.y*DEG_TO_RAD) * dt;
-			}
-
-			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-				zVel += speed * cos(rot.y*DEG_TO_RAD) * dt;
-				xVel -= speed * sin(rot.y*DEG_TO_RAD) * dt;
-			}
-
-			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-				zVel -= speed * sin(rot.y*DEG_TO_RAD) * dt;
-				xVel -= speed * cos(rot.y*DEG_TO_RAD) * dt;
-			}
-
-			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-				zVel += speed * sin(rot.y*DEG_TO_RAD) * dt;
-				xVel += speed * cos(rot.y*DEG_TO_RAD) * dt;
-			}
-
-			if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-				yVel += speed * dt;
-			}
-
-			if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
-				yVel -= speed * dt;
-			}
-
-			if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-			}
-
-			pos.x += xVel;
-			pos.y -= yVel;
-			pos.z += zVel;
-
-			float xdiff = (prev_x - xpos);
-
-			if (xdiff != 0) {
-				rot.y -= 5 * xdiff * 0.085f;// *2 * dt;
-			}
-
-			float ydiff = (prev_y - ypos);
-
-			if (ydiff != 0) {
-				rot.x += 5 * ydiff * 0.085f;// *2 * dt;
-			}
-
-			if (rot.x > 90) {
-				rot.x = 90;
-			}
-
-			if (rot.x < -90) {
-				rot.x = -90;
-			}
-		}
-
-		prev_x = xpos;
-		prev_y = ypos;
-
-		playerInfo->pos = pos;
-
-		getWorldview(uniformBuffer.view, pos, rot);
+		Camera::update(dt);
 
 		vlkClear(context, device, swapChain);
 
@@ -163,6 +94,7 @@ int main() {
 
 	Chunk::destroy(device);
 
+	vlkDestroyShader(device, shader);
 	vlkDestroyDeviceandSwapChain(context, device, swapChain);
 	vlkDestroyContext(context);
 

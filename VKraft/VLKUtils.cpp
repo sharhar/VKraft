@@ -1,5 +1,4 @@
 #include "VLKUtils.h"
-#include <assert.h>
 #include <windows.h>
 #include <vector>
 #include "lodepng.h"
@@ -1109,7 +1108,7 @@ void vlkClear(VLKContext context, VLKDevice device, VLKSwapchain& swapChain) {
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.renderPass = swapChain.renderPass;
 	renderPassBeginInfo.framebuffer = swapChain.frameBuffers[swapChain.nextImageIdx];
-	renderPassBeginInfo.renderArea = { 0, 0, (uint32_t)swapChain.width, (uint32_t)swapChain.height };
+	renderPassBeginInfo.renderArea = { 0, 0, swapChain.width, swapChain.height };
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValue;
 	vkCmdBeginRenderPass(device.drawCmdBuffer, &renderPassBeginInfo,

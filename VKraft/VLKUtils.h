@@ -4,6 +4,9 @@
 #include <vulkan/vulkan.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <assert.h>
+
+void VLKCheck(VkResult result, char *msg);
 
 typedef struct Vertex {
 	float x, y, z;

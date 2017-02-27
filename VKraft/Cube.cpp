@@ -1,5 +1,6 @@
-#include "Cube.h"
+#include "master.h"
 #include <iostream>
+#include <assert.h>
 
 #define CHUNK_NUM 922
 #define CHUNK_RAD 6
@@ -66,10 +67,7 @@ int Chunk::rcubesSize = 0;
 int Chunk::rsize = 0;
 uint32_t Chunk::cubeNum = 0;
 ChunkModelInfo* Chunk::model = 0;
-VLKShader Chunk::shader = {};
-VLKPipeline Chunk::pipeline = {};
-VLKTexture Chunk::texture = {};
-CubeUniformBuffer* Chunk::cubeUniformBuffer = 0;
+VulkanRenderContext* Chunk::renderContext = 0;
 
 Chunk* Chunk::getChunkAt(Vec3 pos) {
 	int sz = chunks.size();
@@ -122,7 +120,7 @@ static bool closeEnough(Vec3 pos, Vec3 other) {
 	return pos.dist(other) <= CHUNK_RAD;
 }
 
-static void chunkThreadRun(GLFWwindow* window, PlayerInfo* playerInfo, VLKDevice* device) {
+static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
 	Chunk** closeChunks = new Chunk*[CHUNK_NUM];
 
 	for (int i = 0; i < CHUNK_NUM; i++) {
@@ -139,16 +137,36 @@ static void chunkThreadRun(GLFWwindow* window, PlayerInfo* playerInfo, VLKDevice
 	ChunkModelInfo* pmodelInfo = NULL;
 	ChunkModelInfo* modelInfo = NULL;
 
+	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
+	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	commandPoolCreateInfo.queueFamilyIndex = vrc->device.presentQueueIdx;
+
+	VkCommandPool commandPool;
+	VLKCheck(vkCreateCommandPool(vrc->device.device, &commandPoolCreateInfo, NULL, &commandPool),
+		"Failed to create command pool");
+
+	VkCommandBufferAllocateInfo commandBufferAllocationInfo = {};
+	commandBufferAllocationInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	commandBufferAllocationInfo.commandPool = commandPool;
+	commandBufferAllocationInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+	commandBufferAllocationInfo.commandBufferCount = 2 * vrc->swapChain.imageCount;
+
+	VkCommandBuffer* commandBuffer = new VkCommandBuffer[2 * vrc->swapChain.imageCount];
+	VLKCheck(vkAllocateCommandBuffers(vrc->device.device, &commandBufferAllocationInfo, commandBuffer),
+		"Failed to allocate command buffers");
+
+	int commandBuferID = 0;
+
 	while (!glfwWindowShouldClose(window)) {
-		Vec3 playerPos = { floor(playerInfo->pos.x / 16.0f), floor(playerInfo->pos.y / 16.0f), floor(playerInfo->pos.z / 16.0f) };
+		Vec3 playerPos = { floor(Camera::pos.x / 16.0f), floor(Camera::pos.y / 16.0f), floor(Camera::pos.z / 16.0f) };
 
 		Chunk* playerChunk = Chunk::getChunkAt(playerPos);
 
 		if (playerChunk == NULL) {
 			Chunk* temp = new Chunk(playerPos);
 			recalcChunksNextTo(temp);
-		}
-		else {
+		} else {
 			if (playerChunk->m_xn == NULL) {
 				Chunk* temp = new Chunk(playerPos.add({ -1, 0, 0 }));
 				recalcChunksNextTo(temp);
@@ -267,7 +285,52 @@ static void chunkThreadRun(GLFWwindow* window, PlayerInfo* playerInfo, VLKDevice
 
 			modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
 			modelInfo->full = true;
-			modelInfo->model = vlkCreateModel(*device, verts, rcsz);
+			modelInfo->model = vlkCreateModel(vrc->device, verts, rcsz);
+
+			VkCommandBufferInheritanceInfo inheritanceInfo = {};
+			inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+			inheritanceInfo.pNext = NULL;
+			inheritanceInfo.occlusionQueryEnable = VK_FALSE;
+			inheritanceInfo.queryFlags = 0;
+			inheritanceInfo.pipelineStatistics = 0;
+			inheritanceInfo.renderPass = vrc->swapChain.renderPass;
+			inheritanceInfo.subpass = 0;
+
+			VkCommandBufferBeginInfo beginInfo = {};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+			beginInfo.pInheritanceInfo = &inheritanceInfo;
+
+			VkViewport viewport = { 0, 0, vrc->swapChain.width, vrc->swapChain.height, 0, 1 };
+			VkRect2D scissor = { 0, 0, vrc->swapChain.width, vrc->swapChain.height };
+			VkDeviceSize offsets = {};
+
+			modelInfo->commandBuffer = new VkCommandBuffer[2 * vrc->swapChain.imageCount];
+
+			for (int i = 0; i < vrc->swapChain.imageCount;i++) {
+				inheritanceInfo.framebuffer = vrc->swapChain.frameBuffers[i];
+
+				vkBeginCommandBuffer(commandBuffer[commandBuferID * 2 + i], &beginInfo);
+
+				vkCmdSetViewport(commandBuffer[commandBuferID * 2 + i], 0, 1, &viewport);
+				vkCmdSetScissor(commandBuffer[commandBuferID * 2 + i], 0, 1, &scissor);
+				vkCmdBindPipeline(commandBuffer[commandBuferID * 2 + i], VK_PIPELINE_BIND_POINT_GRAPHICS, vrc->pipeline.pipeline);
+				vkCmdBindVertexBuffers(commandBuffer[commandBuferID * 2 + i], 0, 1, &modelInfo->model.vertexInputBuffer, &offsets);
+				vkCmdBindDescriptorSets(commandBuffer[commandBuferID * 2 + i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+					vrc->pipeline.pipelineLayout, 0, 1, &vrc->shader.descriptorSet, 0, NULL);
+
+				vkCmdDraw(commandBuffer[commandBuferID * 2 + i], rcsz, 1, 0, 0);
+
+				vkEndCommandBuffer(commandBuffer[commandBuferID * 2 + i]);
+
+				modelInfo->commandBuffer[i] = commandBuffer[commandBuferID * 2 + i];
+			}
+
+			if (commandBuferID == 0) {
+				commandBuferID = 1;
+			} else {
+				commandBuferID == 0;
+			}
 
 			delete[] verts;
 		}
@@ -284,8 +347,8 @@ static void chunkThreadRun(GLFWwindow* window, PlayerInfo* playerInfo, VLKDevice
 		Chunk::m_fence = 0;
 
 		if (pmodelInfo != NULL) {
-			vlkDestroyModel(*device, pmodelInfo->model);
-
+			vlkDestroyModel(vrc->device, pmodelInfo->model);
+			
 			free(pmodelInfo);
 		}
 
@@ -304,7 +367,7 @@ static void chunkThreadRun(GLFWwindow* window, PlayerInfo* playerInfo, VLKDevice
 	}
 }
 
-void Chunk::init(unsigned int seed, GLFWwindow* window, VLKDevice device, VLKSwapchain swapChain, CubeUniformBuffer* uniformBuffer, PlayerInfo* playerInfo) {
+void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vulkanRenderContext) {
 	noise = new PerlinNoise(seed);
 
 	rcubes = new Cube*[0];
@@ -312,23 +375,13 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VLKDevice device, VLKSwa
 	
 	model = NULL;
 
-	cubeUniformBuffer = uniformBuffer;
+	renderContext = vulkanRenderContext;
 
-	shader = vlkCreateShader(device, "vert.spv", "geom.spv", "frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
-	pipeline = vlkCreatePipeline(device, swapChain, shader);
-	texture = vlkCreateTexture(device, "pack.png");
-
-	vlkBindTexture(device, shader, texture);
-
-	chunkThread = new std::thread(chunkThreadRun, window, playerInfo, &device);
+	chunkThread = new std::thread(chunkThreadRun, window, renderContext);
 }
 
 void Chunk::destroy(VLKDevice device) {
 	chunkThread->join();
-
-	vlkDestroyTexture(device, texture);
-	vlkDestroyPipeline(device, pipeline);
-	vlkDestroyShader(device, shader);
 
 	if (model->full) {
 		vlkDestroyModel(device, model->model);
@@ -336,30 +389,15 @@ void Chunk::destroy(VLKDevice device) {
 }
 
 void Chunk::render(VLKDevice& device, VLKSwapchain& swapChain) {
+	vlkUniforms(device, renderContext->shader, renderContext->uniformBuffer, sizeof(CubeUniformBuffer));
+
 	while (m_fence == 1) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
-
 	m_fence = m_fence + 2;
 
 	if (model != NULL) {
-		vlkUniforms(device, shader, cubeUniformBuffer, sizeof(CubeUniformBuffer));
-
-		vkCmdBindPipeline(device.drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
-
-		VkViewport viewport = { 0, 0, swapChain.width, swapChain.height, 0, 1 };
-		vkCmdSetViewport(device.drawCmdBuffer, 0, 1, &viewport);
-
-		VkRect2D scissor = { 0, 0, swapChain.width, swapChain.height };
-		vkCmdSetScissor(device.drawCmdBuffer, 0, 1, &scissor);
-
-		VkDeviceSize offsets = {};
-		vkCmdBindVertexBuffers(device.drawCmdBuffer, 0, 1, &model->model.vertexInputBuffer, &offsets);
-
-		vkCmdBindDescriptorSets(device.drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipeline.pipelineLayout, 0, 1, &shader.descriptorSet, 0, NULL);
-
-		vkCmdDraw(device.drawCmdBuffer, rcubesSize, 1, 0, 0);
+		vkCmdExecuteCommands(device.drawCmdBuffer, 1, &model->commandBuffer[swapChain.nextImageIdx]);
 	}
 
 	m_fence = m_fence - 2;

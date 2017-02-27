@@ -17,14 +17,19 @@ typedef struct CubeUniformBuffer {
 		0, 0, 0, 1 };
 } CubeUniformBuffer;
 
-typedef struct PlayerInfo {
-	Vec3 pos;
-} PlayerInfo;
-
 typedef struct ChunkModelInfo {
 	VLKModel model;
+	VkCommandBuffer* commandBuffer;
 	bool full;
 } ChunkmodelInfo;
+
+typedef struct VulkanRenderContext {
+	VLKDevice device;
+	VLKSwapchain swapChain;
+	VLKShader shader;
+	VLKPipeline pipeline;
+	CubeUniformBuffer* uniformBuffer;
+} VulkanRenderContext;
 
 class Cube {
 public:
@@ -68,14 +73,11 @@ public:
 
 	static uint32_t cubeNum;
 	static ChunkModelInfo* model;
-	static VLKShader shader;
-	static VLKPipeline pipeline;
-	static VLKTexture texture;
-	static CubeUniformBuffer* cubeUniformBuffer;
+	static VulkanRenderContext* renderContext;
 
 	Cube** cubes;
 
-	static void init(unsigned int seed, GLFWwindow* window, VLKDevice device, VLKSwapchain swapChain, CubeUniformBuffer* uniformBuffer, PlayerInfo* playerInfo);
+	static void init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vulkanRenderContext);
 	static void destroy(VLKDevice device);
 	static void render(VLKDevice& device, VLKSwapchain& swapChain);
 
@@ -84,6 +86,6 @@ public:
 	void recalcqrid();
 	void findChunks();
 
-	friend static void chunkThreadRun(GLFWwindow* window, PlayerInfo* playerInfo, VLKDevice* device);
+	friend static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vulkanRenderContext);
 	friend static void recalcChunksNextTo(Chunk* chunk);
 };
