@@ -21,6 +21,7 @@ typedef struct ChunkModelInfo {
 	VLKModel model;
 	VkCommandBuffer* commandBuffer;
 	bool full;
+	bool start;
 } ChunkmodelInfo;
 
 typedef struct VulkanRenderContext {

@@ -188,7 +188,7 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevi
 			vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevices[i], j, device.surface,
 				&supportsPresent);
 
-			if (supportsPresent && (queueFamilyProperties[j].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+			if (supportsPresent && (queueFamilyProperties[j].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT))) {
 				device.physicalDevice = physicalDevices[i];
 				device.physicalDeviceProperties = deviceProperties;
 				device.presentQueueIdx = j;
@@ -205,11 +205,12 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevi
 
 	assert(device.physicalDevice, "No physical device detected that can render and present!");
 
+	float queuePriorities[] = { 1.0f, 1.0f };
+
 	VkDeviceQueueCreateInfo queueCreateInfo = {};
 	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 	queueCreateInfo.queueFamilyIndex = device.presentQueueIdx;
-	queueCreateInfo.queueCount = 1;
-	float queuePriorities[] = { 1.0f };
+	queueCreateInfo.queueCount = 2;
 	queueCreateInfo.pQueuePriorities = queuePriorities;
 
 	VkDeviceCreateInfo deviceInfo = {};
@@ -458,7 +459,7 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevi
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	imageCreateInfo.format = VK_FORMAT_D16_UNORM;
-	imageCreateInfo.extent = { (uint32_t)swapChain.width, (uint32_t)swapChain.height, 1 };
+	imageCreateInfo.extent = { swapChain.width, swapChain.height, 1 };
 	imageCreateInfo.mipLevels = 1;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -700,7 +701,7 @@ VLKShader vlkCreateShader(VLKDevice device, char* vertPath, char* geomPath, char
 	VLKShader shader = {};
 
 	uint32_t codeSize;
-	char *code = new char[15000];
+	char* code = new char[20000];
 	HANDLE fileHandle = 0;
 
 	fileHandle = CreateFile(vertPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -708,7 +709,7 @@ VLKShader vlkCreateShader(VLKDevice device, char* vertPath, char* geomPath, char
 		OutputDebugStringA("Failed to open shader file.");
 		exit(1);
 	}
-	ReadFile((HANDLE)fileHandle, code, 15000, (LPDWORD)&codeSize, 0);
+	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
 	CloseHandle(fileHandle);
 
 	VkShaderModuleCreateInfo vertexShaderCreationInfo = {};
@@ -724,7 +725,7 @@ VLKShader vlkCreateShader(VLKDevice device, char* vertPath, char* geomPath, char
 		OutputDebugStringA("Failed to open shader file.");
 		exit(1);
 	}
-	ReadFile((HANDLE)fileHandle, code, 15000, (LPDWORD)&codeSize, 0);
+	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
 	CloseHandle(fileHandle);
 
 	VkShaderModuleCreateInfo geometryShaderCreationInfo = {};
@@ -740,7 +741,7 @@ VLKShader vlkCreateShader(VLKDevice device, char* vertPath, char* geomPath, char
 		OutputDebugStringA("Failed to open shader file.");
 		exit(1);
 	}
-	ReadFile((HANDLE)fileHandle, code, 15000, (LPDWORD)&codeSize, 0);
+	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
 	CloseHandle(fileHandle);
 
 	VkShaderModuleCreateInfo fragmentShaderCreationInfo = {};
@@ -750,6 +751,8 @@ VLKShader vlkCreateShader(VLKDevice device, char* vertPath, char* geomPath, char
 
 	VLKCheck(vkCreateShaderModule(device.device, &fragmentShaderCreationInfo, NULL, &shader.fragmentShaderModule),
 		"Could not create Fragment shader");
+
+	delete[] code;
 
 	VkBufferCreateInfo bufferCreateInfo = {};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -926,7 +929,7 @@ VLKPipeline vlkCreatePipeline(VLKDevice device, VLKSwapchain swapChain, VLKShade
 	vertexBindingDescription.stride = sizeof(Vertex);
 	vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-	VkVertexInputAttributeDescription vertexAttributeDescritpion[2];
+	VkVertexInputAttributeDescription vertexAttributeDescritpion[3];
 	vertexAttributeDescritpion[0].location = 0;
 	vertexAttributeDescritpion[0].binding = 0;
 	vertexAttributeDescritpion[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -1173,7 +1176,7 @@ void vlkSwap(VLKContext context, VLKDevice device, VLKSwapchain& swapChain) {
 	vkDestroySemaphore(device.device, swapChain.renderingCompleteSemaphore, NULL);
 }
 
-VLKTexture vlkCreateTexture(VLKDevice device, char* path) {
+VLKTexture vlkCreateTexture(VLKDevice& device, char* path) {
 	VLKTexture texture = {};
 
 	uint32_t width, height;

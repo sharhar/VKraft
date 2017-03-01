@@ -56,14 +56,14 @@ int main() {
 	double cts = glfwGetTime();
 	double dts = 0;
 
-	Camera::init(window, uniformBuffer.view);
-
 	VulkanRenderContext renderContext = {};
 	renderContext.device = device;
 	renderContext.swapChain = swapChain;
 	renderContext.uniformBuffer = &uniformBuffer;
 	renderContext.shader = shader;
 	renderContext.pipeline = pipeline;
+
+	Camera::init(window, uniformBuffer.view, &renderContext);
 
 	Cube::init();
 	Chunk::init(245325, window, &renderContext);
@@ -93,6 +93,7 @@ int main() {
 	}
 
 	Chunk::destroy(device);
+	Camera::destroy();
 
 	vlkDestroyShader(device, shader);
 	vlkDestroyDeviceandSwapChain(context, device, swapChain);

@@ -13,7 +13,6 @@ public:
 	static bool grounded;
 	static float* worldviewMat;
 	static GLFWwindow* window;
-	static GLFWwindow* gameWindow;
 
 	static Vec3* poss;
 	static int possSize;
@@ -23,6 +22,7 @@ public:
 	static Vec3 renderPos;
 	static Vec3 rot;
 
-	static void init(GLFWwindow* win, float* viewMat);
+	static void init(GLFWwindow* win, float* viewMat, VulkanRenderContext* vrc);
 	static void update(float dt);
+	static void destroy();
 };

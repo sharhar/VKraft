@@ -1,0 +1,14 @@
+#version 430
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 0, std430) buffer a {
+	vec3 pos[3068];
+} inArray;
+
+layout(binding = 1, std430) buffer b {
+	float dist[3068];
+} outArray;
+
+void main() {
+	outArray.dist[gl_GlobalInvocationID.x] = inArray.pos[gl_GlobalInvocationID.x].x;
+}

@@ -11,5 +11,5 @@ layout ( location = 0 ) in struct fragment_in {
 } IN;
 
 void main() {
-    uFragColor = texture(tex, IN.uv);
+	uFragColor = texture(tex, IN.uv);
 }

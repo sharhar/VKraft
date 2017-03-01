@@ -25,16 +25,7 @@ void main() {
 	int rct = vids & 15;
 	int rit = 0;
 
-	int sx = IN[0].rinf.x % 16;
-	int sy = (IN[0].rinf.x - sx)/16;
-
-	vec2 tex0 = vec2((sx + 0.0)/16.0, (sy + 0.0)/16.0);
-	vec2 tex1 = vec2((sx + 0.0)/16.0, (sy + 1.0)/16.0);
-	vec2 tex2 = vec2((sx + 1.0)/16.0, (sy + 1.0)/16.0);
-	vec2 tex3 = vec2((sx + 1.0)/16.0, (sy + 0.0)/16.0);
-
 	if(rct != 0) {
-		/*
 		int sx = IN[0].rinf.x % 16;
 		int sy = (IN[0].rinf.x - sx)/16;
 
@@ -42,7 +33,6 @@ void main() {
 		vec2 tex1 = vec2((sx + 0.0)/16.0, (sy + 1.0)/16.0);
 		vec2 tex2 = vec2((sx + 1.0)/16.0, (sy + 1.0)/16.0);
 		vec2 tex3 = vec2((sx + 1.0)/16.0, (sy + 0.0)/16.0);
-		*/
 
 		rit = vids & 1;
 

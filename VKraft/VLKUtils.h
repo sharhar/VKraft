@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <vulkan/vulkan.h>
-#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <assert.h>
 
@@ -101,6 +100,6 @@ void vlkDestroyPipeline(VLKDevice device, VLKPipeline pipeline);
 void vlkClear(VLKContext context, VLKDevice device, VLKSwapchain& swapChain);
 void vlkSwap(VLKContext context, VLKDevice device, VLKSwapchain& swapChain);
 
-VLKTexture vlkCreateTexture(VLKDevice device, char* path);
+VLKTexture vlkCreateTexture(VLKDevice& device, char* path);
 void vlkBindTexture(VLKDevice device, VLKShader shader, VLKTexture texture);
 void vlkDestroyTexture(VLKDevice device, VLKTexture texture);
