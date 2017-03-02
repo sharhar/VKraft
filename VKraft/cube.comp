@@ -2,13 +2,25 @@
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0, std430) buffer a {
-	vec3 pos[3068];
+	float data[12272];
 } inArray;
 
 layout(binding = 1, std430) buffer b {
-	float dist[3068];
+	float data[3068];
 } outArray;
 
+layout(binding = 2, std430) buffer c {
+	float data[6];
+} posArray;
+
 void main() {
-	outArray.dist[gl_GlobalInvocationID.x] = inArray.pos[gl_GlobalInvocationID.x].x;
+	float x = inArray.data[gl_GlobalInvocationID.x*4+0];
+	float y = inArray.data[gl_GlobalInvocationID.x*4+1];
+	float z = inArray.data[gl_GlobalInvocationID.x*4+2];
+	float rinf = inArray.data[gl_GlobalInvocationID.x*4+3];
+
+	vec3 pos = vec3(posArray.data[0], posArray.data[1], posArray.data[2]);
+	vec3 norm = vec3(posArray.data[3], posArray.data[4], posArray.data[5]);
+
+	outArray.data[gl_GlobalInvocationID.x] = pos.y;
 }
