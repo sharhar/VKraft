@@ -10,6 +10,14 @@ layout ( location = 0 ) in struct fragment_in {
     vec2 uv;
 } IN;
 
+layout ( location = 1 ) in flat struct fragment_in_sel {
+	int selected;
+} SEL;
+
 void main() {
-	uFragColor = texture(tex, IN.uv);
+	if(SEL.selected == 1) {
+		uFragColor = texture(tex, IN.uv)*1.35;
+	} else {
+		uFragColor = texture(tex, IN.uv);
+	}
 }

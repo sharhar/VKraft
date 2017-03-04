@@ -36,7 +36,7 @@ int main() {
 	CubeUniformBuffer uniformBuffer;
 	memcpy(uniformBuffer.proj, getPerspective(), sizeof(float) * 16);
 
-	VLKShader shader = vlkCreateShader(device, "vert.spv", "geom.spv", "frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
+	VLKShader shader = vlkCreateShader(device, "cube-vert.spv", "cube-geom.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
 	VLKPipeline pipeline = vlkCreatePipeline(device, swapChain, shader);
 
 	Vec3 pos = {0, 0, 1};
@@ -95,6 +95,8 @@ int main() {
 	Chunk::destroy(device);
 	Camera::destroy();
 
+	vlkDestroyTexture(device, texture);
+	vlkDestroyPipeline(device, pipeline);
 	vlkDestroyShader(device, shader);
 	vlkDestroyDeviceandSwapChain(context, device, swapChain);
 	vlkDestroyContext(context);

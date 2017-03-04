@@ -68,6 +68,7 @@ int Chunk::rsize = 0;
 uint32_t Chunk::cubeNum = 0;
 ChunkModelInfo* Chunk::model = 0;
 VulkanRenderContext* Chunk::renderContext = 0;
+ChunkThreadFreeInfo* Chunk::freeInfo = 0;
 
 Chunk* Chunk::getChunkAt(Vec3 pos) {
 	int sz = chunks.size();
@@ -120,7 +121,10 @@ static bool closeEnough(Vec3 pos, Vec3 other) {
 	return pos.dist(other) <= CHUNK_RAD;
 }
 
-static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
+static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkThreadFreeInfo* freeInfo) {
+	freeInfo->modelInfo = NULL;
+	freeInfo->pmodelInfo = NULL;
+
 	Chunk** closeChunks = new Chunk*[CHUNK_NUM];
 
 	for (int i = 0; i < CHUNK_NUM; i++) {
@@ -134,16 +138,12 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
 	int prcsz = 0;
 	int rcsz = 0;
 
-	ChunkModelInfo* pmodelInfo = NULL;
-	ChunkModelInfo* modelInfo = NULL;
-
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	commandPoolCreateInfo.queueFamilyIndex = vrc->device.presentQueueIdx;
 
-	VkCommandPool commandPool;
-	VLKCheck(vkCreateCommandPool(vrc->device.device, &commandPoolCreateInfo, NULL, &commandPool),
+	VLKCheck(vkCreateCommandPool(vrc->device.device, &commandPoolCreateInfo, NULL, &freeInfo->commandPool),
 		"Failed to create command pool");
 
 	while (!glfwWindowShouldClose(window)) {
@@ -270,10 +270,10 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
 				verts[i].rinf = rCubesPtr[i]->vid;
 			}
 
-			modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
-			modelInfo->full = true;
-			modelInfo->start = false;
-			modelInfo->model = vlkCreateModel(vrc->device, verts, rcsz);
+			freeInfo->modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
+			freeInfo->modelInfo->full = true;
+			freeInfo->modelInfo->start = false;
+			freeInfo->modelInfo->model = vlkCreateModel(vrc->device, verts, rcsz);
 
 			VkCommandBufferInheritanceInfo inheritanceInfo = {};
 			inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
@@ -295,11 +295,11 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
 
 			VkCommandBufferAllocateInfo commandBufferAllocationInfo = {};
 			commandBufferAllocationInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-			commandBufferAllocationInfo.commandPool = commandPool;
+			commandBufferAllocationInfo.commandPool = freeInfo->commandPool;
 			commandBufferAllocationInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
 			commandBufferAllocationInfo.commandBufferCount = vrc->swapChain.imageCount;
 
-			modelInfo->commandBuffer = new VkCommandBuffer[vrc->swapChain.imageCount];
+			freeInfo->modelInfo->commandBuffer = new VkCommandBuffer[vrc->swapChain.imageCount];
 
 			while (Chunk::m_fence > 0) {
 				if (glfwWindowShouldClose(window)) {
@@ -310,27 +310,27 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
 			}
 			Chunk::m_fence = 1;
 
-			VLKCheck(vkAllocateCommandBuffers(vrc->device.device, &commandBufferAllocationInfo, modelInfo->commandBuffer),
+			VLKCheck(vkAllocateCommandBuffers(vrc->device.device, &commandBufferAllocationInfo, freeInfo->modelInfo->commandBuffer),
 				"Failed to allocate command buffers");
 
 			for (int i = 0; i < vrc->swapChain.imageCount;i++) {
 				inheritanceInfo.framebuffer = vrc->swapChain.frameBuffers[i];
 
-				vkBeginCommandBuffer(modelInfo->commandBuffer[i], &beginInfo);
+				vkBeginCommandBuffer(freeInfo->modelInfo->commandBuffer[i], &beginInfo);
 
-				vkCmdSetViewport(modelInfo->commandBuffer[i], 0, 1, &viewport);
-				vkCmdSetScissor(modelInfo->commandBuffer[i], 0, 1, &scissor);
-				vkCmdBindPipeline(modelInfo->commandBuffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vrc->pipeline.pipeline);
-				vkCmdBindVertexBuffers(modelInfo->commandBuffer[i], 0, 1, &modelInfo->model.vertexInputBuffer, &offsets);
-				vkCmdBindDescriptorSets(modelInfo->commandBuffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+				vkCmdSetViewport(freeInfo->modelInfo->commandBuffer[i], 0, 1, &viewport);
+				vkCmdSetScissor(freeInfo->modelInfo->commandBuffer[i], 0, 1, &scissor);
+				vkCmdBindPipeline(freeInfo->modelInfo->commandBuffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vrc->pipeline.pipeline);
+				vkCmdBindVertexBuffers(freeInfo->modelInfo->commandBuffer[i], 0, 1, &freeInfo->modelInfo->model.vertexInputBuffer, &offsets);
+				vkCmdBindDescriptorSets(freeInfo->modelInfo->commandBuffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
 					vrc->pipeline.pipelineLayout, 0, 1, &vrc->shader.descriptorSet, 0, NULL);
 
-				vkCmdDraw(modelInfo->commandBuffer[i], rcsz, 1, 0, 0);
+				vkCmdDraw(freeInfo->modelInfo->commandBuffer[i], rcsz, 1, 0, 0);
 
-				vkEndCommandBuffer(modelInfo->commandBuffer[i]);
+				vkEndCommandBuffer(freeInfo->modelInfo->commandBuffer[i]);
 			}
 
-			Chunk::model = modelInfo;
+			Chunk::model = freeInfo->modelInfo;
 			Chunk::rcubesSize = rcsz;
 			Chunk::rcubes = rCubesPtr;
 
@@ -339,8 +339,8 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
 			delete[] verts;
 		}
 
-		if (pmodelInfo != NULL) {
-			while (!modelInfo->start || Chunk::m_fence > 0) {
+		if (freeInfo->pmodelInfo != NULL) {
+			while (!freeInfo->modelInfo->start || Chunk::m_fence > 0) {
 				if (glfwWindowShouldClose(window)) {
 					return;
 				}
@@ -350,16 +350,16 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
 
 			Chunk::m_fence = 1;
 
-			vkFreeCommandBuffers(vrc->device.device, commandPool, vrc->swapChain.imageCount, pmodelInfo->commandBuffer);
+			vkFreeCommandBuffers(vrc->device.device, freeInfo->commandPool, vrc->swapChain.imageCount, freeInfo->pmodelInfo->commandBuffer);
 
 			Chunk::m_fence = 0;
 			
-			vlkDestroyModel(vrc->device, pmodelInfo->model);
+			vlkDestroyModel(vrc->device, freeInfo->pmodelInfo->model);
 
-			free(pmodelInfo);
+			free(freeInfo->pmodelInfo);
 		}
 
-		pmodelInfo = modelInfo;
+		freeInfo->pmodelInfo = freeInfo->modelInfo;
 
 		if (pCubesPtr != NULL) {
 			for (int i = 0; i < prcsz; i++) {
@@ -372,6 +372,21 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc) {
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 	}
+
+	/*
+	if (modelInfo != NULL) {
+		vlkDestroyModel(vrc->device, modelInfo->model);
+
+		vkFreeCommandBuffers(vrc->device.device, commandPool, vrc->swapChain.imageCount, modelInfo->commandBuffer);
+
+		free(modelInfo);
+		modelInfo = NULL;
+	}
+
+	vkDestroyCommandPool(vrc->device.device, commandPool, NULL);
+
+	std::cout << "freed command pool\n";
+	*/
 }
 
 void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vulkanRenderContext) {
@@ -384,14 +399,26 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vul
 
 	renderContext = vulkanRenderContext;
 
-	chunkThread = new std::thread(chunkThreadRun, window, renderContext);
+	freeInfo = (ChunkThreadFreeInfo*)malloc(sizeof(ChunkThreadFreeInfo));
+
+	chunkThread = new std::thread(chunkThreadRun, window, renderContext, freeInfo);
 }
 
 void Chunk::destroy(VLKDevice device) {
 	chunkThread->join();
 
-	if (model->full) {
-		vlkDestroyModel(device, model->model);
+	vkDestroyCommandPool(device.device, freeInfo->commandPool, NULL);
+
+	if (freeInfo->pmodelInfo != NULL && freeInfo->pmodelInfo->full) {
+		vlkDestroyModel(device, freeInfo->pmodelInfo->model);
+		free(freeInfo->pmodelInfo);
+		freeInfo->pmodelInfo = NULL;
+	}
+
+	if (freeInfo->modelInfo != NULL && freeInfo->modelInfo->full) {
+		vlkDestroyModel(device, freeInfo->modelInfo->model);
+		free(freeInfo->modelInfo);
+		freeInfo->modelInfo = NULL;
 	}
 }
 
@@ -421,7 +448,10 @@ Chunk::Chunk(Vec3 pos) {
 		float xf = m_cubePos.x + x;
 		for (int z = 0; z < 16; z++) {
 			float zf = m_cubePos.z + z;
-			float nz = (noise->noise(xf / 25.0f, 0.8f, zf / 25.0f) - 0.5) * 16;
+			float nz1 = (noise->noise(xf / 100.0f, 0.8f, zf / 100.0f) - 0.5) * 64;
+			float nz2 = (noise->noise(xf / 25.0f, 2.7f, zf / 25.0f) - 0.5) * 16;
+
+			float nz = nz1 + nz2;
 
 			for (int y = 0; y < 16; y++) {
 				float yf = m_cubePos.y + y;
@@ -431,35 +461,33 @@ Chunk::Chunk(Vec3 pos) {
 				int type = 0;
 
 				if (yh <= 0) {
-					if (yh <= 0 && yh > -1) {
-						type = 1;
-					}
-					else if (yh <= -1 && yh > -5) {
-						type = 2;
-					}
-					else {
-						float cnzc = noise->noise(xf / 5.0f, yf / 5.0f, zf / 5.0f);
-						float inzc = noise->noise(xf / 2.50f, yf / 2.50f, zf / 2.50f);
-
-						if (cnzc > 0.8) {
-							type = 4;
-						}
-						else if (inzc > 0.8) {
-							type = 5;
-						}
-						else {
-							type = 3;
-						}
-
-					}
-
 					float nzc = noise->noise(xf / 25.0f, yf / 25.0f, zf / 25.0f);
 
-					if (nzc > 0.7) {
+					if (nzc < 0.7) {
+						if (yh <= 0 && yh > -1) {
+							type = 1;
+						}
+						else if (yh <= -1 && yh > -5) {
+							type = 2;
+						}
+						else {
+							float cnzc = noise->noise(xf / 5.0f, yf / 5.0f, zf / 5.0f);
+							float inzc = noise->noise(xf / 2.50f, yf / 2.50f, zf / 2.50f);
+
+							if (cnzc > 0.8) {
+								type = 4;
+							}
+							else if (inzc > 0.8) {
+								type = 5;
+							}
+							else {
+								type = 3;
+							}
+
+						}
+					} else {
 						type = 0;
 					}
-
-
 				}
 
 				cubes[x * 256 + y * 16 + z] = new Cube({ xf, yf, zf }, type);

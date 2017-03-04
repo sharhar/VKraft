@@ -259,7 +259,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	VkDescriptorPoolCreateInfo descriptorCreateInfo = {};
 	descriptorCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descriptorCreateInfo.pNext = NULL;
-	descriptorCreateInfo.flags = 0;
+	descriptorCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	descriptorCreateInfo.maxSets = 1;
 	descriptorCreateInfo.poolSizeCount = 1;
 	descriptorCreateInfo.pPoolSizes = &descriptorPoolSize;
@@ -350,6 +350,28 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	return context;
 }
 
+void destroyComputeContext(VulkanRenderContext* vrc, VLKComputeContext& context) {
+	vkFreeCommandBuffers(vrc->device.device, context.commandPool, 1, &context.computeCmdBuffer);
+	vkDestroyCommandPool(vrc->device.device, context.commandPool, NULL);
+
+	vkFreeDescriptorSets(vrc->device.device, context.descriptorPool, 1, &context.descriptorSet);
+	vkDestroyDescriptorPool(vrc->device.device, context.descriptorPool, NULL);
+	vkDestroyDescriptorSetLayout(vrc->device.device, context.descriptorSetLayout, NULL);
+
+	vkDestroyPipeline(vrc->device.device, context.pipeline, NULL);
+	vkDestroyPipelineLayout(vrc->device.device, context.pipelineLayout, NULL);
+
+	vkDestroyShaderModule(vrc->device.device, context.shader, NULL);
+
+	vkFreeMemory(vrc->device.device, context.inMemory, NULL);
+	vkFreeMemory(vrc->device.device, context.outMemory, NULL);
+	vkFreeMemory(vrc->device.device, context.posMemory, NULL);
+
+	vkDestroyBuffer(vrc->device.device, context.inBuffer, NULL);
+	vkDestroyBuffer(vrc->device.device, context.outBuffer, NULL);
+	vkDestroyBuffer(vrc->device.device, context.posBuffer, NULL);
+}
+
 static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 	std::vector<Cube*> closeCubes;
 	Vec3* pvecs = NULL;
@@ -390,13 +412,20 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 		}
 
 		if (cbsz > 0) {
+			float tx = Camera::rot.x;
+			float ty = Camera::rot.y;
+
+			float nx = sin(ty*DEG_TO_RAD)*cos(tx*DEG_TO_RAD);
+			float ny = sin(tx*DEG_TO_RAD);
+			float nz = -cos(ty*DEG_TO_RAD)*cos(tx*DEG_TO_RAD);
+
 			float* posData = new float[6];
-			posData[0] = 0;
-			posData[1] = 4.3f;
-			posData[2] = 0;
-			posData[3] = 0;
-			posData[4] = 0;
-			posData[5] = 0;
+			posData[0] = Camera::pos.x;
+			posData[1] = Camera::pos.y + 0.5f;
+			posData[2] = Camera::pos.z;
+			posData[3] = nx;
+			posData[4] = ny;
+			posData[5] = nz;
 
 			void *mapped;
 			vkMapMemory(vrc->device.device, context.posMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
@@ -476,11 +505,19 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 
 			float* data = (float*)mapped;
 
+			float closest = 10;
+			int id = -1;
+
 			for (int i = 0; i < cbsz; i++) {
-				if (data[i] != 4.3f) {
-					std::cout << "Wrong\n";
+				if (data[i] != -1 && data[i] < closest) {
+					closest = data[i];
+					id = i;
 				}
 			}
+
+			vrc->uniformBuffer->selected.x = vecs[id].x;
+			vrc->uniformBuffer->selected.y = vecs[id].y;
+			vrc->uniformBuffer->selected.z = vecs[id].z;
 
 			vkUnmapMemory(vrc->device.device, context.outMemory);
 		}
@@ -504,6 +541,9 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 	}
+
+	vkDestroyFence(vrc->device.device, fence, NULL);
+	destroyComputeContext(vrc, context);
 }
 
 void Camera::init(GLFWwindow* win, float* viewMat, VulkanRenderContext* vrc) {

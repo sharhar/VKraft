@@ -15,6 +15,8 @@ typedef struct CubeUniformBuffer {
 		0, 1, 0, 0,
 		0, 0, 1, 0,
 		0, 0, 0, 1 };
+
+	Vec3 selected = { 0, -9, 0 };
 } CubeUniformBuffer;
 
 typedef struct ChunkModelInfo {
@@ -31,6 +33,12 @@ typedef struct VulkanRenderContext {
 	VLKPipeline pipeline;
 	CubeUniformBuffer* uniformBuffer;
 } VulkanRenderContext;
+
+typedef struct ChunkThreadFreeInfo {
+	VkCommandPool commandPool;
+	ChunkModelInfo* modelInfo;
+	ChunkModelInfo* pmodelInfo;
+} ChunkThreadFreeInfo;
 
 class Cube {
 public:
@@ -74,6 +82,7 @@ public:
 
 	static uint32_t cubeNum;
 	static ChunkModelInfo* model;
+	static ChunkThreadFreeInfo* freeInfo;
 	static VulkanRenderContext* renderContext;
 
 	Cube** cubes;
@@ -87,6 +96,6 @@ public:
 	void recalcqrid();
 	void findChunks();
 
-	friend static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vulkanRenderContext);
+	friend static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vulkanRenderContext, ChunkThreadFreeInfo* freeInfo);
 	friend static void recalcChunksNextTo(Chunk* chunk);
 };

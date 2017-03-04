@@ -13,9 +13,15 @@ layout( location = 0 ) out struct geom_out {
     vec2 uv;
 } OUT;
 
+layout ( location = 1 ) out struct geom_out_sel {
+	int selected;
+} SEL;
+
 layout( std140, binding = 0 ) uniform UniformBufferObject {
 	mat4 view;
 	mat4 proj;
+
+	vec3 selected;
 } UBO;
 
 void main() {
@@ -24,6 +30,12 @@ void main() {
 
 	int rct = vids & 15;
 	int rit = 0;
+
+	int selected = 0;
+
+	if(gl_in[0].gl_Position.x == UBO.selected.x && gl_in[0].gl_Position.y == 0.5-UBO.selected.y && gl_in[0].gl_Position.z == UBO.selected.z) {
+		selected = 1;
+	}
 
 	if(rct != 0) {
 		int sx = IN[0].rinf.x % 16;
@@ -40,27 +52,33 @@ void main() {
 			//Front Face
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, -0.5, 0.0));
 			OUT.uv = tex3;
+			SEL.selected = selected;
 			EmitVertex();
 	
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, -0.5, 0.0));
 			OUT.uv = tex1;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, -0.5, -0.5, 0.0));
 			OUT.uv = tex0;
+			SEL.selected = selected;
 			EmitVertex();
 			EndPrimitive();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, 0.5, -0.5, 0.0));
 			OUT.uv = tex2;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, -0.5, 0.0));
 			OUT.uv = tex1;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, -0.5, 0.0));
 			OUT.uv = tex3;
+			SEL.selected = selected;
 			EmitVertex();
 			EndPrimitive();
 		}
@@ -71,27 +89,33 @@ void main() {
 			//Back Face
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, -0.5, 0.5, 0.0));
 			OUT.uv = tex0;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, 0.5, 0.0));
 			OUT.uv = tex1;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, 0.5, 0.0));
 			OUT.uv = tex3;
+			SEL.selected = selected;
 			EmitVertex();
 			EndPrimitive();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, 0.5, 0.0));
 			OUT.uv = tex3;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, 0.5, 0.0));
 			OUT.uv = tex1;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, 0.5, 0.5, 0.0));
 			OUT.uv = tex2;
+			SEL.selected = selected;
 			EmitVertex();
 			EndPrimitive();
 		}
@@ -102,27 +126,33 @@ void main() {
 			//Right Face
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, 0.5, 0.0));
 			OUT.uv = tex3;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, 0.5, -0.5, 0.0));
 			OUT.uv = tex1;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, -0.5, 0.0));
 			OUT.uv = tex0;
+			SEL.selected = selected;
 			EmitVertex();
 			EndPrimitive();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, 0.5, 0.5, 0.0));
 			OUT.uv = tex2;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, 0.5, -0.5, 0.0));
 			OUT.uv = tex1;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, 0.5, 0.0));
 			OUT.uv = tex3;
+			SEL.selected = selected;
 			EmitVertex();
 			EndPrimitive();
 		}
@@ -133,27 +163,33 @@ void main() {
 			//Left Face
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, -0.5, -0.5, 0.0));
 			OUT.uv = tex0;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, -0.5, 0.0));
 			OUT.uv = tex1;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, -0.5, 0.5, 0.0));
 			OUT.uv = tex3;
+			SEL.selected = selected;
 			EmitVertex();
 			EndPrimitive();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, -0.5, 0.5, 0.0));
 			OUT.uv = tex3;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, -0.5, 0.0));
 			OUT.uv = tex1;
+			SEL.selected = selected;
 			EmitVertex();
 
 			gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, 0.5, 0.0));
 			OUT.uv = tex2;
+			SEL.selected = selected;
 			EmitVertex();
 			EndPrimitive();
 		}
@@ -174,27 +210,33 @@ void main() {
 		//Top Face
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, 0.5, 0.0));
 		OUT.uv = tex2t;
+		SEL.selected = selected;
 		EmitVertex();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, -0.5, -0.5, 0.0));
 		OUT.uv = tex0t;
+		SEL.selected = selected;
 		EmitVertex();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, -0.5, 0.5, 0.0));
 		OUT.uv = tex1t;
+		SEL.selected = selected;
 		EmitVertex();
 		EndPrimitive();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, -0.5, 0.0));
 		OUT.uv = tex3t;
+		SEL.selected = selected;
 		EmitVertex();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, -0.5, -0.5, 0.0));
 		OUT.uv = tex0t;
+		SEL.selected = selected;
 		EmitVertex();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, -0.5, 0.5, 0.0));
 		OUT.uv = tex2t;
+		SEL.selected = selected;
 		EmitVertex();
 		EndPrimitive();
 	}
@@ -213,27 +255,33 @@ void main() {
 		//Bottom Face
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, 0.5, 0.0));
 		OUT.uv = tex1b;
+		SEL.selected = selected;
 		EmitVertex();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, -0.5, 0.0));
 		OUT.uv = tex0b;
+		SEL.selected = selected;
 		EmitVertex();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, 0.5, 0.5, 0.0));
 		OUT.uv = tex2b;
+		SEL.selected = selected;
 		EmitVertex();
 		EndPrimitive();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, 0.5, 0.5, 0.0));
 		OUT.uv = tex2b;
+		SEL.selected = selected;
 		EmitVertex();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(-0.5, 0.5, -0.5, 0.0));
 		OUT.uv = tex0b;
+		SEL.selected = selected;
 		EmitVertex();
 
 		gl_Position = trans * (gl_in[0].gl_Position + vec4(0.5, 0.5, -0.5, 0.0));
 		OUT.uv = tex3b;
+		SEL.selected = selected;
 		EmitVertex();
 		EndPrimitive();
 	}
