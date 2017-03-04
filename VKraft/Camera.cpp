@@ -20,10 +20,10 @@ VLKComputeContext Camera::context = {};
 VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	VLKComputeContext context = { };
 
-	vkGetDeviceQueue(vrc->device.device, vrc->device.presentQueueIdx, 1, &context.computeQueue);
+	vkGetDeviceQueue(vrc->device->device, vrc->device->presentQueueIdx, 1, &context.computeQueue);
 
 	VkPhysicalDeviceMemoryProperties properties;
-	vkGetPhysicalDeviceMemoryProperties(vrc->device.physicalDevice, &properties);
+	vkGetPhysicalDeviceMemoryProperties(vrc->device->physicalDevice, &properties);
 
 	VkBufferCreateInfo inputBufferInfo = {};
 	inputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -31,9 +31,9 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	inputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	inputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	inputBufferInfo.queueFamilyIndexCount = 1;
-	inputBufferInfo.pQueueFamilyIndices = &vrc->device.presentQueueIdx;
+	inputBufferInfo.pQueueFamilyIndices = &vrc->device->presentQueueIdx;
 
-	VLKCheck(vkCreateBuffer(vrc->device.device, &inputBufferInfo, NULL, &context.inBuffer),
+	VLKCheck(vkCreateBuffer(vrc->device->device, &inputBufferInfo, NULL, &context.inBuffer),
 		"Could not create input buffer");
 
 	VkDeviceSize memorySize = 3068 * 4 * sizeof(float);
@@ -56,18 +56,18 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	memoryAllocateInfo.allocationSize = memorySize;
 	memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
 
-	VLKCheck(vkAllocateMemory(vrc->device.device, &memoryAllocateInfo, 0, &context.inMemory),
+	VLKCheck(vkAllocateMemory(vrc->device->device, &memoryAllocateInfo, 0, &context.inMemory),
 		"Could not allocate memory");
 
 	void* mapped;
-	VLKCheck(vkMapMemory(vrc->device.device, context.inMemory, 0, memorySize, 0, &mapped),
+	VLKCheck(vkMapMemory(vrc->device->device, context.inMemory, 0, memorySize, 0, &mapped),
 		"Could not map memory");
 
 	memset(mapped, 0, 3068 * 4 * sizeof(float));
 
-	vkUnmapMemory(vrc->device.device, context.inMemory);
+	vkUnmapMemory(vrc->device->device, context.inMemory);
 
-	vkBindBufferMemory(vrc->device.device, context.inBuffer, context.inMemory, 0);
+	vkBindBufferMemory(vrc->device->device, context.inBuffer, context.inMemory, 0);
 
 	VkBufferCreateInfo outputBufferInfo = {};
 	outputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -75,9 +75,9 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	outputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	outputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	outputBufferInfo.queueFamilyIndexCount = 1;
-	outputBufferInfo.pQueueFamilyIndices = &vrc->device.presentQueueIdx;
+	outputBufferInfo.pQueueFamilyIndices = &vrc->device->presentQueueIdx;
 
-	VLKCheck(vkCreateBuffer(vrc->device.device, &outputBufferInfo, NULL, &context.outBuffer),
+	VLKCheck(vkCreateBuffer(vrc->device->device, &outputBufferInfo, NULL, &context.outBuffer),
 		"Could not create input buffer");
 
 	memorySize = 3068 * sizeof(float);
@@ -99,17 +99,17 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	memoryAllocateInfo.allocationSize = memorySize;
 	memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
 	
-	VLKCheck(vkAllocateMemory(vrc->device.device, &memoryAllocateInfo, 0, &context.outMemory),
+	VLKCheck(vkAllocateMemory(vrc->device->device, &memoryAllocateInfo, 0, &context.outMemory),
 		"Could not allocate memory");
 
-	VLKCheck(vkMapMemory(vrc->device.device, context.outMemory, 0, memorySize, 0, &mapped),
+	VLKCheck(vkMapMemory(vrc->device->device, context.outMemory, 0, memorySize, 0, &mapped),
 		"Could not map memory");
 
 	memset(mapped, 0, 3068 * sizeof(float));
 
-	vkUnmapMemory(vrc->device.device, context.outMemory);
+	vkUnmapMemory(vrc->device->device, context.outMemory);
 
-	vkBindBufferMemory(vrc->device.device, context.outBuffer, context.outMemory, 0);
+	vkBindBufferMemory(vrc->device->device, context.outBuffer, context.outMemory, 0);
 
 	VkBufferCreateInfo posBufferInfo = {};
 	posBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -117,9 +117,9 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	posBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	posBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	posBufferInfo.queueFamilyIndexCount = 1;
-	posBufferInfo.pQueueFamilyIndices = &vrc->device.presentQueueIdx;
+	posBufferInfo.pQueueFamilyIndices = &vrc->device->presentQueueIdx;
 
-	VLKCheck(vkCreateBuffer(vrc->device.device, &posBufferInfo, NULL, &context.posBuffer),
+	VLKCheck(vkCreateBuffer(vrc->device->device, &posBufferInfo, NULL, &context.posBuffer),
 		"Could not create input buffer");
 
 	memorySize = 6 * sizeof(float);
@@ -141,17 +141,17 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	memoryAllocateInfo.allocationSize = memorySize;
 	memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
 
-	VLKCheck(vkAllocateMemory(vrc->device.device, &memoryAllocateInfo, 0, &context.posMemory),
+	VLKCheck(vkAllocateMemory(vrc->device->device, &memoryAllocateInfo, 0, &context.posMemory),
 		"Could not allocate memory");
 
-	VLKCheck(vkMapMemory(vrc->device.device, context.posMemory, 0, memorySize, 0, &mapped),
+	VLKCheck(vkMapMemory(vrc->device->device, context.posMemory, 0, memorySize, 0, &mapped),
 		"Could not map memory");
 
 	memset(mapped, 0, 6 * sizeof(float));
 
-	vkUnmapMemory(vrc->device.device, context.posMemory);
+	vkUnmapMemory(vrc->device->device, context.posMemory);
 
-	vkBindBufferMemory(vrc->device.device, context.posBuffer, context.posMemory, 0);
+	vkBindBufferMemory(vrc->device->device, context.posBuffer, context.posMemory, 0);
 
 	uint32_t codeSize;
 	char* code = new char[20000];
@@ -170,7 +170,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	vertexShaderCreationInfo.codeSize = codeSize;
 	vertexShaderCreationInfo.pCode = (uint32_t *)code;
 
-	VLKCheck(vkCreateShaderModule(vrc->device.device, &vertexShaderCreationInfo, NULL, &context.shader),
+	VLKCheck(vkCreateShaderModule(vrc->device->device, &vertexShaderCreationInfo, NULL, &context.shader),
 		"Failed to create vertex shader module");
 
 	delete[] code;
@@ -199,7 +199,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	setLayoutCreateInfo.bindingCount = 3;
 	setLayoutCreateInfo.pBindings = bindings;
 
-	VLKCheck(vkCreateDescriptorSetLayout(vrc->device.device, &setLayoutCreateInfo, NULL, &context.descriptorSetLayout),
+	VLKCheck(vkCreateDescriptorSetLayout(vrc->device->device, &setLayoutCreateInfo, NULL, &context.descriptorSetLayout),
 		"Failed to create DescriptorSetLayout");
 
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
@@ -211,7 +211,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 	pipelineLayoutCreateInfo.pPushConstantRanges = NULL;
 
-	VLKCheck(vkCreatePipelineLayout(vrc->device.device, &pipelineLayoutCreateInfo, NULL, &context.pipelineLayout),
+	VLKCheck(vkCreatePipelineLayout(vrc->device->device, &pipelineLayoutCreateInfo, NULL, &context.pipelineLayout),
 		"Failed ot create pipline layout");
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo = {};
@@ -228,7 +228,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	pipelineCreateInfo.layout = context.pipelineLayout;
 	pipelineCreateInfo.stage = shaderStageCreateInfo;
 
-	VLKCheck(vkCreateComputePipelines(vrc->device.device, NULL, 1, &pipelineCreateInfo, NULL, &context.pipeline),
+	VLKCheck(vkCreateComputePipelines(vrc->device->device, NULL, 1, &pipelineCreateInfo, NULL, &context.pipeline),
 		"Failed to create pipeline");
 
 	VkDescriptorPoolSize descriptorPoolSize = {};
@@ -243,7 +243,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	descriptorCreateInfo.poolSizeCount = 1;
 	descriptorCreateInfo.pPoolSizes = &descriptorPoolSize;
 
-	VLKCheck(vkCreateDescriptorPool(vrc->device.device, &descriptorCreateInfo, 0, &context.descriptorPool),
+	VLKCheck(vkCreateDescriptorPool(vrc->device->device, &descriptorCreateInfo, 0, &context.descriptorPool),
 		"Failed to create discriptor pool");
 
 	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
@@ -253,7 +253,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	descriptorSetAllocateInfo.descriptorSetCount = 1;
 	descriptorSetAllocateInfo.pSetLayouts = &context.descriptorSetLayout;
 
-	VLKCheck(vkAllocateDescriptorSets(vrc->device.device, &descriptorSetAllocateInfo, &context.descriptorSet), 
+	VLKCheck(vkAllocateDescriptorSets(vrc->device->device, &descriptorSetAllocateInfo, &context.descriptorSet),
 		"Failed to create descriptor set");
 
 	VkDescriptorBufferInfo inDescriptorBuffer = {};
@@ -305,15 +305,15 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	writeDescriptorSet[2].pImageInfo = NULL;
 	writeDescriptorSet[2].pTexelBufferView = NULL;
 
-	vkUpdateDescriptorSets(vrc->device.device, 3, writeDescriptorSet, 0, 0);
+	vkUpdateDescriptorSets(vrc->device->device, 3, writeDescriptorSet, 0, 0);
 
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.pNext = NULL;
 	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	commandPoolCreateInfo.queueFamilyIndex = vrc->device.presentQueueIdx;
+	commandPoolCreateInfo.queueFamilyIndex = vrc->device->presentQueueIdx;
 
-	VLKCheck(vkCreateCommandPool(vrc->device.device, &commandPoolCreateInfo, NULL, &context.commandPool), 
+	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &context.commandPool),
 		"Failed to create command pool");
 
 	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
@@ -323,7 +323,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	commandBufferAllocateInfo.commandPool = context.commandPool;
 	commandBufferAllocateInfo.commandBufferCount = 1;
 
-	VLKCheck(vkAllocateCommandBuffers(vrc->device.device, &commandBufferAllocateInfo, &context.computeCmdBuffer),
+	VLKCheck(vkAllocateCommandBuffers(vrc->device->device, &commandBufferAllocateInfo, &context.computeCmdBuffer),
 		"Failed to create command pool");
 
 	VkFenceCreateInfo fenceCreateInfo = {};
@@ -331,34 +331,34 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	fenceCreateInfo.pNext = NULL;
 	fenceCreateInfo.flags = 0;
 
-	VLKCheck(vkCreateFence(vrc->device.device, &fenceCreateInfo, NULL, &context.fence),
+	VLKCheck(vkCreateFence(vrc->device->device, &fenceCreateInfo, NULL, &context.fence),
 		"Failed ot create fence");
 
 	return context;
 }
 
-void destroyComputeContext(VLKDevice device, VLKComputeContext& context) {
-	vkDestroyFence(device.device, context.fence, NULL);
+void destroyComputeContext(VLKDevice* device, VLKComputeContext& context) {
+	vkDestroyFence(device->device, context.fence, NULL);
 	
-	vkFreeCommandBuffers(device.device, context.commandPool, 1, &context.computeCmdBuffer);
-	vkDestroyCommandPool(device.device, context.commandPool, NULL);
+	vkFreeCommandBuffers(device->device, context.commandPool, 1, &context.computeCmdBuffer);
+	vkDestroyCommandPool(device->device, context.commandPool, NULL);
 
-	vkFreeDescriptorSets(device.device, context.descriptorPool, 1, &context.descriptorSet);
-	vkDestroyDescriptorPool(device.device, context.descriptorPool, NULL);
-	vkDestroyDescriptorSetLayout(device.device, context.descriptorSetLayout, NULL);
+	vkFreeDescriptorSets(device->device, context.descriptorPool, 1, &context.descriptorSet);
+	vkDestroyDescriptorPool(device->device, context.descriptorPool, NULL);
+	vkDestroyDescriptorSetLayout(device->device, context.descriptorSetLayout, NULL);
 
-	vkDestroyPipeline(device.device, context.pipeline, NULL);
-	vkDestroyPipelineLayout(device.device, context.pipelineLayout, NULL);
+	vkDestroyPipeline(device->device, context.pipeline, NULL);
+	vkDestroyPipelineLayout(device->device, context.pipelineLayout, NULL);
 
-	vkDestroyShaderModule(device.device, context.shader, NULL);
+	vkDestroyShaderModule(device->device, context.shader, NULL);
 
-	vkFreeMemory(device.device, context.inMemory, NULL);
-	vkFreeMemory(device.device, context.outMemory, NULL);
-	vkFreeMemory(device.device, context.posMemory, NULL);
+	vkFreeMemory(device->device, context.inMemory, NULL);
+	vkFreeMemory(device->device, context.outMemory, NULL);
+	vkFreeMemory(device->device, context.posMemory, NULL);
 
-	vkDestroyBuffer(device.device, context.inBuffer, NULL);
-	vkDestroyBuffer(device.device, context.outBuffer, NULL);
-	vkDestroyBuffer(device.device, context.posBuffer, NULL);
+	vkDestroyBuffer(device->device, context.inBuffer, NULL);
+	vkDestroyBuffer(device->device, context.outBuffer, NULL);
+	vkDestroyBuffer(device->device, context.posBuffer, NULL);
 }
 
 static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComputeContext* context) {
@@ -406,7 +406,7 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			posData[5] = nz;
 
 			void *mapped;
-			vkMapMemory(vrc->device.device, context->posMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
+			vkMapMemory(vrc->device->device, context->posMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
 
 			memcpy(mapped, posData, 6 * sizeof(float));
 
@@ -415,9 +415,9 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			memoryRange.memory = context->posMemory;
 			memoryRange.offset = 0;
 			memoryRange.size = VK_WHOLE_SIZE;
-			vkFlushMappedMemoryRanges(vrc->device.device, 1, &memoryRange);
+			vkFlushMappedMemoryRanges(vrc->device->device, 1, &memoryRange);
 
-			vkUnmapMemory(vrc->device.device, context->posMemory);
+			vkUnmapMemory(vrc->device->device, context->posMemory);
 
 			float* inputData = new float[4 * cbsz];
 
@@ -428,7 +428,7 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 				inputData[i * 4 + 3] = (float)closeCubes[i]->vid;
 			}
 
-			vkMapMemory(vrc->device.device, context->inMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
+			vkMapMemory(vrc->device->device, context->inMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
 
 			memcpy(mapped, inputData, cbsz * 4 * sizeof(float));
 
@@ -436,9 +436,9 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			memoryRange.memory = context->inMemory;
 			memoryRange.offset = 0;
 			memoryRange.size = VK_WHOLE_SIZE;
-			vkFlushMappedMemoryRanges(vrc->device.device, 1, &memoryRange);
+			vkFlushMappedMemoryRanges(vrc->device->device, 1, &memoryRange);
 
-			vkUnmapMemory(vrc->device.device, context->inMemory);
+			vkUnmapMemory(vrc->device->device, context->inMemory);
 
 			delete[] posData;
 			delete[] inputData;
@@ -476,10 +476,10 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			VLKCheck(vkQueueSubmit(context->computeQueue, 1, &submitInfo, context->fence),
 				"Failed to submit Queue");
 
-			vkWaitForFences(vrc->device.device, 1, &context->fence, VK_TRUE, UINT64_MAX);
-			vkResetFences(vrc->device.device, 1, &context->fence);
+			vkWaitForFences(vrc->device->device, 1, &context->fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(vrc->device->device, 1, &context->fence);
 
-			vkMapMemory(vrc->device.device, context->outMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
+			vkMapMemory(vrc->device->device, context->outMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
 
 			float* data = (float*)mapped;
 
@@ -493,11 +493,17 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 				}
 			}
 
-			vrc->uniformBuffer->selected.x = vecs[id].x;
-			vrc->uniformBuffer->selected.y = vecs[id].y;
-			vrc->uniformBuffer->selected.z = vecs[id].z;
+			if (id != -1) {
+				vrc->uniformBuffer->selected.x = vecs[id].x;
+				vrc->uniformBuffer->selected.y = vecs[id].y;
+				vrc->uniformBuffer->selected.z = vecs[id].z;
+			} else {
+				vrc->uniformBuffer->selected.x = 0.25f;
+				vrc->uniformBuffer->selected.y = 0.25f;
+				vrc->uniformBuffer->selected.z = 0.25f;
+			}
 
-			vkUnmapMemory(vrc->device.device, context->outMemory);
+			vkUnmapMemory(vrc->device->device, context->outMemory);
 		}
 
 		while (Camera::fence > 0) {
@@ -676,7 +682,7 @@ void Camera::update(float dt) {
 	getWorldview(worldviewMat, renderPos, rot);
 }
 
-void Camera::destroy(VLKDevice device) {
+void Camera::destroy(VLKDevice* device) {
 	cameraThread->join();
 
 	destroyComputeContext(device, context);

@@ -19,8 +19,8 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
 	}
 }
 
-VLKModel createCursorModel(VLKDevice device, float* verts, uint32_t vertNum) {
-	VLKModel model = {};
+VLKModel* createCursorModel(VLKDevice* device, float* verts, uint32_t vertNum) {
+	VLKModel* model = (VLKModel*)malloc(sizeof(VLKModel));
 
 	VkBufferCreateInfo vertexInputBufferInfo = {};
 	vertexInputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -28,11 +28,11 @@ VLKModel createCursorModel(VLKDevice device, float* verts, uint32_t vertNum) {
 	vertexInputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	vertexInputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	VLKCheck(vkCreateBuffer(device.device, &vertexInputBufferInfo, NULL, &model.vertexInputBuffer),
+	VLKCheck(vkCreateBuffer(device->device, &vertexInputBufferInfo, NULL, &model->vertexInputBuffer),
 		"Failed to create vertex input buffer.");
 
 	VkMemoryRequirements vertexBufferMemoryRequirements = {};
-	vkGetBufferMemoryRequirements(device.device, model.vertexInputBuffer,
+	vkGetBufferMemoryRequirements(device->device, model->vertexInputBuffer,
 		&vertexBufferMemoryRequirements);
 
 	VkMemoryAllocateInfo bufferAllocateInfo = {};
@@ -42,7 +42,7 @@ VLKModel createCursorModel(VLKDevice device, float* verts, uint32_t vertNum) {
 	uint32_t vertexMemoryTypeBits = vertexBufferMemoryRequirements.memoryTypeBits;
 	VkMemoryPropertyFlags vertexDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 	for (uint32_t i = 0; i < 32; ++i) {
-		VkMemoryType memoryType = device.memoryProperties.memoryTypes[i];
+		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
 		if (vertexMemoryTypeBits & 1) {
 			if ((memoryType.propertyFlags & vertexDesiredMemoryFlags) == vertexDesiredMemoryFlags) {
 				bufferAllocateInfo.memoryTypeIndex = i;
@@ -52,25 +52,31 @@ VLKModel createCursorModel(VLKDevice device, float* verts, uint32_t vertNum) {
 		vertexMemoryTypeBits = vertexMemoryTypeBits >> 1;
 	}
 
-	VLKCheck(vkAllocateMemory(device.device, &bufferAllocateInfo, NULL, &model.vertexBufferMemory),
+	VLKCheck(vkAllocateMemory(device->device, &bufferAllocateInfo, NULL, &model->vertexBufferMemory),
 		"Failed to allocate buffer memory");
 
 	void *mapped;
-	VLKCheck(vkMapMemory(device.device, model.vertexBufferMemory, 0, VK_WHOLE_SIZE, 0, &mapped),
+	VLKCheck(vkMapMemory(device->device, model->vertexBufferMemory, 0, VK_WHOLE_SIZE, 0, &mapped),
 		"Failed to map buffer memory");
 
 	memcpy(mapped, verts, sizeof(float) * 4 * vertNum);
 
-	vkUnmapMemory(device.device, model.vertexBufferMemory);
+	vkUnmapMemory(device->device, model->vertexBufferMemory);
 
-	VLKCheck(vkBindBufferMemory(device.device, model.vertexInputBuffer, model.vertexBufferMemory, 0),
+	VLKCheck(vkBindBufferMemory(device->device, model->vertexInputBuffer, model->vertexBufferMemory, 0),
 		"Failed to bind buffer memory");
 
 	return model;
 }
 
-VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
-	VLKShader shader = {};
+void destroyCursorModel(VLKDevice* device, VLKModel* model) {
+	vkFreeMemory(device->device, model->vertexBufferMemory, NULL);
+	vkDestroyBuffer(device->device, model->vertexInputBuffer, NULL);
+	free(model);
+}
+
+VLKShader* createCursorShader(VLKDevice* device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
+	VLKShader* shader = (VLKShader*)malloc(sizeof(VLKShader));
 
 	uint32_t codeSize;
 	char* code = new char[20000];
@@ -89,7 +95,7 @@ VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, v
 	vertexShaderCreationInfo.codeSize = codeSize;
 	vertexShaderCreationInfo.pCode = (uint32_t *)code;
 
-	VLKCheck(vkCreateShaderModule(device.device, &vertexShaderCreationInfo, NULL, &shader.vertexShaderModule),
+	VLKCheck(vkCreateShaderModule(device->device, &vertexShaderCreationInfo, NULL, &shader->vertexShaderModule),
 		"Failed to create vertex shader module");
 
 	fileHandle = CreateFile(fragPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -105,7 +111,7 @@ VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, v
 	fragmentShaderCreationInfo.codeSize = codeSize;
 	fragmentShaderCreationInfo.pCode = (uint32_t *)code;
 
-	VLKCheck(vkCreateShaderModule(device.device, &fragmentShaderCreationInfo, NULL, &shader.fragmentShaderModule),
+	VLKCheck(vkCreateShaderModule(device->device, &fragmentShaderCreationInfo, NULL, &shader->fragmentShaderModule),
 		"Could not create Fragment shader");
 
 	delete[] code;
@@ -116,11 +122,11 @@ VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, v
 	bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	VLKCheck(vkCreateBuffer(device.device, &bufferCreateInfo, NULL, &shader.buffer),
+	VLKCheck(vkCreateBuffer(device->device, &bufferCreateInfo, NULL, &shader->buffer),
 		"Failed to create uniforms buffer");
 
 	VkMemoryRequirements bufferMemoryRequirements = {};
-	vkGetBufferMemoryRequirements(device.device, shader.buffer, &bufferMemoryRequirements);
+	vkGetBufferMemoryRequirements(device->device, shader->buffer, &bufferMemoryRequirements);
 
 	VkMemoryAllocateInfo matrixAllocateInfo = {};
 	matrixAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -129,7 +135,7 @@ VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, v
 	uint32_t uniformMemoryTypeBits = bufferMemoryRequirements.memoryTypeBits;
 	VkMemoryPropertyFlags uniformDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 	for (uint32_t i = 0; i < 32; ++i) {
-		VkMemoryType memoryType = device.memoryProperties.memoryTypes[i];
+		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
 		if (uniformMemoryTypeBits & 1) {
 			if ((memoryType.propertyFlags & uniformDesiredMemoryFlags) == uniformDesiredMemoryFlags) {
 				matrixAllocateInfo.memoryTypeIndex = i;
@@ -139,19 +145,19 @@ VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, v
 		uniformMemoryTypeBits = uniformMemoryTypeBits >> 1;
 	}
 
-	VLKCheck(vkAllocateMemory(device.device, &matrixAllocateInfo, NULL, &shader.memory),
+	VLKCheck(vkAllocateMemory(device->device, &matrixAllocateInfo, NULL, &shader->memory),
 		"Failed to allocate uniforms buffer memory");
 
-	VLKCheck(vkBindBufferMemory(device.device, shader.buffer, shader.memory, 0),
+	VLKCheck(vkBindBufferMemory(device->device, shader->buffer, shader->memory, 0),
 		"Failed to bind uniforms buffer memory");
 
 	void *matrixMapped;
-	VLKCheck(vkMapMemory(device.device, shader.memory, 0, VK_WHOLE_SIZE, 0, &matrixMapped),
+	VLKCheck(vkMapMemory(device->device, shader->memory, 0, VK_WHOLE_SIZE, 0, &matrixMapped),
 		"Failed to map uniform buffer memory.");
 
 	memcpy(matrixMapped, uniformBuffer, uniformSize);
 
-	vkUnmapMemory(device.device, shader.memory);
+	vkUnmapMemory(device->device, shader->memory);
 
 	VkDescriptorSetLayoutBinding bindings[2];
 	bindings[0].binding = 0;
@@ -171,7 +177,7 @@ VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, v
 	setLayoutCreateInfo.bindingCount = 2;
 	setLayoutCreateInfo.pBindings = bindings;
 
-	VLKCheck(vkCreateDescriptorSetLayout(device.device, &setLayoutCreateInfo, NULL, &shader.setLayout),
+	VLKCheck(vkCreateDescriptorSetLayout(device->device, &setLayoutCreateInfo, NULL, &shader->setLayout),
 		"Failed to create DescriptorSetLayout");
 
 	VkDescriptorPoolSize uniformBufferPoolSize[2];
@@ -186,26 +192,26 @@ VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, v
 	poolCreateInfo.poolSizeCount = 2;
 	poolCreateInfo.pPoolSizes = uniformBufferPoolSize;
 
-	VLKCheck(vkCreateDescriptorPool(device.device, &poolCreateInfo, NULL, &shader.descriptorPool),
+	VLKCheck(vkCreateDescriptorPool(device->device, &poolCreateInfo, NULL, &shader->descriptorPool),
 		"Failed to create descriptor pool");
 
 	VkDescriptorSetAllocateInfo descriptorAllocateInfo = {};
 	descriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	descriptorAllocateInfo.descriptorPool = shader.descriptorPool;
+	descriptorAllocateInfo.descriptorPool = shader->descriptorPool;
 	descriptorAllocateInfo.descriptorSetCount = 1;
-	descriptorAllocateInfo.pSetLayouts = &shader.setLayout;
+	descriptorAllocateInfo.pSetLayouts = &shader->setLayout;
 
-	VLKCheck(vkAllocateDescriptorSets(device.device, &descriptorAllocateInfo, &shader.descriptorSet),
+	VLKCheck(vkAllocateDescriptorSets(device->device, &descriptorAllocateInfo, &shader->descriptorSet),
 		"Failed to allocate descriptor sets");
 
 	VkDescriptorBufferInfo descriptorBufferInfo = {};
-	descriptorBufferInfo.buffer = shader.buffer;
+	descriptorBufferInfo.buffer = shader->buffer;
 	descriptorBufferInfo.offset = 0;
 	descriptorBufferInfo.range = VK_WHOLE_SIZE;
 
 	VkWriteDescriptorSet writeDescriptor = {};
 	writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writeDescriptor.dstSet = shader.descriptorSet;
+	writeDescriptor.dstSet = shader->descriptorSet;
 	writeDescriptor.dstBinding = 0;
 	writeDescriptor.dstArrayElement = 0;
 	writeDescriptor.descriptorCount = 1;
@@ -214,34 +220,48 @@ VLKShader createCursorShader(VLKDevice device, char* vertPath, char* fragPath, v
 	writeDescriptor.pBufferInfo = &descriptorBufferInfo;
 	writeDescriptor.pTexelBufferView = NULL;
 
-	vkUpdateDescriptorSets(device.device, 1, &writeDescriptor, 0, NULL);
+	vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
 
 	return shader;
 }
 
-VLKPipeline createCursorPipeline(VLKDevice device, VLKSwapchain swapChain, VLKShader shader) {
-	VLKPipeline pipeline = {};
+void destroyCursorShader(VLKDevice* device, VLKShader* shader) {
+	vkFreeMemory(device->device, shader->memory, NULL);
+
+	vkDestroyDescriptorPool(device->device, shader->descriptorPool, NULL);
+	vkDestroyDescriptorSetLayout(device->device, shader->setLayout, NULL);
+
+	vkDestroyBuffer(device->device, shader->buffer, NULL);
+
+	vkDestroyShaderModule(device->device, shader->vertexShaderModule, NULL);
+	vkDestroyShaderModule(device->device, shader->fragmentShaderModule, NULL);
+
+	free(shader);
+}
+
+VLKPipeline* createCursorPipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKShader* shader) {
+	VLKPipeline* pipeline = (VLKPipeline*)malloc(sizeof(VLKPipeline));
 
 	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
 	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	layoutCreateInfo.setLayoutCount = 1;
-	layoutCreateInfo.pSetLayouts = &shader.setLayout;
+	layoutCreateInfo.pSetLayouts = &shader->setLayout;
 	layoutCreateInfo.pushConstantRangeCount = 0;
 	layoutCreateInfo.pPushConstantRanges = NULL;
 
-	VLKCheck(vkCreatePipelineLayout(device.device, &layoutCreateInfo, NULL, &pipeline.pipelineLayout),
+	VLKCheck(vkCreatePipelineLayout(device->device, &layoutCreateInfo, NULL, &pipeline->pipelineLayout),
 		"Failed to create pipeline layout");
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[2] = {};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	shaderStageCreateInfo[0].module = shader.vertexShaderModule;
+	shaderStageCreateInfo[0].module = shader->vertexShaderModule;
 	shaderStageCreateInfo[0].pName = "main";
 	shaderStageCreateInfo[0].pSpecializationInfo = NULL;
 
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shaderStageCreateInfo[1].module = shader.fragmentShaderModule;
+	shaderStageCreateInfo[1].module = shader->fragmentShaderModule;
 	shaderStageCreateInfo[1].pName = "main";
 	shaderStageCreateInfo[1].pSpecializationInfo = NULL;
 
@@ -276,14 +296,14 @@ VLKPipeline createCursorPipeline(VLKDevice device, VLKSwapchain swapChain, VLKSh
 	VkViewport viewport = {};
 	viewport.x = 0;
 	viewport.y = 0;
-	viewport.width = swapChain.width;
-	viewport.height = swapChain.height;
+	viewport.width = swapChain->width;
+	viewport.height = swapChain->height;
 	viewport.minDepth = 0;
 	viewport.maxDepth = 1;
 
 	VkRect2D scissors = {};
 	scissors.offset = { 0, 0 };
-	scissors.extent = { swapChain.width, swapChain.height };
+	scissors.extent = { swapChain->width, swapChain->height };
 
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -375,20 +395,27 @@ VLKPipeline createCursorPipeline(VLKDevice device, VLKSwapchain swapChain, VLKSh
 	pipelineCreateInfo.pDepthStencilState = &depthState;
 	pipelineCreateInfo.pColorBlendState = &colorBlendState;
 	pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
-	pipelineCreateInfo.layout = pipeline.pipelineLayout;
-	pipelineCreateInfo.renderPass = swapChain.renderPass;
+	pipelineCreateInfo.layout = pipeline->pipelineLayout;
+	pipelineCreateInfo.renderPass = swapChain->renderPass;
 	pipelineCreateInfo.subpass = 0;
 	pipelineCreateInfo.basePipelineHandle = NULL;
 	pipelineCreateInfo.basePipelineIndex = 0;
 
-	VLKCheck(vkCreateGraphicsPipelines(device.device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline.pipeline),
+	VLKCheck(vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline->pipeline),
 		"Failed to create graphics pipeline");
 
 	return pipeline;
 }
 
-VLKTexture createCursorTexture(VLKDevice& device, char* path) {
-	VLKTexture texture = {};
+void destroyCursorPipeline(VLKDevice* device, VLKPipeline* pipeline) {
+	vkDestroyPipeline(device->device, pipeline->pipeline, NULL);
+	vkDestroyPipelineLayout(device->device, pipeline->pipelineLayout, NULL);
+
+	free(pipeline);
+}
+
+VLKTexture*  createCursorTexture(VLKDevice* device, char* path) {
+	VLKTexture* texture = (VLKTexture*)malloc(sizeof(VLKTexture));
 
 	uint32_t width, height;
 
@@ -396,15 +423,15 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 
 	unsigned int error = lodepng::decode(imageData, width, height, path);
 
-	texture.width = width;
-	texture.height = height;
-	texture.data = imageData.data();
+	texture->width = width;
+	texture->height = height;
+	texture->data = imageData.data();
 
 	VkImageCreateInfo textureCreateInfo = {};
 	textureCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	textureCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	textureCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	textureCreateInfo.extent = { texture.width, texture.height, 1 };
+	textureCreateInfo.extent = { texture->width, texture->height, 1 };
 	textureCreateInfo.mipLevels = 1;
 	textureCreateInfo.arrayLayers = 1;
 	textureCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -413,11 +440,11 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 	textureCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	textureCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 
-	VLKCheck(vkCreateImage(device.device, &textureCreateInfo, NULL, &texture.textureImage),
+	VLKCheck(vkCreateImage(device->device, &textureCreateInfo, NULL, &texture->textureImage),
 		"Failed to create texture image");
 
 	VkMemoryRequirements textureMemoryRequirements = {};
-	vkGetImageMemoryRequirements(device.device, texture.textureImage, &textureMemoryRequirements);
+	vkGetImageMemoryRequirements(device->device, texture->textureImage, &textureMemoryRequirements);
 
 	VkMemoryAllocateInfo textureImageAllocateInfo = {};
 	textureImageAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -426,7 +453,7 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 	uint32_t textureMemoryTypeBits = textureMemoryRequirements.memoryTypeBits;
 	VkMemoryPropertyFlags tDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 	for (uint32_t i = 0; i < 32; ++i) {
-		VkMemoryType memoryType = device.memoryProperties.memoryTypes[i];
+		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
 		if (textureMemoryTypeBits & 1) {
 			if ((memoryType.propertyFlags & tDesiredMemoryFlags) == tDesiredMemoryFlags) {
 				textureImageAllocateInfo.memoryTypeIndex = i;
@@ -437,26 +464,26 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 	}
 
 
-	VLKCheck(vkAllocateMemory(device.device, &textureImageAllocateInfo, NULL, &texture.textureImageMemory),
+	VLKCheck(vkAllocateMemory(device->device, &textureImageAllocateInfo, NULL, &texture->textureImageMemory),
 		"Failed to allocate device memory");
 
-	VLKCheck(vkBindImageMemory(device.device, texture.textureImage, texture.textureImageMemory, 0),
+	VLKCheck(vkBindImageMemory(device->device, texture->textureImage, texture->textureImageMemory, 0),
 		"Failed to bind image memory");
 
 	void *imageMapped;
-	VLKCheck(vkMapMemory(device.device, texture.textureImageMemory, 0, VK_WHOLE_SIZE, 0, &imageMapped),
+	VLKCheck(vkMapMemory(device->device, texture->textureImageMemory, 0, VK_WHOLE_SIZE, 0, &imageMapped),
 		"Failed to map image memory.");
 
-	memcpy(imageMapped, texture.data, texture.width * texture.height * 4);
+	memcpy(imageMapped, texture->data, texture->width * texture->height * 4);
 
 	VkMappedMemoryRange memoryRange = {};
 	memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-	memoryRange.memory = texture.textureImageMemory;
+	memoryRange.memory = texture->textureImageMemory;
 	memoryRange.offset = 0;
 	memoryRange.size = VK_WHOLE_SIZE;
-	vkFlushMappedMemoryRanges(device.device, 1, &memoryRange);
+	vkFlushMappedMemoryRanges(device->device, 1, &memoryRange);
 
-	vkUnmapMemory(device.device, texture.textureImageMemory);
+	vkUnmapMemory(device->device, texture->textureImageMemory);
 
 	imageData.clear();
 
@@ -464,7 +491,7 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-	vkBeginCommandBuffer(device.setupCmdBuffer, &beginInfo);
+	vkBeginCommandBuffer(device->setupCmdBuffer, &beginInfo);
 
 	VkImageMemoryBarrier layoutTransitionBarrier = {};
 	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -474,11 +501,11 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 	layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	layoutTransitionBarrier.image = texture.textureImage;
+	layoutTransitionBarrier.image = texture->textureImage;
 	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 	layoutTransitionBarrier.subresourceRange = resourceRange;
 
-	vkCmdPipelineBarrier(device.setupCmdBuffer,
+	vkCmdPipelineBarrier(device->setupCmdBuffer,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 		0,
@@ -486,7 +513,7 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 		0, NULL,
 		1, &layoutTransitionBarrier);
 
-	vkEndCommandBuffer(device.setupCmdBuffer);
+	vkEndCommandBuffer(device->setupCmdBuffer);
 
 	VkPipelineStageFlags waitStageMash[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	VkSubmitInfo submitInfo = {};
@@ -495,26 +522,26 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 	submitInfo.pWaitSemaphores = NULL;
 	submitInfo.pWaitDstStageMask = waitStageMash;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &device.setupCmdBuffer;
+	submitInfo.pCommandBuffers = &device->setupCmdBuffer;
 	submitInfo.signalSemaphoreCount = 0;
 	submitInfo.pSignalSemaphores = NULL;
 
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	VkFence submitFence;
-	vkCreateFence(device.device, &fenceCreateInfo, NULL, &submitFence);
+	vkCreateFence(device->device, &fenceCreateInfo, NULL, &submitFence);
 
-	VLKCheck(vkQueueSubmit(device.presentQueue, 1, &submitInfo, submitFence),
+	VLKCheck(vkQueueSubmit(device->presentQueue, 1, &submitInfo, submitFence),
 		"Could not submit Queue");
 
-	vkWaitForFences(device.device, 1, &submitFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(device.device, 1, &submitFence);
-	vkDestroyFence(device.device, submitFence, NULL);
-	vkResetCommandBuffer(device.setupCmdBuffer, 0);
+	vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device->device, 1, &submitFence);
+	vkDestroyFence(device->device, submitFence, NULL);
+	vkResetCommandBuffer(device->setupCmdBuffer, 0);
 
 	VkImageViewCreateInfo textureImageViewCreateInfo = {};
 	textureImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	textureImageViewCreateInfo.image = texture.textureImage;
+	textureImageViewCreateInfo.image = texture->textureImage;
 	textureImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	textureImageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
 	textureImageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R,
@@ -527,7 +554,7 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 	textureImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
 	textureImageViewCreateInfo.subresourceRange.layerCount = 1;
 
-	VLKCheck(vkCreateImageView(device.device, &textureImageViewCreateInfo, NULL, &texture.textureView),
+	VLKCheck(vkCreateImageView(device->device, &textureImageViewCreateInfo, NULL, &texture->textureView),
 		"Failed to create image view");
 
 	VkSamplerCreateInfo samplerCreateInfo = {};
@@ -545,17 +572,27 @@ VLKTexture createCursorTexture(VLKDevice& device, char* path) {
 	samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
 
-	VLKCheck(vkCreateSampler(device.device, &samplerCreateInfo, NULL, &texture.sampler),
+	VLKCheck(vkCreateSampler(device->device, &samplerCreateInfo, NULL, &texture->sampler),
 		"Failed to create sampler");
 
 	VkDescriptorImageInfo descriptorImageInfo = {};
-	descriptorImageInfo.sampler = texture.sampler;
-	descriptorImageInfo.imageView = texture.textureView;
+	descriptorImageInfo.sampler = texture->sampler;
+	descriptorImageInfo.imageView = texture->textureView;
 	descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 
-	texture.descriptorImageInfo = descriptorImageInfo;
+	texture->descriptorImageInfo = descriptorImageInfo;
 
 	return texture;
+}
+
+void destroyCursorTexture(VLKDevice* device, VLKTexture* texture) {
+	vkFreeMemory(device->device, texture->textureImageMemory, NULL);
+
+	vkDestroySampler(device->device, texture->sampler, NULL);
+	vkDestroyImageView(device->device, texture->textureView, NULL);
+	vkDestroyImage(device->device, texture->textureImage, NULL);
+
+	free(texture);
 }
 
 int main() {
@@ -569,17 +606,17 @@ int main() {
 	glfwSetWindowFocusCallback(window, window_focus_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
-	VLKContext context = vlkCreateContext();
-	VLKDevice device;
-	VLKSwapchain swapChain;
-	vlkCreateDeviceAndSwapchain(window, context, device, swapChain);
+	VLKContext* context = vlkCreateContext();
+	VLKDevice* device;
+	VLKSwapchain* swapChain;
+	vlkCreateDeviceAndSwapchain(window, context, &device, &swapChain);
 
 	CubeUniformBuffer uniformBuffer;
 	memcpy(uniformBuffer.proj, getPerspective(), sizeof(float) * 16);
 
-	VLKShader shader = vlkCreateShader(device, "cube-vert.spv", "cube-geom.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
-	VLKPipeline pipeline = vlkCreatePipeline(device, swapChain, shader);
-
+	VLKShader* shader = vlkCreateShader(device, "cube-vert.spv", "cube-geom.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
+	VLKPipeline* pipeline = vlkCreatePipeline(device, swapChain, shader);
+	
 	Vec3 pos = {0, 0, 1};
 	Vec3 rot = {0, 0, 0};
 	double prev_x = 0;
@@ -596,7 +633,7 @@ int main() {
 
 	double cts = glfwGetTime();
 	double dts = 0;
-
+	
 	VulkanRenderContext renderContext = {};
 	renderContext.device = device;
 	renderContext.swapChain = swapChain;
@@ -609,9 +646,9 @@ int main() {
 	Cube::init();
 	Chunk::init(245325, window, &renderContext);
 
-	VLKTexture texture = vlkCreateTexture(device, "pack.png");
+	VLKTexture* texture = vlkCreateTexture(device, "pack.png");
 	vlkBindTexture(device, shader, texture);
-
+	
 	float cursorVerts[] = {
 		-0.075f, -0.075f, 0, 0,
 		 0.075f, -0.075f, 1, 0,
@@ -628,10 +665,10 @@ int main() {
 		0, 0, 1, 0,
 		0, 0, 0, 1 };
 
-	VLKModel cursorModel = createCursorModel(device, cursorVerts, 6);
-	VLKShader cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", proj, sizeof(float) * 16);
-	VLKPipeline cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
-	VLKTexture cursorTexture = createCursorTexture(device, "pack.png");
+	VLKModel* cursorModel = createCursorModel(device, cursorVerts, 6);
+	VLKShader* cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", proj, sizeof(float) * 16);
+	VLKPipeline* cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
+	VLKTexture* cursorTexture = createCursorTexture(device, "pack.png");
 	vlkBindTexture(device, cursorShader, cursorTexture);
 
 	while (!glfwWindowShouldClose(window)) {
@@ -651,23 +688,28 @@ int main() {
 		vlkClear(context, device, swapChain);
 
 		Chunk::render(device, swapChain);
-
-		VkViewport viewport = { 0, 0, swapChain.width, swapChain.height, 0, 1 };
-		VkRect2D scissor = { 0, 0, swapChain.width, swapChain.height };
+		
+		VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
+		VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
 		VkDeviceSize offsets = {};
 
-		vkCmdSetViewport(device.drawCmdBuffer, 0, 1, &viewport);
-		vkCmdSetScissor(device.drawCmdBuffer, 0, 1, &scissor);
+		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
 		
-		vkCmdBindPipeline(device.drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline.pipeline);
-		vkCmdBindVertexBuffers(device.drawCmdBuffer, 0, 1, &cursorModel.vertexInputBuffer, &offsets);
-		vkCmdBindDescriptorSets(device.drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			cursorPipeline.pipelineLayout, 0, 1, &cursorShader.descriptorSet, 0, NULL);
+		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
+		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &cursorModel->vertexInputBuffer, &offsets);
+		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
 
-		vkCmdDraw(device.drawCmdBuffer, 6, 1, 0, 0);
+		vkCmdDraw(device->drawCmdBuffer, 6, 1, 0, 0);
 		
 		vlkSwap(context, device, swapChain);
 	}
+
+	destroyCursorTexture(device, cursorTexture);
+	destroyCursorPipeline(device, cursorPipeline);
+	destroyCursorShader(device, cursorShader);
+	destroyCursorModel(device, cursorModel);
 
 	Chunk::destroy(device);
 	Camera::destroy(device);
@@ -675,7 +717,7 @@ int main() {
 	vlkDestroyTexture(device, texture);
 	vlkDestroyPipeline(device, pipeline);
 	vlkDestroyShader(device, shader);
-	vlkDestroyDeviceandSwapChain(context, device, swapChain);
+	vlkDestroyDeviceAndSwapchain(context, device, swapChain);
 	vlkDestroyContext(context);
 
 	glfwDestroyWindow(window);

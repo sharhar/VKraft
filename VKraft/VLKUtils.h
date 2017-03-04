@@ -81,25 +81,25 @@ typedef struct VLKTexture {
 	VkDescriptorImageInfo descriptorImageInfo;
 } VLKTexture;
 
-VLKContext vlkCreateContext();
-void vlkDestroyContext(VLKContext& context);
+VLKContext* vlkCreateContext();
+void vlkDestroyContext(VLKContext* context);
 
-void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevice& device, VLKSwapchain& swapChain);
-void vlkDestroyDeviceandSwapChain(VLKContext context, VLKDevice& device, VLKSwapchain& swapChain);
+void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext* context, VLKDevice** device, VLKSwapchain** swapChain);
+void vlkDestroyDeviceAndSwapchain(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain);
 
-VLKModel vlkCreateModel(VLKDevice device, Vertex* verts, uint32_t num);
-void vlkDestroyModel(VLKDevice device, VLKModel& model);
+VLKModel* vlkCreateModel(VLKDevice* device, Vertex* verts, uint32_t num);
+void vlkDestroyModel(VLKDevice* device, VLKModel* model);
 
-VLKShader vlkCreateShader(VLKDevice device, char* vertPath, char* geomPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize);
-void vlkUniforms(VLKDevice device, VLKShader& shader, void* uniformBuffer, uint32_t uniformSize);
-void vlkDestroyShader(VLKDevice device, VLKShader& shader);
+VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* geomPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize);
+void vlkUniforms(VLKDevice* device, VLKShader* shader, void* uniformBuffer, uint32_t uniformSize);
+void vlkDestroyShader(VLKDevice* device, VLKShader* shader);
 
-VLKPipeline vlkCreatePipeline(VLKDevice device, VLKSwapchain swapChain, VLKShader shader);
-void vlkDestroyPipeline(VLKDevice device, VLKPipeline pipeline);
+VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKShader* shader);
+void vlkDestroyPipeline(VLKDevice* device, VLKPipeline* pipeline);
 
-void vlkClear(VLKContext context, VLKDevice device, VLKSwapchain& swapChain);
-void vlkSwap(VLKContext context, VLKDevice device, VLKSwapchain& swapChain);
+void vlkClear(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain);
+void vlkSwap(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain);
 
-VLKTexture vlkCreateTexture(VLKDevice& device, char* path);
-void vlkBindTexture(VLKDevice device, VLKShader shader, VLKTexture texture);
-void vlkDestroyTexture(VLKDevice device, VLKTexture texture);
+VLKTexture* vlkCreateTexture(VLKDevice* device, char* path);
+void vlkBindTexture(VLKDevice* device, VLKShader* shader, VLKTexture* texture);
+void vlkDestroyTexture(VLKDevice* device, VLKTexture* texture);

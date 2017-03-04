@@ -20,16 +20,16 @@ typedef struct CubeUniformBuffer {
 } CubeUniformBuffer;
 
 typedef struct ChunkModelInfo {
-	VLKModel model;
+	VLKModel* model;
 	VkCommandBuffer* commandBuffer;
 	bool start;
 } ChunkmodelInfo;
 
 typedef struct VulkanRenderContext {
-	VLKDevice device;
-	VLKSwapchain swapChain;
-	VLKShader shader;
-	VLKPipeline pipeline;
+	VLKDevice* device;
+	VLKSwapchain* swapChain;
+	VLKShader* shader;
+	VLKPipeline* pipeline;
 	CubeUniformBuffer* uniformBuffer;
 } VulkanRenderContext;
 
@@ -87,8 +87,8 @@ public:
 	Cube** cubes;
 
 	static void init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vulkanRenderContext);
-	static void destroy(VLKDevice device);
-	static void render(VLKDevice& device, VLKSwapchain& swapChain);
+	static void destroy(VLKDevice* device);
+	static void render(VLKDevice* device, VLKSwapchain* swapChain);
 
 	Chunk(Vec3 pos);
 

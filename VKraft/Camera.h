@@ -49,5 +49,5 @@ public:
 
 	static void init(GLFWwindow* win, float* viewMat, VulkanRenderContext* vrc);
 	static void update(float dt);
-	static void destroy(VLKDevice device);
+	static void destroy(VLKDevice* device);
 };
