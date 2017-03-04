@@ -106,7 +106,6 @@ static void getWorldview(float* mat, Vec3 pos, Vec3 rot) {
 	mat[15] = 1;
 }
 
-
 static void getModelview(float* mat, Vec3 pos, Vec3 rot, Vec3 scale) {
 	float cx = cos(rot.x*DEG_TO_RAD);
 	float sx = sin(rot.x*DEG_TO_RAD);

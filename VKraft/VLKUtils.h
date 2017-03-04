@@ -21,7 +21,6 @@ typedef struct VLKContext {
 } VLKContext;
 
 typedef struct VLKDevice {
-	VkSurfaceKHR surface;
 	VkPhysicalDevice physicalDevice;
 	VkPhysicalDeviceProperties physicalDeviceProperties;
 	VkPhysicalDeviceMemoryProperties memoryProperties;
@@ -34,6 +33,7 @@ typedef struct VLKDevice {
 } VLKDevice;
 
 typedef struct VLKSwapchain {
+	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
 	VkImage* presentImages;
 	VkImageView *presentImageViews;
@@ -60,8 +60,8 @@ typedef struct VLKShader {
 	VkBuffer buffer;
 	VkDeviceMemory memory;
 	VkDescriptorSetLayout setLayout;
-	VkDescriptorSet descriptorSet;
 	VkDescriptorPool descriptorPool;
+	VkDescriptorSet descriptorSet;
 } VLKShader;
 
 typedef struct VLKPipeline {

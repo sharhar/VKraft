@@ -122,9 +122,6 @@ static bool closeEnough(Vec3 pos, Vec3 other) {
 }
 
 static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkThreadFreeInfo* freeInfo) {
-	freeInfo->modelInfo = NULL;
-	freeInfo->pmodelInfo = NULL;
-
 	Chunk** closeChunks = new Chunk*[CHUNK_NUM];
 
 	for (int i = 0; i < CHUNK_NUM; i++) {
@@ -271,7 +268,6 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 			}
 
 			freeInfo->modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
-			freeInfo->modelInfo->full = true;
 			freeInfo->modelInfo->start = false;
 			freeInfo->modelInfo->model = vlkCreateModel(vrc->device, verts, rcsz);
 
@@ -357,6 +353,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 			vlkDestroyModel(vrc->device, freeInfo->pmodelInfo->model);
 
 			free(freeInfo->pmodelInfo);
+			freeInfo->pmodelInfo = NULL;
 		}
 
 		freeInfo->pmodelInfo = freeInfo->modelInfo;
@@ -372,21 +369,6 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 	}
-
-	/*
-	if (modelInfo != NULL) {
-		vlkDestroyModel(vrc->device, modelInfo->model);
-
-		vkFreeCommandBuffers(vrc->device.device, commandPool, vrc->swapChain.imageCount, modelInfo->commandBuffer);
-
-		free(modelInfo);
-		modelInfo = NULL;
-	}
-
-	vkDestroyCommandPool(vrc->device.device, commandPool, NULL);
-
-	std::cout << "freed command pool\n";
-	*/
 }
 
 void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vulkanRenderContext) {
@@ -400,6 +382,8 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vul
 	renderContext = vulkanRenderContext;
 
 	freeInfo = (ChunkThreadFreeInfo*)malloc(sizeof(ChunkThreadFreeInfo));
+	freeInfo->modelInfo = NULL;
+	freeInfo->pmodelInfo = NULL;
 
 	chunkThread = new std::thread(chunkThreadRun, window, renderContext, freeInfo);
 }
@@ -409,13 +393,13 @@ void Chunk::destroy(VLKDevice device) {
 
 	vkDestroyCommandPool(device.device, freeInfo->commandPool, NULL);
 
-	if (freeInfo->pmodelInfo != NULL && freeInfo->pmodelInfo->full) {
+	if (freeInfo->pmodelInfo != NULL) {
 		vlkDestroyModel(device, freeInfo->pmodelInfo->model);
 		free(freeInfo->pmodelInfo);
 		freeInfo->pmodelInfo = NULL;
 	}
 
-	if (freeInfo->modelInfo != NULL && freeInfo->modelInfo->full) {
+	if (freeInfo->modelInfo != NULL) {
 		vlkDestroyModel(device, freeInfo->modelInfo->model);
 		free(freeInfo->modelInfo);
 		freeInfo->modelInfo = NULL;

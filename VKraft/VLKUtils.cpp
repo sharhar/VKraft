@@ -164,7 +164,7 @@ void vlkDestroyContext(VLKContext& context) {
 }
 
 void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevice& device, VLKSwapchain& swapChain) {
-	glfwCreateWindowSurface(context.instance, window, NULL, &device.surface);
+	glfwCreateWindowSurface(context.instance, window, NULL, &swapChain.surface);
 
 	uint32_t physicalDeviceCount = 0;
 	vkEnumeratePhysicalDevices(context.instance, &physicalDeviceCount, NULL);
@@ -185,7 +185,7 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevi
 		for (uint32_t j = 0; j < queueFamilyCount; ++j) {
 
 			VkBool32 supportsPresent;
-			vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevices[i], j, device.surface,
+			vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevices[i], j, swapChain.surface,
 				&supportsPresent);
 
 			if (supportsPresent && (queueFamilyProperties[j].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT))) {
@@ -238,10 +238,10 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevi
 		"Failed to create logical device");
 
 	uint32_t formatCount = 0;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, device.surface,
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, swapChain.surface,
 		&formatCount, NULL);
 	VkSurfaceFormatKHR *surfaceFormats = new VkSurfaceFormatKHR[formatCount];
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, device.surface,
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice, swapChain.surface,
 		&formatCount, surfaceFormats);
 
 	VkFormat colorFormat;
@@ -256,7 +256,7 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevi
 	delete[] surfaceFormats;
 
 	VkSurfaceCapabilitiesKHR surfaceCapabilities = {};
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physicalDevice, device.surface,
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physicalDevice, swapChain.surface,
 		&surfaceCapabilities);
 
 	uint32_t desiredImageCount = 2;
@@ -289,10 +289,10 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevi
 	}
 
 	uint32_t presentModeCount = 0;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, device.surface,
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, swapChain.surface,
 		&presentModeCount, NULL);
 	VkPresentModeKHR *presentModes = new VkPresentModeKHR[presentModeCount];
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, device.surface,
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice, swapChain.surface,
 		&presentModeCount, presentModes);
 
 	VkPresentModeKHR presentationMode = VK_PRESENT_MODE_FIFO_KHR;
@@ -306,7 +306,7 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext context, VLKDevi
 
 	VkSwapchainCreateInfoKHR swapChainCreateInfo = {};
 	swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	swapChainCreateInfo.surface = device.surface;
+	swapChainCreateInfo.surface = swapChain.surface;
 	swapChainCreateInfo.minImageCount = desiredImageCount;
 	swapChainCreateInfo.imageFormat = colorFormat;
 	swapChainCreateInfo.imageColorSpace = colorSpace;
@@ -639,7 +639,7 @@ void vlkDestroyDeviceandSwapChain(VLKContext context, VLKDevice& device, VLKSwap
 
 	vkDestroyCommandPool(device.device, device.commandPool, NULL);
 	vkDestroyDevice(device.device, NULL);
-	vkDestroySurfaceKHR(context.instance, device.surface, NULL);
+	vkDestroySurfaceKHR(context.instance, swapChain.surface, NULL);
 }
 
 VLKModel vlkCreateModel(VLKDevice device, Vertex* verts, uint32_t num) {

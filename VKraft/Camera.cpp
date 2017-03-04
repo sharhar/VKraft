@@ -15,28 +15,7 @@ Vec3* Camera::poss = 0;
 int Camera::possSize = 0;
 int Camera::fence = 0;
 bool Camera::grounded = false;
-
-typedef struct VLKComputeContext {
-	VkQueue computeQueue;
-
-	VkBuffer inBuffer;
-	VkBuffer outBuffer;
-	VkBuffer posBuffer;
-
-	VkDeviceMemory inMemory;
-	VkDeviceMemory outMemory;
-	VkDeviceMemory posMemory;
-
-	VkShaderModule shader;
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipeline;
-
-	VkCommandBuffer computeCmdBuffer;
-	VkCommandPool commandPool;
-	VkDescriptorPool descriptorPool;
-	VkDescriptorSet descriptorSet;
-} VLKComputeContext;
+VLKComputeContext Camera::context = {};
 
 VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	VLKComputeContext context = { };
@@ -347,48 +326,47 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	VLKCheck(vkAllocateCommandBuffers(vrc->device.device, &commandBufferAllocateInfo, &context.computeCmdBuffer),
 		"Failed to create command pool");
 
-	return context;
-}
-
-void destroyComputeContext(VulkanRenderContext* vrc, VLKComputeContext& context) {
-	vkFreeCommandBuffers(vrc->device.device, context.commandPool, 1, &context.computeCmdBuffer);
-	vkDestroyCommandPool(vrc->device.device, context.commandPool, NULL);
-
-	vkFreeDescriptorSets(vrc->device.device, context.descriptorPool, 1, &context.descriptorSet);
-	vkDestroyDescriptorPool(vrc->device.device, context.descriptorPool, NULL);
-	vkDestroyDescriptorSetLayout(vrc->device.device, context.descriptorSetLayout, NULL);
-
-	vkDestroyPipeline(vrc->device.device, context.pipeline, NULL);
-	vkDestroyPipelineLayout(vrc->device.device, context.pipelineLayout, NULL);
-
-	vkDestroyShaderModule(vrc->device.device, context.shader, NULL);
-
-	vkFreeMemory(vrc->device.device, context.inMemory, NULL);
-	vkFreeMemory(vrc->device.device, context.outMemory, NULL);
-	vkFreeMemory(vrc->device.device, context.posMemory, NULL);
-
-	vkDestroyBuffer(vrc->device.device, context.inBuffer, NULL);
-	vkDestroyBuffer(vrc->device.device, context.outBuffer, NULL);
-	vkDestroyBuffer(vrc->device.device, context.posBuffer, NULL);
-}
-
-static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
-	std::vector<Cube*> closeCubes;
-	Vec3* pvecs = NULL;
-
-	VLKComputeContext context = getComputeContext(vrc);
-
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.pNext = NULL;
 	fenceCreateInfo.flags = 0;
 
-	VkFence fence;
-	VLKCheck(vkCreateFence(vrc->device.device, &fenceCreateInfo, NULL, &fence),
+	VLKCheck(vkCreateFence(vrc->device.device, &fenceCreateInfo, NULL, &context.fence),
 		"Failed ot create fence");
 
+	return context;
+}
+
+void destroyComputeContext(VLKDevice device, VLKComputeContext& context) {
+	vkDestroyFence(device.device, context.fence, NULL);
+	
+	vkFreeCommandBuffers(device.device, context.commandPool, 1, &context.computeCmdBuffer);
+	vkDestroyCommandPool(device.device, context.commandPool, NULL);
+
+	vkFreeDescriptorSets(device.device, context.descriptorPool, 1, &context.descriptorSet);
+	vkDestroyDescriptorPool(device.device, context.descriptorPool, NULL);
+	vkDestroyDescriptorSetLayout(device.device, context.descriptorSetLayout, NULL);
+
+	vkDestroyPipeline(device.device, context.pipeline, NULL);
+	vkDestroyPipelineLayout(device.device, context.pipelineLayout, NULL);
+
+	vkDestroyShaderModule(device.device, context.shader, NULL);
+
+	vkFreeMemory(device.device, context.inMemory, NULL);
+	vkFreeMemory(device.device, context.outMemory, NULL);
+	vkFreeMemory(device.device, context.posMemory, NULL);
+
+	vkDestroyBuffer(device.device, context.inBuffer, NULL);
+	vkDestroyBuffer(device.device, context.outBuffer, NULL);
+	vkDestroyBuffer(device.device, context.posBuffer, NULL);
+}
+
+static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComputeContext* context) {
+	std::vector<Cube*> closeCubes;
+	Vec3* pvecs = NULL;
+
 	while (!glfwWindowShouldClose(win)) {
-		
+
 		while (Chunk::m_fence == 1) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
@@ -428,39 +406,39 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 			posData[5] = nz;
 
 			void *mapped;
-			vkMapMemory(vrc->device.device, context.posMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
+			vkMapMemory(vrc->device.device, context->posMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
 
 			memcpy(mapped, posData, 6 * sizeof(float));
 
 			VkMappedMemoryRange memoryRange = {};
 			memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-			memoryRange.memory = context.posMemory;
+			memoryRange.memory = context->posMemory;
 			memoryRange.offset = 0;
 			memoryRange.size = VK_WHOLE_SIZE;
 			vkFlushMappedMemoryRanges(vrc->device.device, 1, &memoryRange);
 
-			vkUnmapMemory(vrc->device.device, context.posMemory);
+			vkUnmapMemory(vrc->device.device, context->posMemory);
 
-			float* inputData = new float[4*cbsz];
+			float* inputData = new float[4 * cbsz];
 
-			for (int i = 0; i < cbsz;i++) {
+			for (int i = 0; i < cbsz; i++) {
 				inputData[i * 4 + 0] = vecs[i].x;
 				inputData[i * 4 + 1] = vecs[i].y;
 				inputData[i * 4 + 2] = vecs[i].z;
 				inputData[i * 4 + 3] = (float)closeCubes[i]->vid;
 			}
 
-			vkMapMemory(vrc->device.device, context.inMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
+			vkMapMemory(vrc->device.device, context->inMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
 
 			memcpy(mapped, inputData, cbsz * 4 * sizeof(float));
 
 			memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-			memoryRange.memory = context.inMemory;
+			memoryRange.memory = context->inMemory;
 			memoryRange.offset = 0;
 			memoryRange.size = VK_WHOLE_SIZE;
 			vkFlushMappedMemoryRanges(vrc->device.device, 1, &memoryRange);
 
-			vkUnmapMemory(vrc->device.device, context.inMemory);
+			vkUnmapMemory(vrc->device.device, context->inMemory);
 
 			delete[] posData;
 			delete[] inputData;
@@ -471,17 +449,17 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 			commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 			commandBufferBeginInfo.pInheritanceInfo = NULL;
 
-			VLKCheck(vkBeginCommandBuffer(context.computeCmdBuffer, &commandBufferBeginInfo),
+			VLKCheck(vkBeginCommandBuffer(context->computeCmdBuffer, &commandBufferBeginInfo),
 				"Failed to begin command buffer");
 
-			vkCmdBindPipeline(context.computeCmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, context.pipeline);
+			vkCmdBindPipeline(context->computeCmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, context->pipeline);
 
-			vkCmdBindDescriptorSets(context.computeCmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-				context.pipelineLayout, 0, 1, &context.descriptorSet, 0, 0);
+			vkCmdBindDescriptorSets(context->computeCmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+				context->pipelineLayout, 0, 1, &context->descriptorSet, 0, 0);
 
-			vkCmdDispatch(context.computeCmdBuffer, cbsz, 1, 1);
+			vkCmdDispatch(context->computeCmdBuffer, cbsz, 1, 1);
 
-			VLKCheck(vkEndCommandBuffer(context.computeCmdBuffer),
+			VLKCheck(vkEndCommandBuffer(context->computeCmdBuffer),
 				"Failed to end command buffer");
 
 			VkSubmitInfo submitInfo = {};
@@ -493,15 +471,15 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 			submitInfo.waitSemaphoreCount = 0;
 			submitInfo.pWaitDstStageMask = NULL;
 			submitInfo.commandBufferCount = 1;
-			submitInfo.pCommandBuffers = &context.computeCmdBuffer;
+			submitInfo.pCommandBuffers = &context->computeCmdBuffer;
 
-			VLKCheck(vkQueueSubmit(context.computeQueue, 1, &submitInfo, fence),
+			VLKCheck(vkQueueSubmit(context->computeQueue, 1, &submitInfo, context->fence),
 				"Failed to submit Queue");
 
-			vkWaitForFences(vrc->device.device, 1, &fence, VK_TRUE, UINT64_MAX);
-			vkResetFences(vrc->device.device, 1, &fence);
-			
-			vkMapMemory(vrc->device.device, context.outMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
+			vkWaitForFences(vrc->device.device, 1, &context->fence, VK_TRUE, UINT64_MAX);
+			vkResetFences(vrc->device.device, 1, &context->fence);
+
+			vkMapMemory(vrc->device.device, context->outMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
 
 			float* data = (float*)mapped;
 
@@ -519,7 +497,7 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 			vrc->uniformBuffer->selected.y = vecs[id].y;
 			vrc->uniformBuffer->selected.z = vecs[id].z;
 
-			vkUnmapMemory(vrc->device.device, context.outMemory);
+			vkUnmapMemory(vrc->device.device, context->outMemory);
 		}
 
 		while (Camera::fence > 0) {
@@ -541,9 +519,6 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc) {
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 	}
-
-	vkDestroyFence(vrc->device.device, fence, NULL);
-	destroyComputeContext(vrc, context);
 }
 
 void Camera::init(GLFWwindow* win, float* viewMat, VulkanRenderContext* vrc) {
@@ -562,7 +537,9 @@ void Camera::init(GLFWwindow* win, float* viewMat, VulkanRenderContext* vrc) {
 	prev_x = xpos;
 	prev_y = ypos;
 
-	cameraThread = new std::thread(cameraThreadRun, window, vrc);
+	context = getComputeContext(vrc);
+
+	cameraThread = new std::thread(cameraThreadRun, window, vrc, &context);
 }
 
 bool hittingCube(Vec3 pos, Vec3 other) {
@@ -699,6 +676,8 @@ void Camera::update(float dt) {
 	getWorldview(worldviewMat, renderPos, rot);
 }
 
-void Camera::destroy() {
+void Camera::destroy(VLKDevice device) {
 	cameraThread->join();
+
+	destroyComputeContext(device, context);
 }

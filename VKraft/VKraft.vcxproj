@@ -155,6 +155,8 @@
     <None Include="cube.frag" />
     <None Include="cube.geom" />
     <None Include="cube.vert" />
+    <None Include="cursor.frag" />
+    <None Include="cursor.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -66,5 +66,7 @@
     </None>
     <None Include="cube.geom" />
     <None Include="cube.comp" />
+    <None Include="cursor.frag" />
+    <None Include="cursor.vert" />
   </ItemGroup>
 </Project>
