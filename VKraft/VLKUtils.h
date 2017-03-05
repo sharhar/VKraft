@@ -8,7 +8,7 @@
 void VLKCheck(VkResult result, char *msg);
 
 typedef struct Vertex {
-	float x, y, z;
+	float x, y, z, w;
 	float u, v;
 } Vertex;
 
@@ -80,6 +80,23 @@ typedef struct VLKTexture {
 	VkDescriptorImageInfo descriptorImageInfo;
 } VLKTexture;
 
+typedef struct VLKFramebuffer {
+	VkImage colorImage;
+	VkImageView colorImageView;
+	VkDeviceMemory colorImageMemory;
+	VkImage depthImage;
+	VkDeviceMemory depthImageMemory;
+	VkImageView depthImageView;
+	VkRenderPass renderPass;
+	VkFramebuffer frameBuffer;
+
+	VkSampler sampler;
+	VkDescriptorImageInfo descriptorImageInfo;
+	VkCommandBuffer drawCmdBuffer;
+
+	uint32_t imageCount, width, height;
+} VLKFramebuffer;
+
 VLKContext* vlkCreateContext();
 void vlkDestroyContext(VLKContext* context);
 
@@ -96,9 +113,15 @@ void vlkDestroyShader(VLKDevice* device, VLKShader* shader);
 VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKShader* shader);
 void vlkDestroyPipeline(VLKDevice* device, VLKPipeline* pipeline);
 
-void vlkClear(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain);
-void vlkSwap(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain);
+void vlkClear(VLKDevice* device, VLKSwapchain* swapChain);
+void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain);
 
 VLKTexture* vlkCreateTexture(VLKDevice* device, char* path);
 void vlkBindTexture(VLKDevice* device, VLKShader* shader, VLKTexture* texture);
 void vlkDestroyTexture(VLKDevice* device, VLKTexture* texture);
+
+VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t imageCount, uint32_t width, uint32_t height);
+void vlkDestroyFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer);
+
+void vlkStartFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer);
+void vlkEndFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer);

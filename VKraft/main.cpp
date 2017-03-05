@@ -626,6 +626,8 @@ int main() {
 	VLKShader* shader = vlkCreateShader(device, "cube-vert.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
 	VLKPipeline* pipeline = vlkCreatePipeline(device, swapChain, shader);
 	
+	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width, swapChain->height);
+
 	Vec3 pos = {0, 0, 1};
 	Vec3 rot = {0, 0, 0};
 	double prev_x = 0;
@@ -643,6 +645,7 @@ int main() {
 	renderContext.uniformBuffer = &uniformBuffer;
 	renderContext.shader = shader;
 	renderContext.pipeline = pipeline;
+	renderContext.framebuffer = frameBuffer;
 
 	Camera::init(window, uniformBuffer.view, &renderContext);
 
@@ -651,7 +654,7 @@ int main() {
 
 	VLKTexture* texture = vlkCreateTexture(device, "pack.png");
 	vlkBindTexture(device, shader, texture);
-	
+
 	float cursorVerts[] = {
 		-0.0375f, -0.0375f, 0, 0,
 		 0.0375f, -0.0375f, 1, 0,
@@ -659,6 +662,14 @@ int main() {
 		-0.0375f,  0.0375f, 0, 1,
 		 0.0375f, -0.0375f, 1, 0,
 		 0.0375f,  0.0375f, 1, 1 };
+
+	float backGroundVerts[] = {
+		-1, -1, 0, 0,
+		 1, -1, 1, 0,
+		-1,  1, 0, 1,
+		-1,  1, 0, 1,
+		 1, -1, 1, 0,
+		 1,  1, 1, 1 };
 
 	float aspect = 16.0f / 9.0f;
 
@@ -668,10 +679,34 @@ int main() {
 		0, 0, 1, 0,
 		0, 0, 0, 1 };
 
+	float projBack[] = {
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, 0,
+		0, 0, 0, 1 };
+
+	VLKModel* backGroundModel = createCursorModel(device, backGroundVerts, 6);
+	VLKShader* backGroundShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", projBack, sizeof(float) * 16);
+	VLKPipeline* backGroundPipeline = createCursorPipeline(device, swapChain, backGroundShader);
+
+	VkWriteDescriptorSet writeDescriptor = {};
+	writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeDescriptor.dstSet = backGroundShader->descriptorSet;
+	writeDescriptor.dstBinding = 1;
+	writeDescriptor.dstArrayElement = 0;
+	writeDescriptor.descriptorCount = 1;
+	writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writeDescriptor.pImageInfo = &frameBuffer->descriptorImageInfo;
+	writeDescriptor.pBufferInfo = NULL;
+	writeDescriptor.pTexelBufferView = NULL;
+
+	vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
+
 	VLKModel* cursorModel = createCursorModel(device, cursorVerts, 6);
 	VLKShader* cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", proj, sizeof(float) * 16);
 	VLKPipeline* cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
 	VLKTexture* cursorTexture = createCursorTexture(device, "Cursor.png");
+
 	vlkBindTexture(device, cursorShader, cursorTexture);
 
 	double ct = glfwGetTime();
@@ -694,25 +729,39 @@ int main() {
 
 		Camera::update(dt);
 
-		vlkClear(context, device, swapChain);
-
-		Chunk::render(device, swapChain);
-		
 		VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
 		VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
 		VkDeviceSize offsets = {};
 
+		vlkStartFramebuffer(device, frameBuffer);
+
+		Chunk::render(device, swapChain);
+
+		vkCmdSetViewport(frameBuffer->drawCmdBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(frameBuffer->drawCmdBuffer, 0, 1, &scissor);
+
+		vkCmdBindPipeline(frameBuffer->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
+		vkCmdBindVertexBuffers(frameBuffer->drawCmdBuffer, 0, 1, &cursorModel->vertexInputBuffer, &offsets);
+		vkCmdBindDescriptorSets(frameBuffer->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
+
+		vkCmdDraw(frameBuffer->drawCmdBuffer, 6, 1, 0, 0);
+
+		vlkEndFramebuffer(device, frameBuffer);
+		
+		vlkClear(device, swapChain);
+
 		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
 		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
 		
-		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
-		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &cursorModel->vertexInputBuffer, &offsets);
+		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, backGroundPipeline->pipeline);
+		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &backGroundModel->vertexInputBuffer, &offsets);
 		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
+			backGroundPipeline->pipelineLayout, 0, 1, &backGroundShader->descriptorSet, 0, NULL);
 
 		vkCmdDraw(device->drawCmdBuffer, 6, 1, 0, 0);
 		
-		vlkSwap(context, device, swapChain);
+		vlkSwap(device, swapChain);
 	}
 
 	destroyCursorTexture(device, cursorTexture);
@@ -720,9 +769,14 @@ int main() {
 	destroyCursorShader(device, cursorShader);
 	destroyCursorModel(device, cursorModel);
 
+	destroyCursorPipeline(device, backGroundPipeline);
+	destroyCursorShader(device, backGroundShader);
+	destroyCursorModel(device, backGroundModel);
+
 	Chunk::destroy(device);
 	Camera::destroy(device);
 
+	vlkDestroyFramebuffer(device, frameBuffer);
 	vlkDestroyTexture(device, texture);
 	vlkDestroyPipeline(device, pipeline);
 	vlkDestroyShader(device, shader);

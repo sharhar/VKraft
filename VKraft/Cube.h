@@ -21,13 +21,14 @@ typedef struct CubeUniformBuffer {
 
 typedef struct ChunkModelInfo {
 	VLKModel* model;
-	VkCommandBuffer* commandBuffer;
+	VkCommandBuffer commandBuffer;
 	bool start;
 } ChunkmodelInfo;
 
 typedef struct VulkanRenderContext {
 	VLKDevice* device;
 	VLKSwapchain* swapChain;
+	VLKFramebuffer* framebuffer;
 	VLKShader* shader;
 	VLKPipeline* pipeline;
 	CubeUniformBuffer* uniformBuffer;

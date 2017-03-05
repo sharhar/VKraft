@@ -923,13 +923,13 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	VkVertexInputAttributeDescription vertexAttributeDescritpion[2];
 	vertexAttributeDescritpion[0].location = 0;
 	vertexAttributeDescritpion[0].binding = 0;
-	vertexAttributeDescritpion[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	vertexAttributeDescritpion[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	vertexAttributeDescritpion[0].offset = 0;
 
 	vertexAttributeDescritpion[1].location = 1;
 	vertexAttributeDescritpion[1].binding = 0;
 	vertexAttributeDescritpion[1].format = VK_FORMAT_R32G32_SFLOAT;
-	vertexAttributeDescritpion[1].offset = 3 * sizeof(float);
+	vertexAttributeDescritpion[1].offset = 4 * sizeof(float);
 
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -1064,7 +1064,7 @@ void vlkDestroyPipeline(VLKDevice* device, VLKPipeline* pipeline) {
 	free(pipeline);
 }
 
-void vlkClear(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain) {
+void vlkClear(VLKDevice* device, VLKSwapchain* swapChain) {
 	VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, 0, 0 };
 	vkCreateSemaphore(device->device, &semaphoreCreateInfo, NULL, &swapChain->presentCompleteSemaphore);
 	vkCreateSemaphore(device->device, &semaphoreCreateInfo, NULL, &swapChain->renderingCompleteSemaphore);
@@ -1111,7 +1111,7 @@ void vlkClear(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain) {
 		VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void vlkSwap(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain) {
+void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
 	vkCmdEndRenderPass(device->drawCmdBuffer);
 
 	VkImageMemoryBarrier prePresentBarrier = {};
@@ -1333,7 +1333,7 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
 	VkDescriptorImageInfo descriptorImageInfo = {};
 	descriptorImageInfo.sampler = texture->sampler;
 	descriptorImageInfo.imageView = texture->textureView;
-	descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+	descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	texture->descriptorImageInfo = descriptorImageInfo;
 
@@ -1363,4 +1363,423 @@ void vlkDestroyTexture(VLKDevice* device, VLKTexture* texture) {
 	vkDestroyImage(device->device, texture->textureImage, NULL);
 
 	free(texture);
+}
+
+VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t imageCount, uint32_t width, uint32_t height) {
+	VLKFramebuffer* frameBuffer = (VLKFramebuffer*)malloc(sizeof(VLKFramebuffer));
+
+	frameBuffer->imageCount = imageCount;
+	frameBuffer->width = width;
+	frameBuffer->height = height;
+
+	VkImageCreateInfo imageCreateInfo = {};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageCreateInfo.extent = { frameBuffer->width, frameBuffer->height, 1 };
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.queueFamilyIndexCount = 0;
+	imageCreateInfo.pQueueFamilyIndices = NULL;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VLKCheck(vkCreateImage(device->device, &imageCreateInfo, NULL, &frameBuffer->colorImage),
+		"Failed to create depth image");
+
+	VkMemoryRequirements memoryRequirements = {};
+	vkGetImageMemoryRequirements(device->device, frameBuffer->colorImage, &memoryRequirements);
+
+	VkMemoryAllocateInfo imageAllocateInfo = {};
+	imageAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	imageAllocateInfo.allocationSize = memoryRequirements.size;
+
+	uint32_t memoryTypeBits = memoryRequirements.memoryTypeBits;
+	VkMemoryPropertyFlags desiredMemoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	for (uint32_t i = 0; i < 32; ++i) {
+		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
+		if (memoryTypeBits & 1) {
+			if ((memoryType.propertyFlags & desiredMemoryFlags) == desiredMemoryFlags) {
+				imageAllocateInfo.memoryTypeIndex = i;
+				break;
+			}
+		}
+		memoryTypeBits = memoryTypeBits >> 1;
+	}
+
+	VLKCheck(vkAllocateMemory(device->device, &imageAllocateInfo, NULL, &frameBuffer->colorImageMemory),
+		"Failed to allocate device memory");
+
+	VLKCheck(vkBindImageMemory(device->device, frameBuffer->colorImage, frameBuffer->colorImageMemory, 0),
+		"Failed to bind image memory");
+
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	VkFence submitFence;
+	vkCreateFence(device->device, &fenceCreateInfo, NULL, &submitFence);
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(device->setupCmdBuffer, &beginInfo);
+
+	VkImageMemoryBarrier layoutTransitionBarrier = {};
+	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	layoutTransitionBarrier.srcAccessMask = 0;
+	layoutTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	layoutTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.image = frameBuffer->colorImage;
+	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	layoutTransitionBarrier.subresourceRange = resourceRange;
+
+	vkCmdPipelineBarrier(device->setupCmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &layoutTransitionBarrier);
+
+	vkEndCommandBuffer(device->setupCmdBuffer);
+
+	VkPipelineStageFlags waitStageMash[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = NULL;
+	submitInfo.pWaitDstStageMask = waitStageMash;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &device->setupCmdBuffer;
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = NULL;
+	VLKCheck(vkQueueSubmit(device->presentQueue, 1, &submitInfo, submitFence),
+		"Could not submit queue");
+
+	vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device->device, 1, &submitFence);
+
+	vkResetCommandBuffer(device->setupCmdBuffer, 0);
+	
+	VkImageViewCreateInfo presentImagesViewCreateInfo = {};
+	presentImagesViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	presentImagesViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	presentImagesViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	presentImagesViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R,
+		VK_COMPONENT_SWIZZLE_G,
+		VK_COMPONENT_SWIZZLE_B,
+		VK_COMPONENT_SWIZZLE_A };
+	presentImagesViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	presentImagesViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	presentImagesViewCreateInfo.subresourceRange.levelCount = 1;
+	presentImagesViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	presentImagesViewCreateInfo.subresourceRange.layerCount = 1;
+	presentImagesViewCreateInfo.image = frameBuffer->colorImage;
+
+	VLKCheck(vkCreateImageView(device->device, &presentImagesViewCreateInfo, NULL, &frameBuffer->colorImageView),
+		"Coud not create image view");
+
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.format = VK_FORMAT_D16_UNORM;
+	imageCreateInfo.extent = { frameBuffer->width, frameBuffer->height, 1 };
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.queueFamilyIndexCount = 0;
+	imageCreateInfo.pQueueFamilyIndices = NULL;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VLKCheck(vkCreateImage(device->device, &imageCreateInfo, NULL, &frameBuffer->depthImage),
+		"Failed to create depth image");
+
+	vkGetImageMemoryRequirements(device->device, frameBuffer->depthImage, &memoryRequirements);
+
+	imageAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	imageAllocateInfo.allocationSize = memoryRequirements.size;
+
+	memoryTypeBits = memoryRequirements.memoryTypeBits;
+	desiredMemoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	for (uint32_t i = 0; i < 32; ++i) {
+		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
+		if (memoryTypeBits & 1) {
+			if ((memoryType.propertyFlags & desiredMemoryFlags) == desiredMemoryFlags) {
+				imageAllocateInfo.memoryTypeIndex = i;
+				break;
+			}
+		}
+		memoryTypeBits = memoryTypeBits >> 1;
+	}
+
+	VLKCheck(vkAllocateMemory(device->device, &imageAllocateInfo, NULL, &frameBuffer->depthImageMemory),
+		"Failed to allocate device memory");
+
+	VLKCheck(vkBindImageMemory(device->device, frameBuffer->depthImage, frameBuffer->depthImageMemory, 0),
+		"Failed to bind image memory");
+
+	vkBeginCommandBuffer(device->setupCmdBuffer, &beginInfo);
+
+	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	layoutTransitionBarrier.srcAccessMask = 0;
+	layoutTransitionBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+		VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	layoutTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.image = frameBuffer->depthImage;
+	resourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+	layoutTransitionBarrier.subresourceRange = resourceRange;
+
+	vkCmdPipelineBarrier(device->setupCmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &layoutTransitionBarrier);
+
+	vkEndCommandBuffer(device->setupCmdBuffer);
+
+	VkPipelineStageFlags waitStageMask[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = NULL;
+	submitInfo.pWaitDstStageMask = waitStageMask;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &device->setupCmdBuffer;
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = NULL;
+	VLKCheck(vkQueueSubmit(device->presentQueue, 1, &submitInfo, submitFence),
+		"Could not submit Queue");
+
+	vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device->device, 1, &submitFence);
+	vkDestroyFence(device->device, submitFence, NULL);
+	vkResetCommandBuffer(device->setupCmdBuffer, 0);
+
+	VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	VkImageViewCreateInfo imageViewCreateInfo = {};
+	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.image = frameBuffer->depthImage;
+	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imageViewCreateInfo.format = imageCreateInfo.format;
+	imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+	imageViewCreateInfo.subresourceRange.aspectMask = aspectMask;
+	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	imageViewCreateInfo.subresourceRange.levelCount = 1;
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	imageViewCreateInfo.subresourceRange.layerCount = 1;
+
+	VLKCheck(vkCreateImageView(device->device, &imageViewCreateInfo, NULL, &frameBuffer->depthImageView),
+		"Failed to create image view");
+
+	VkAttachmentDescription passAttachments[2] = {};
+	passAttachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+	passAttachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+	passAttachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	passAttachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	passAttachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	passAttachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	passAttachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	passAttachments[1].format = VK_FORMAT_D16_UNORM;
+	passAttachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+	passAttachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	passAttachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	passAttachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	passAttachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference colorAttachmentReference = {};
+	colorAttachmentReference.attachment = 0;
+	colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depthAttachmentReference = {};
+	depthAttachmentReference.attachment = 1;
+	depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorAttachmentReference;
+	subpass.pDepthStencilAttachment = &depthAttachmentReference;
+
+	VkRenderPassCreateInfo renderPassCreateInfo = {};
+	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassCreateInfo.attachmentCount = 2;
+	renderPassCreateInfo.pAttachments = passAttachments;
+	renderPassCreateInfo.subpassCount = 1;
+	renderPassCreateInfo.pSubpasses = &subpass;
+
+	VLKCheck(vkCreateRenderPass(device->device, &renderPassCreateInfo, NULL, &frameBuffer->renderPass),
+		"Failed to create renderpass");
+
+	VkImageView frameBufferAttachments[2];
+	frameBufferAttachments[0] = frameBuffer->colorImageView;
+	frameBufferAttachments[1] = frameBuffer->depthImageView;
+
+	VkFramebufferCreateInfo frameBufferCreateInfo = {};
+	frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	frameBufferCreateInfo.renderPass = frameBuffer->renderPass;
+	frameBufferCreateInfo.attachmentCount = 2;
+	frameBufferCreateInfo.pAttachments = frameBufferAttachments;
+	frameBufferCreateInfo.width = frameBuffer->width;
+	frameBufferCreateInfo.height = frameBuffer->height;
+	frameBufferCreateInfo.layers = 1;
+
+	VLKCheck(vkCreateFramebuffer(device->device, &frameBufferCreateInfo, NULL, &frameBuffer->frameBuffer),
+		"Failed to create framebuffer");
+
+	VkSamplerCreateInfo samplerCreateInfo = {};
+	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.mipLodBias = 0;
+	samplerCreateInfo.anisotropyEnable = VK_FALSE;
+	samplerCreateInfo.minLod = 0;
+	samplerCreateInfo.maxLod = 5;
+	samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+
+	VLKCheck(vkCreateSampler(device->device, &samplerCreateInfo, NULL, &frameBuffer->sampler),
+		"Failed to create sampler");
+
+	VkDescriptorImageInfo descriptorImageInfo = {};
+	descriptorImageInfo.sampler = frameBuffer->sampler;
+	descriptorImageInfo.imageView = frameBuffer->colorImageView;
+	descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	frameBuffer->descriptorImageInfo = descriptorImageInfo;
+
+	VkCommandBufferAllocateInfo commandBufferAllocationInfo = {};
+	commandBufferAllocationInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	commandBufferAllocationInfo.commandPool = device->commandPool;
+	commandBufferAllocationInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	commandBufferAllocationInfo.commandBufferCount = 1;
+
+	VLKCheck(vkAllocateCommandBuffers(device->device, &commandBufferAllocationInfo, &frameBuffer->drawCmdBuffer),
+		"Failed to allocate setup command buffer");
+	
+	return frameBuffer;
+}
+
+void vlkDestroyFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
+	vkDestroySampler(device->device, frameBuffer->sampler, NULL);
+	vkFreeCommandBuffers(device->device, device->commandPool, 1, &frameBuffer->drawCmdBuffer);
+
+	vkDestroyFramebuffer(device->device, frameBuffer->frameBuffer, NULL);
+
+	vkDestroyRenderPass(device->device, frameBuffer->renderPass, NULL);
+
+	vkFreeMemory(device->device, frameBuffer->depthImageMemory, NULL);
+	vkDestroyImageView(device->device, frameBuffer->depthImageView, NULL);
+	vkDestroyImage(device->device, frameBuffer->depthImage, NULL);
+
+	vkFreeMemory(device->device, frameBuffer->colorImageMemory, NULL);
+	vkDestroyImageView(device->device, frameBuffer->colorImageView, NULL);
+	vkDestroyImage(device->device, frameBuffer->colorImage, NULL);
+}
+
+void vlkStartFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	vkBeginCommandBuffer(frameBuffer->drawCmdBuffer, &beginInfo);
+
+	VkImageMemoryBarrier layoutTransitionBarrier = {};
+	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	layoutTransitionBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	layoutTransitionBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+		VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	layoutTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.image = frameBuffer->colorImage;
+	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	layoutTransitionBarrier.subresourceRange = resourceRange;
+
+	vkCmdPipelineBarrier(frameBuffer->drawCmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &layoutTransitionBarrier);
+
+	VkClearValue clearValue[] = { { 0.25f, 0.45f, 1.0f, 1.0f },{ 1.0, 0.0 } };
+	VkRenderPassBeginInfo renderPassBeginInfo = {};
+	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassBeginInfo.renderPass = frameBuffer->renderPass;
+	renderPassBeginInfo.framebuffer = frameBuffer->frameBuffer;
+	renderPassBeginInfo.renderArea = { 0, 0, frameBuffer->width, frameBuffer->height };
+	renderPassBeginInfo.clearValueCount = 2;
+	renderPassBeginInfo.pClearValues = clearValue;
+	vkCmdBeginRenderPass(frameBuffer->drawCmdBuffer, &renderPassBeginInfo,
+		VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void vlkEndFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
+	vkCmdEndRenderPass(frameBuffer->drawCmdBuffer);
+
+	VkImageMemoryBarrier prePresentBarrier = {};
+	prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	prePresentBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	prePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	prePresentBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	prePresentBarrier.image = frameBuffer->colorImage;
+
+	vkCmdPipelineBarrier(frameBuffer->drawCmdBuffer,
+		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &prePresentBarrier);
+
+	vkEndCommandBuffer(frameBuffer->drawCmdBuffer);
+
+	VkFence renderFence;
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	vkCreateFence(device->device, &fenceCreateInfo, NULL, &renderFence);
+
+	VkPipelineStageFlags waitStageMash = { VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = NULL;
+	submitInfo.pWaitDstStageMask = &waitStageMash;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &frameBuffer->drawCmdBuffer;
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = NULL;
+	vkQueueSubmit(device->presentQueue, 1, &submitInfo, renderFence);
+
+	vkWaitForFences(device->device, 1, &renderFence, VK_TRUE, UINT64_MAX);
+	vkDestroyFence(device->device, renderFence, NULL);
+
+	vkResetCommandBuffer(frameBuffer->drawCmdBuffer, 0);
 }
