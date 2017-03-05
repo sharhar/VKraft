@@ -414,18 +414,27 @@ void destroyCursorPipeline(VLKDevice* device, VLKPipeline* pipeline) {
 	free(pipeline);
 }
 
-VLKTexture*  createCursorTexture(VLKDevice* device, char* path) {
+VLKTexture* createCursorTexture(VLKDevice* device, char* path) {
 	VLKTexture* texture = (VLKTexture*)malloc(sizeof(VLKTexture));
 
-	uint32_t width, height;
+	texture->width = 48;
+	texture->height = 48;
 
-	std::vector<unsigned char> imageData;
+	uint32_t* data = new uint32_t[48*48];
 
-	unsigned int error = lodepng::decode(imageData, width, height, path);
-
-	texture->width = width;
-	texture->height = height;
-	texture->data = imageData.data();
+	for (int y = 0; y < 48;y++) {
+		for (int x = 0; x < 48; x++) {
+			if ((x < 20 || x > 28) && (y < 20 || y > 28)) {
+				data[y * 48 + x] = 0x00000000;
+			} else if (((x == 20 || x == 28) && (y <= 20 || y >= 28)) ||
+					   ((x <= 20 || x >= 28) && (y == 20 || y == 28)) ||
+					   (x == 47 || x == 0 || y == 47 || y == 0)) {
+				data[y * 48 + x] = 0xff000000;
+			} else {
+				data[y * 48 + x] = 0xffffffff;
+			}
+		}
+	}
 
 	VkImageCreateInfo textureCreateInfo = {};
 	textureCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -474,7 +483,7 @@ VLKTexture*  createCursorTexture(VLKDevice* device, char* path) {
 	VLKCheck(vkMapMemory(device->device, texture->textureImageMemory, 0, VK_WHOLE_SIZE, 0, &imageMapped),
 		"Failed to map image memory.");
 
-	memcpy(imageMapped, texture->data, texture->width * texture->height * 4);
+	memcpy(imageMapped, data, texture->width * texture->height* sizeof(uint32_t));
 
 	VkMappedMemoryRange memoryRange = {};
 	memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
@@ -485,7 +494,7 @@ VLKTexture*  createCursorTexture(VLKDevice* device, char* path) {
 
 	vkUnmapMemory(device->device, texture->textureImageMemory);
 
-	imageData.clear();
+	delete[] data;
 
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -559,8 +568,8 @@ VLKTexture*  createCursorTexture(VLKDevice* device, char* path) {
 
 	VkSamplerCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-	samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
 	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -627,12 +636,6 @@ int main() {
 
 	prev_x = xpos;
 	prev_y = ypos;
-
-	double ct = glfwGetTime();
-	double dt = 0;
-
-	double cts = glfwGetTime();
-	double dts = 0;
 	
 	VulkanRenderContext renderContext = {};
 	renderContext.device = device;
@@ -650,12 +653,12 @@ int main() {
 	vlkBindTexture(device, shader, texture);
 	
 	float cursorVerts[] = {
-		-0.075f, -0.075f, 0, 0,
-		 0.075f, -0.075f, 1, 0,
-		-0.075f,  0.075f, 0, 1,
-		-0.075f,  0.075f, 0, 1,
-		 0.075f, -0.075f, 1, 0,
-		 0.075f,  0.075f, 1, 1 };
+		-0.0375f, -0.0375f, 0, 0,
+		 0.0375f, -0.0375f, 1, 0,
+		-0.0375f,  0.0375f, 0, 1,
+		-0.0375f,  0.0375f, 0, 1,
+		 0.0375f, -0.0375f, 1, 0,
+		 0.0375f,  0.0375f, 1, 1 };
 
 	float aspect = 16.0f / 9.0f;
 
@@ -668,8 +671,14 @@ int main() {
 	VLKModel* cursorModel = createCursorModel(device, cursorVerts, 6);
 	VLKShader* cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", proj, sizeof(float) * 16);
 	VLKPipeline* cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
-	VLKTexture* cursorTexture = createCursorTexture(device, "pack.png");
+	VLKTexture* cursorTexture = createCursorTexture(device, "Cursor.png");
 	vlkBindTexture(device, cursorShader, cursorTexture);
+
+	double ct = glfwGetTime();
+	double dt = 0;
+
+	double cts = glfwGetTime();
+	double dts = 0;
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
