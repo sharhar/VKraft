@@ -648,7 +648,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 
 			freeInfo->modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
 			freeInfo->modelInfo->start = false;
-			freeInfo->modelInfo->model = vlkCreateModel(vrc->device, verts, rcct);
+			freeInfo->modelInfo->model = vlkCreateModel(vrc->device, verts, rcct * sizeof(Vertex));
 
 			VkCommandBufferInheritanceInfo inheritanceInfo = {};
 			inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;

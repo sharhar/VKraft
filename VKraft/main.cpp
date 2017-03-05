@@ -19,60 +19,94 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
 	}
 }
 
-VLKModel* createCursorModel(VLKDevice* device, float* verts, uint32_t vertNum) {
-	VLKModel* model = (VLKModel*)malloc(sizeof(VLKModel));
+VLKShader* createBGShader(VLKDevice* device, char* vertPath, char* fragPath) {
+	VLKShader* shader = (VLKShader*)malloc(sizeof(VLKShader));
 
-	VkBufferCreateInfo vertexInputBufferInfo = {};
-	vertexInputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	vertexInputBufferInfo.size = sizeof(float) * 4 * vertNum;
-	vertexInputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	vertexInputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	uint32_t codeSize;
+	char* code = new char[20000];
+	HANDLE fileHandle = 0;
 
-	VLKCheck(vkCreateBuffer(device->device, &vertexInputBufferInfo, NULL, &model->vertexInputBuffer),
-		"Failed to create vertex input buffer.");
-
-	VkMemoryRequirements vertexBufferMemoryRequirements = {};
-	vkGetBufferMemoryRequirements(device->device, model->vertexInputBuffer,
-		&vertexBufferMemoryRequirements);
-
-	VkMemoryAllocateInfo bufferAllocateInfo = {};
-	bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	bufferAllocateInfo.allocationSize = vertexBufferMemoryRequirements.size;
-
-	uint32_t vertexMemoryTypeBits = vertexBufferMemoryRequirements.memoryTypeBits;
-	VkMemoryPropertyFlags vertexDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-	for (uint32_t i = 0; i < 32; ++i) {
-		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
-		if (vertexMemoryTypeBits & 1) {
-			if ((memoryType.propertyFlags & vertexDesiredMemoryFlags) == vertexDesiredMemoryFlags) {
-				bufferAllocateInfo.memoryTypeIndex = i;
-				break;
-			}
-		}
-		vertexMemoryTypeBits = vertexMemoryTypeBits >> 1;
+	fileHandle = CreateFile(vertPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (fileHandle == INVALID_HANDLE_VALUE) {
+		OutputDebugStringA("Failed to open shader file.");
+		exit(1);
 	}
+	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
+	CloseHandle(fileHandle);
 
-	VLKCheck(vkAllocateMemory(device->device, &bufferAllocateInfo, NULL, &model->vertexBufferMemory),
-		"Failed to allocate buffer memory");
+	VkShaderModuleCreateInfo vertexShaderCreationInfo = {};
+	vertexShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	vertexShaderCreationInfo.codeSize = codeSize;
+	vertexShaderCreationInfo.pCode = (uint32_t *)code;
 
-	void *mapped;
-	VLKCheck(vkMapMemory(device->device, model->vertexBufferMemory, 0, VK_WHOLE_SIZE, 0, &mapped),
-		"Failed to map buffer memory");
+	VLKCheck(vkCreateShaderModule(device->device, &vertexShaderCreationInfo, NULL, &shader->vertexShaderModule),
+		"Failed to create vertex shader module");
 
-	memcpy(mapped, verts, sizeof(float) * 4 * vertNum);
+	fileHandle = CreateFile(fragPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (fileHandle == INVALID_HANDLE_VALUE) {
+		OutputDebugStringA("Failed to open shader file.");
+		exit(1);
+	}
+	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
+	CloseHandle(fileHandle);
 
-	vkUnmapMemory(device->device, model->vertexBufferMemory);
+	VkShaderModuleCreateInfo fragmentShaderCreationInfo = {};
+	fragmentShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	fragmentShaderCreationInfo.codeSize = codeSize;
+	fragmentShaderCreationInfo.pCode = (uint32_t *)code;
 
-	VLKCheck(vkBindBufferMemory(device->device, model->vertexInputBuffer, model->vertexBufferMemory, 0),
-		"Failed to bind buffer memory");
+	VLKCheck(vkCreateShaderModule(device->device, &fragmentShaderCreationInfo, NULL, &shader->fragmentShaderModule),
+		"Could not create Fragment shader");
 
-	return model;
+	delete[] code;
+
+	VkDescriptorSetLayoutBinding binding;
+	binding.binding = 0;
+	binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binding.descriptorCount = 1;
+	binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	binding.pImmutableSamplers = NULL;
+
+	VkDescriptorSetLayoutCreateInfo setLayoutCreateInfo = {};
+	setLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	setLayoutCreateInfo.bindingCount = 1;
+	setLayoutCreateInfo.pBindings = &binding;
+
+	VLKCheck(vkCreateDescriptorSetLayout(device->device, &setLayoutCreateInfo, NULL, &shader->setLayout),
+		"Failed to create DescriptorSetLayout");
+
+	VkDescriptorPoolSize uniformBufferPoolSize;
+	uniformBufferPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	uniformBufferPoolSize.descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo poolCreateInfo = {};
+	poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolCreateInfo.maxSets = 1;
+	poolCreateInfo.poolSizeCount = 1;
+	poolCreateInfo.pPoolSizes = &uniformBufferPoolSize;
+
+	VLKCheck(vkCreateDescriptorPool(device->device, &poolCreateInfo, NULL, &shader->descriptorPool),
+		"Failed to create descriptor pool");
+
+	VkDescriptorSetAllocateInfo descriptorAllocateInfo = {};
+	descriptorAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descriptorAllocateInfo.descriptorPool = shader->descriptorPool;
+	descriptorAllocateInfo.descriptorSetCount = 1;
+	descriptorAllocateInfo.pSetLayouts = &shader->setLayout;
+
+	VLKCheck(vkAllocateDescriptorSets(device->device, &descriptorAllocateInfo, &shader->descriptorSet),
+		"Failed to allocate descriptor sets");
+	return shader;
 }
 
-void destroyCursorModel(VLKDevice* device, VLKModel* model) {
-	vkFreeMemory(device->device, model->vertexBufferMemory, NULL);
-	vkDestroyBuffer(device->device, model->vertexInputBuffer, NULL);
-	free(model);
+void destroyBGShader(VLKDevice* device, VLKShader* shader) {
+	vkDestroyDescriptorPool(device->device, shader->descriptorPool, NULL);
+	vkDestroyDescriptorSetLayout(device->device, shader->setLayout, NULL);
+
+	vkDestroyShaderModule(device->device, shader->vertexShaderModule, NULL);
+	vkDestroyShaderModule(device->device, shader->fragmentShaderModule, NULL);
+
+	free(shader);
 }
 
 VLKShader* createCursorShader(VLKDevice* device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
@@ -239,7 +273,7 @@ void destroyCursorShader(VLKDevice* device, VLKShader* shader) {
 	free(shader);
 }
 
-VLKPipeline* createCursorPipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKShader* shader) {
+VLKPipeline* createBGPipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKShader* shader) {
 	VLKPipeline* pipeline = (VLKPipeline*)malloc(sizeof(VLKPipeline));
 
 	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
@@ -287,6 +321,176 @@ VLKPipeline* createCursorPipeline(VLKDevice* device, VLKSwapchain* swapChain, VL
 	vertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexBindingDescription;
 	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = 2;
 	vertexInputStateCreateInfo.pVertexAttributeDescriptions = vertexAttributeDescritpion;
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
+	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
+
+	VkViewport viewport = {};
+	viewport.x = 0;
+	viewport.y = 0;
+	viewport.width = swapChain->width;
+	viewport.height = swapChain->height;
+	viewport.minDepth = 0;
+	viewport.maxDepth = 1;
+
+	VkRect2D scissors = {};
+	scissors.offset = { 0, 0 };
+	scissors.extent = { swapChain->width, swapChain->height };
+
+	VkPipelineViewportStateCreateInfo viewportState = {};
+	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = 1;
+	viewportState.pViewports = &viewport;
+	viewportState.scissorCount = 1;
+	viewportState.pScissors = &scissors;
+
+	VkPipelineRasterizationStateCreateInfo rasterizationState = {};
+	rasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizationState.depthClampEnable = VK_FALSE;
+	rasterizationState.rasterizerDiscardEnable = VK_FALSE;
+	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
+	rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizationState.depthBiasEnable = VK_FALSE;
+	rasterizationState.depthBiasConstantFactor = 0;
+	rasterizationState.depthBiasClamp = 0;
+	rasterizationState.depthBiasSlopeFactor = 0;
+	rasterizationState.lineWidth = 1;
+
+	VkPipelineMultisampleStateCreateInfo multisampleState = {};
+	multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampleState.sampleShadingEnable = VK_FALSE;
+	multisampleState.minSampleShading = 0;
+	multisampleState.pSampleMask = NULL;
+	multisampleState.alphaToCoverageEnable = VK_FALSE;
+	multisampleState.alphaToOneEnable = VK_FALSE;
+
+	VkStencilOpState noOPStencilState = {};
+	noOPStencilState.failOp = VK_STENCIL_OP_KEEP;
+	noOPStencilState.passOp = VK_STENCIL_OP_KEEP;
+	noOPStencilState.depthFailOp = VK_STENCIL_OP_KEEP;
+	noOPStencilState.compareOp = VK_COMPARE_OP_ALWAYS;
+	noOPStencilState.compareMask = 0;
+	noOPStencilState.writeMask = 0;
+	noOPStencilState.reference = 0;
+
+	VkPipelineDepthStencilStateCreateInfo depthState = {};
+	depthState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthState.depthTestEnable = VK_TRUE;
+	depthState.depthWriteEnable = VK_TRUE;
+	depthState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+	depthState.depthBoundsTestEnable = VK_FALSE;
+	depthState.stencilTestEnable = VK_FALSE;
+	depthState.front = noOPStencilState;
+	depthState.back = noOPStencilState;
+	depthState.minDepthBounds = 0;
+	depthState.maxDepthBounds = 0;
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
+	colorBlendAttachmentState.blendEnable = VK_FALSE;
+	colorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR;
+	colorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+	colorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachmentState.colorWriteMask = 0xf;
+
+	VkPipelineColorBlendStateCreateInfo colorBlendState = {};
+	colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlendState.logicOpEnable = VK_FALSE;
+	colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
+	colorBlendState.attachmentCount = 1;
+	colorBlendState.pAttachments = &colorBlendAttachmentState;
+	colorBlendState.blendConstants[0] = 0.0;
+	colorBlendState.blendConstants[1] = 0.0;
+	colorBlendState.blendConstants[2] = 0.0;
+	colorBlendState.blendConstants[3] = 0.0;
+
+	VkDynamicState dynamicState[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
+	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicStateCreateInfo.dynamicStateCount = 2;
+	dynamicStateCreateInfo.pDynamicStates = dynamicState;
+
+	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
+	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineCreateInfo.stageCount = 2;
+	pipelineCreateInfo.pStages = shaderStageCreateInfo;
+	pipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
+	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
+	pipelineCreateInfo.pTessellationState = NULL;
+	pipelineCreateInfo.pViewportState = &viewportState;
+	pipelineCreateInfo.pRasterizationState = &rasterizationState;
+	pipelineCreateInfo.pMultisampleState = &multisampleState;
+	pipelineCreateInfo.pDepthStencilState = &depthState;
+	pipelineCreateInfo.pColorBlendState = &colorBlendState;
+	pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
+	pipelineCreateInfo.layout = pipeline->pipelineLayout;
+	pipelineCreateInfo.renderPass = swapChain->renderPass;
+	pipelineCreateInfo.subpass = 0;
+	pipelineCreateInfo.basePipelineHandle = NULL;
+	pipelineCreateInfo.basePipelineIndex = 0;
+
+	VLKCheck(vkCreateGraphicsPipelines(device->device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline->pipeline),
+		"Failed to create graphics pipeline");
+
+	return pipeline;
+}
+
+void destroyBGPipeline(VLKDevice* device, VLKPipeline* pipeline) {
+	vkDestroyPipeline(device->device, pipeline->pipeline, NULL);
+	vkDestroyPipelineLayout(device->device, pipeline->pipelineLayout, NULL);
+
+	free(pipeline);
+}
+
+VLKPipeline* createCursorPipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKShader* shader) {
+	VLKPipeline* pipeline = (VLKPipeline*)malloc(sizeof(VLKPipeline));
+
+	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
+	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layoutCreateInfo.setLayoutCount = 1;
+	layoutCreateInfo.pSetLayouts = &shader->setLayout;
+	layoutCreateInfo.pushConstantRangeCount = 0;
+	layoutCreateInfo.pPushConstantRanges = NULL;
+
+	VLKCheck(vkCreatePipelineLayout(device->device, &layoutCreateInfo, NULL, &pipeline->pipelineLayout),
+		"Failed to create pipeline layout");
+
+	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[2] = {};
+	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shaderStageCreateInfo[0].module = shader->vertexShaderModule;
+	shaderStageCreateInfo[0].pName = "main";
+	shaderStageCreateInfo[0].pSpecializationInfo = NULL;
+
+	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shaderStageCreateInfo[1].module = shader->fragmentShaderModule;
+	shaderStageCreateInfo[1].pName = "main";
+	shaderStageCreateInfo[1].pSpecializationInfo = NULL;
+
+	VkVertexInputBindingDescription vertexBindingDescription = {};
+	vertexBindingDescription.binding = 0;
+	vertexBindingDescription.stride = sizeof(float) * 2;
+	vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	VkVertexInputAttributeDescription vertexAttributeDescritpion;
+	vertexAttributeDescritpion.location = 0;
+	vertexAttributeDescritpion.binding = 0;
+	vertexAttributeDescritpion.format = VK_FORMAT_R32G32_SFLOAT;
+	vertexAttributeDescritpion.offset = 0;
+
+	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
+	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
+	vertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexBindingDescription;
+	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = 1;
+	vertexInputStateCreateInfo.pVertexAttributeDescriptions = &vertexAttributeDescritpion;
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
 	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -656,12 +860,19 @@ int main() {
 	vlkBindTexture(device, shader, texture);
 
 	float cursorVerts[] = {
-		-0.0375f, -0.0375f, 0, 0,
-		 0.0375f, -0.0375f, 1, 0,
-		-0.0375f,  0.0375f, 0, 1,
-		-0.0375f,  0.0375f, 0, 1,
-		 0.0375f, -0.0375f, 1, 0,
-		 0.0375f,  0.0375f, 1, 1 };
+		-0.0328125f, -0.0046875f,
+		 0.0328125f, -0.0046875f,
+		-0.0328125f,  0.0046875f,
+		-0.0328125f,  0.0046875f,
+		 0.0328125f, -0.0046875f,
+		 0.0328125f,  0.0046875f,
+		
+		-0.0046875f, -0.0328125f,
+		 0.0046875f, -0.0328125f,
+		-0.0046875f,  0.0328125f,
+		-0.0046875f,  0.0328125f,
+		 0.0046875f, -0.0328125f,
+		 0.0046875f,  0.0328125f };
 
 	float backGroundVerts[] = {
 		-1, -1, 0, 0,
@@ -673,26 +884,14 @@ int main() {
 
 	float aspect = 16.0f / 9.0f;
 
-	float proj[] = {
-		1, 0, 0, 0,
-		0, aspect, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1 };
-
-	float projBack[] = {
-		1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1 };
-
-	VLKModel* backGroundModel = createCursorModel(device, backGroundVerts, 6);
-	VLKShader* backGroundShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", projBack, sizeof(float) * 16);
-	VLKPipeline* backGroundPipeline = createCursorPipeline(device, swapChain, backGroundShader);
+	VLKModel* bgModel = vlkCreateModel(device, backGroundVerts, 6 * 4 * sizeof(float));
+	VLKShader* bgShader = createBGShader(device, "bg-vert.spv", "bg-frag.spv");
+	VLKPipeline* bgPipeline = createBGPipeline(device, swapChain, bgShader);
 
 	VkWriteDescriptorSet writeDescriptor = {};
 	writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writeDescriptor.dstSet = backGroundShader->descriptorSet;
-	writeDescriptor.dstBinding = 1;
+	writeDescriptor.dstSet = bgShader->descriptorSet;
+	writeDescriptor.dstBinding = 0;
 	writeDescriptor.dstArrayElement = 0;
 	writeDescriptor.descriptorCount = 1;
 	writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -702,12 +901,22 @@ int main() {
 
 	vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
 
-	VLKModel* cursorModel = createCursorModel(device, cursorVerts, 6);
-	VLKShader* cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", proj, sizeof(float) * 16);
+	VLKModel* cursorModel = vlkCreateModel(device, cursorVerts, 12 * 2 * sizeof(float));
+	VLKShader* cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", &aspect, sizeof(float));
 	VLKPipeline* cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
 	VLKTexture* cursorTexture = createCursorTexture(device, "Cursor.png");
 
-	vlkBindTexture(device, cursorShader, cursorTexture);
+	writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeDescriptor.dstSet = cursorShader->descriptorSet;
+	writeDescriptor.dstBinding = 1;
+	writeDescriptor.dstArrayElement = 0;
+	writeDescriptor.descriptorCount = 1;
+	writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writeDescriptor.pImageInfo = &frameBuffer->descriptorImageInfo;
+	writeDescriptor.pBufferInfo = NULL;
+	writeDescriptor.pTexelBufferView = NULL;
+
+	vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
 
 	double ct = glfwGetTime();
 	double dt = 0;
@@ -737,16 +946,6 @@ int main() {
 
 		Chunk::render(device, swapChain);
 
-		vkCmdSetViewport(frameBuffer->drawCmdBuffer, 0, 1, &viewport);
-		vkCmdSetScissor(frameBuffer->drawCmdBuffer, 0, 1, &scissor);
-
-		vkCmdBindPipeline(frameBuffer->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
-		vkCmdBindVertexBuffers(frameBuffer->drawCmdBuffer, 0, 1, &cursorModel->vertexInputBuffer, &offsets);
-		vkCmdBindDescriptorSets(frameBuffer->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
-
-		vkCmdDraw(frameBuffer->drawCmdBuffer, 6, 1, 0, 0);
-
 		vlkEndFramebuffer(device, frameBuffer);
 		
 		vlkClear(device, swapChain);
@@ -754,12 +953,22 @@ int main() {
 		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
 		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
 		
-		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, backGroundPipeline->pipeline);
-		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &backGroundModel->vertexInputBuffer, &offsets);
+		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, bgPipeline->pipeline);
+		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &bgModel->vertexInputBuffer, &offsets);
 		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			backGroundPipeline->pipelineLayout, 0, 1, &backGroundShader->descriptorSet, 0, NULL);
+			bgPipeline->pipelineLayout, 0, 1, &bgShader->descriptorSet, 0, NULL);
 
 		vkCmdDraw(device->drawCmdBuffer, 6, 1, 0, 0);
+
+		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
+
+		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
+		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &cursorModel->vertexInputBuffer, &offsets);
+		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
+
+		vkCmdDraw(device->drawCmdBuffer, 12, 1, 0, 0);
 		
 		vlkSwap(device, swapChain);
 	}
@@ -767,11 +976,11 @@ int main() {
 	destroyCursorTexture(device, cursorTexture);
 	destroyCursorPipeline(device, cursorPipeline);
 	destroyCursorShader(device, cursorShader);
-	destroyCursorModel(device, cursorModel);
+	vlkDestroyModel(device, cursorModel);
 
-	destroyCursorPipeline(device, backGroundPipeline);
-	destroyCursorShader(device, backGroundShader);
-	destroyCursorModel(device, backGroundModel);
+	destroyBGPipeline(device, bgPipeline);
+	destroyBGShader(device, bgShader);
+	vlkDestroyModel(device,bgModel);
 
 	Chunk::destroy(device);
 	Camera::destroy(device);

@@ -151,6 +151,8 @@
     <ClInclude Include="VLKUtils.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="bg.frag" />
+    <None Include="bg.vert" />
     <None Include="cube.comp" />
     <None Include="cube.frag" />
     <None Include="cube.geom" />

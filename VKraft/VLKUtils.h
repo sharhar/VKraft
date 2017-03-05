@@ -103,7 +103,7 @@ void vlkDestroyContext(VLKContext* context);
 void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext* context, VLKDevice** device, VLKSwapchain** swapChain);
 void vlkDestroyDeviceAndSwapchain(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain);
 
-VLKModel* vlkCreateModel(VLKDevice* device, Vertex* verts, uint32_t num);
+VLKModel* vlkCreateModel(VLKDevice* device, void* verts, uint32_t vertsSize);
 void vlkDestroyModel(VLKDevice* device, VLKModel* model);
 
 VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize);

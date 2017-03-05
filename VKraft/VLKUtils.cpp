@@ -653,12 +653,12 @@ void vlkDestroyDeviceAndSwapchain(VLKContext* context, VLKDevice* device, VLKSwa
 	free(device);
 }
 
-VLKModel* vlkCreateModel(VLKDevice* device, Vertex* verts, uint32_t num) {
+VLKModel* vlkCreateModel(VLKDevice* device, void* verts, uint32_t vertsSize) {
 	VLKModel* model = (VLKModel*)malloc(sizeof(VLKModel));
 
 	VkBufferCreateInfo vertexInputBufferInfo = {};
 	vertexInputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	vertexInputBufferInfo.size = sizeof(Vertex) * num;
+	vertexInputBufferInfo.size = vertsSize;
 	vertexInputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	vertexInputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -693,7 +693,7 @@ VLKModel* vlkCreateModel(VLKDevice* device, Vertex* verts, uint32_t num) {
 	VLKCheck(vkMapMemory(device->device, model->vertexBufferMemory, 0, VK_WHOLE_SIZE, 0, &mapped),
 		"Failed to map buffer memory");
 
-	memcpy(mapped, verts, sizeof(Vertex) * num);
+	memcpy(mapped, verts, vertsSize);
 
 	vkUnmapMemory(device->device, model->vertexBufferMemory);
 
