@@ -121,6 +121,38 @@ static bool closeEnough(Vec3 pos, Vec3 other) {
 	return pos.dist(other) <= CHUNK_RAD;
 }
 
+static void addNext(Chunk* chunk, Vec3 pos) {
+	if (chunk->m_xn == NULL) {
+		Chunk* temp = new Chunk(pos.add({ -1, 0, 0 }));
+		recalcChunksNextTo(temp);
+	}
+
+	if (chunk->m_xp == NULL) {
+		Chunk* temp = new Chunk(pos.add({ 1, 0, 0 }));
+		recalcChunksNextTo(temp);
+	}
+
+	if (chunk->m_yn == NULL) {
+		Chunk* temp = new Chunk(pos.add({ 0, -1, 0 }));
+		recalcChunksNextTo(temp);
+	}
+
+	if (chunk->m_yp == NULL) {
+		Chunk* temp = new Chunk(pos.add({ 0,  1, 0 }));
+		recalcChunksNextTo(temp);
+	}
+
+	if (chunk->m_zn == NULL) {
+		Chunk* temp = new Chunk(pos.add({ 0, 0, -1 }));
+		recalcChunksNextTo(temp);
+	}
+
+	if (chunk->m_zp == NULL) {
+		Chunk* temp = new Chunk(pos.add({ 0, 0,  1 }));
+		recalcChunksNextTo(temp);
+	}
+}
+
 static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkThreadFreeInfo* freeInfo) {
 	Chunk** closeChunks = new Chunk*[CHUNK_NUM];
 
@@ -152,35 +184,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 			Chunk* temp = new Chunk(playerPos);
 			recalcChunksNextTo(temp);
 		} else {
-			if (playerChunk->m_xn == NULL) {
-				Chunk* temp = new Chunk(playerPos.add({ -1, 0, 0 }));
-				recalcChunksNextTo(temp);
-			}
-
-			if (playerChunk->m_xp == NULL) {
-				Chunk* temp = new Chunk(playerPos.add({ 1, 0, 0 }));
-				recalcChunksNextTo(temp);
-			}
-
-			if (playerChunk->m_yn == NULL) {
-				Chunk* temp = new Chunk(playerPos.add({ 0, -1, 0 }));
-				recalcChunksNextTo(temp);
-			}
-
-			if (playerChunk->m_yn == NULL) {
-				Chunk* temp = new Chunk(playerPos.add({ 0,  1, 0 }));
-				recalcChunksNextTo(temp);
-			}
-
-			if (playerChunk->m_zn == NULL) {
-				Chunk* temp = new Chunk(playerPos.add({ 0, 0, -1 }));
-				recalcChunksNextTo(temp);
-			}
-
-			if (playerChunk->m_zp == NULL) {
-				Chunk* temp = new Chunk(playerPos.add({ 0, 0,  1 }));
-				recalcChunksNextTo(temp);
-			}
+			addNext(playerChunk, playerPos);
 		}
 
 		for (int i = 0; i < CHUNK_NUM; i++) {
@@ -197,35 +201,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 
 		for (int i = 0; i < CHUNK_NUM; i++) {
 			if (closeChunks[i] != NULL && !closeChunks[i]->m_air) {
-				if (closeChunks[i]->m_xn == NULL) {
-					Chunk* temp = new Chunk(closeChunks[i]->m_pos.add({ -1, 0, 0 }));
-					recalcChunksNextTo(temp);
-				}
-
-				if (closeChunks[i]->m_xp == NULL) {
-					Chunk* temp = new Chunk(closeChunks[i]->m_pos.add({ 1, 0, 0 }));
-					recalcChunksNextTo(temp);
-				}
-
-				if (closeChunks[i]->m_yn == NULL) {
-					Chunk* temp = new Chunk(closeChunks[i]->m_pos.add({ 0, -1, 0 }));
-					recalcChunksNextTo(temp);
-				}
-
-				if (closeChunks[i]->m_yp == NULL) {
-					Chunk* temp = new Chunk(closeChunks[i]->m_pos.add({ 0,  1, 0 }));
-					recalcChunksNextTo(temp);
-				}
-
-				if (closeChunks[i]->m_zn == NULL) {
-					Chunk* temp = new Chunk(closeChunks[i]->m_pos.add({ 0, 0, -1 }));
-					recalcChunksNextTo(temp);
-				}
-
-				if (closeChunks[i]->m_zp == NULL) {
-					Chunk* temp = new Chunk(closeChunks[i]->m_pos.add({ 0, 0,  1 }));
-					recalcChunksNextTo(temp);
-				}
+				addNext(closeChunks[i], closeChunks[i]->m_pos);
 			}
 		}
 
@@ -255,21 +231,388 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 		}
 
 		if (rcsz != 0) {
-			Vertex* verts = new Vertex[rcsz];
-			for (int i = 0; i < rcsz; i++) {
-				verts[i].x = rCubesPtr[i]->m_pos.x;
-				verts[i].y = 0.5f - rCubesPtr[i]->m_pos.y;
-				verts[i].z = rCubesPtr[i]->m_pos.z;
+			int rcct = 0;
 
-				verts[i].tx = rCubesPtr[i]->tex->x;
-				verts[i].ty = rCubesPtr[i]->tex->y;
-				verts[i].tz = rCubesPtr[i]->tex->z;
-				verts[i].rinf = rCubesPtr[i]->vid;
+			for (int i = 0; i < rcsz; i++) {
+				if (rCubesPtr[i]->vid & 1) {
+					rcct = rcct + 6;
+				}
+				
+				if (rCubesPtr[i]->vid & 2) {
+					rcct = rcct + 6;
+				}
+
+				if (rCubesPtr[i]->vid & 4) {
+					rcct = rcct + 6;
+				}
+
+				if (rCubesPtr[i]->vid & 8) {
+					rcct = rcct + 6;
+				}
+
+				if (rCubesPtr[i]->vid & 16) {
+					rcct = rcct + 6;
+				}
+
+				if (rCubesPtr[i]->vid & 32) {
+					rcct = rcct + 6;
+				}
+			}
+
+			Vertex* verts = new Vertex[rcct];
+			int rcp = 0;
+			for (int i = 0; i < rcsz; i++) {
+				if (rCubesPtr[i]->vid & 15) {
+					int sx = rCubesPtr[i]->tex->x % 16;
+					int sy = (rCubesPtr[i]->tex->x - sx) / 16;
+
+					float tex0u = (sx + 0.0) / 16.0;
+					float tex0v = (sy + 1.0) / 16.0;
+
+					float tex1u = (sx + 0.0) / 16.0;
+					float tex1v = (sy + 0.0) / 16.0;
+
+					float tex2u = (sx + 1.0) / 16.0;
+					float tex2v = (sy + 0.0) / 16.0;
+
+					float tex3u = (sx + 1.0) / 16.0;
+					float tex3v = (sy + 1.0) / 16.0;
+
+					if (rCubesPtr[i]->vid & 1) {
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex3u;
+						verts[rcp].v = tex3v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex1u;
+						verts[rcp].v = tex1v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex0u;
+						verts[rcp].v = tex0v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex2u;
+						verts[rcp].v = tex2v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex1u;
+						verts[rcp].v = tex1v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex3u;
+						verts[rcp].v = tex3v;
+
+						rcp = rcp + 1;
+					}
+
+					if (rCubesPtr[i]->vid & 2) {
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex0u;
+						verts[rcp].v = tex0v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex1u;
+						verts[rcp].v = tex1v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex3u;
+						verts[rcp].v = tex3v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex3u;
+						verts[rcp].v = tex3v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex1u;
+						verts[rcp].v = tex1v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex2u;
+						verts[rcp].v = tex2v;
+
+						rcp = rcp + 1;
+					}
+
+					if (rCubesPtr[i]->vid & 4) {
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex3u;
+						verts[rcp].v = tex3v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex1u;
+						verts[rcp].v = tex1v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex0u;
+						verts[rcp].v = tex0v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex2u;
+						verts[rcp].v = tex2v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex1u;
+						verts[rcp].v = tex1v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex3u;
+						verts[rcp].v = tex3v;
+
+						rcp = rcp + 1;
+					}
+
+					if (rCubesPtr[i]->vid & 8) {
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex0u;
+						verts[rcp].v = tex0v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex1u;
+						verts[rcp].v = tex1v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex3u;
+						verts[rcp].v = tex3v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex3u;
+						verts[rcp].v = tex3v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+						verts[rcp].u = tex1u;
+						verts[rcp].v = tex1v;
+
+						rcp = rcp + 1;
+
+						verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+						verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+						verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+						verts[rcp].u = tex2u;
+						verts[rcp].v = tex2v;
+
+						rcp = rcp + 1;
+					}
+				}
+
+				if (rCubesPtr[i]->vid & 16) {
+					int sx = rCubesPtr[i]->tex->y % 16;
+					int sy = (rCubesPtr[i]->tex->y - sx) / 16;
+
+					float tex0u = (sx + 0.0) / 16.0;
+					float tex0v = (sy + 1.0) / 16.0;
+
+					float tex1u = (sx + 0.0) / 16.0;
+					float tex1v = (sy + 0.0) / 16.0;
+
+					float tex2u = (sx + 1.0) / 16.0;
+					float tex2v = (sy + 0.0) / 16.0;
+
+					float tex3u = (sx + 1.0) / 16.0;
+					float tex3v = (sy + 1.0) / 16.0;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+					verts[rcp].u = tex1u;
+					verts[rcp].v = tex1v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+					verts[rcp].u = tex0u;
+					verts[rcp].v = tex0v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+					verts[rcp].u = tex2u;
+					verts[rcp].v = tex2v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+					verts[rcp].u = tex2u;
+					verts[rcp].v = tex2v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+					verts[rcp].u = tex0u;
+					verts[rcp].v = tex0v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y + 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+					verts[rcp].u = tex3u;
+					verts[rcp].v = tex3v;
+
+					rcp = rcp + 1;
+				}
+
+				if (rCubesPtr[i]->vid & 32) {
+					int sx = rCubesPtr[i]->tex->z % 16;
+					int sy = (rCubesPtr[i]->tex->z - sx) / 16;
+
+					float tex0u = (sx + 0.0) / 16.0;
+					float tex0v = (sy + 1.0) / 16.0;
+
+					float tex1u = (sx + 0.0) / 16.0;
+					float tex1v = (sy + 0.0) / 16.0;
+
+					float tex2u = (sx + 1.0) / 16.0;
+					float tex2v = (sy + 0.0) / 16.0;
+
+					float tex3u = (sx + 1.0) / 16.0;
+					float tex3v = (sy + 1.0) / 16.0;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+					verts[rcp].u = tex2u;
+					verts[rcp].v = tex2v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+					verts[rcp].u = tex0u;
+					verts[rcp].v = tex0v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+					verts[rcp].u = tex1u;
+					verts[rcp].v = tex1v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+					verts[rcp].u = tex3u;
+					verts[rcp].v = tex3v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x - 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z - 0.5f;
+					verts[rcp].u = tex0u;
+					verts[rcp].v = tex0v;
+
+					rcp = rcp + 1;
+
+					verts[rcp].x = rCubesPtr[i]->m_pos.x + 0.5f;
+					verts[rcp].y = rCubesPtr[i]->m_pos.y - 0.5f;
+					verts[rcp].z = rCubesPtr[i]->m_pos.z + 0.5f;
+					verts[rcp].u = tex2u;
+					verts[rcp].v = tex2v;
+
+					rcp = rcp + 1;
+				}
 			}
 
 			freeInfo->modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
 			freeInfo->modelInfo->start = false;
-			freeInfo->modelInfo->model = vlkCreateModel(vrc->device, verts, rcsz);
+			freeInfo->modelInfo->model = vlkCreateModel(vrc->device, verts, rcct);
 
 			VkCommandBufferInheritanceInfo inheritanceInfo = {};
 			inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
@@ -321,7 +664,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 				vkCmdBindDescriptorSets(freeInfo->modelInfo->commandBuffer[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
 					vrc->pipeline->pipelineLayout, 0, 1, &vrc->shader->descriptorSet, 0, NULL);
 
-				vkCmdDraw(freeInfo->modelInfo->commandBuffer[i], rcsz, 1, 0, 0);
+				vkCmdDraw(freeInfo->modelInfo->commandBuffer[i], rcct, 1, 0, 0);
 
 				vkEndCommandBuffer(freeInfo->modelInfo->commandBuffer[i]);
 			}

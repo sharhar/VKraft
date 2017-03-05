@@ -97,4 +97,5 @@ public:
 
 	friend static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vulkanRenderContext, ChunkThreadFreeInfo* freeInfo);
 	friend static void recalcChunksNextTo(Chunk* chunk);
+	friend static void addNext(Chunk* chunk, Vec3 pos);
 };

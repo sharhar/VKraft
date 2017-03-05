@@ -3,13 +3,25 @@
 #extension GL_ARB_shading_language_420pack : enable
 
 layout (location = 0) in vec3 pos;
-layout (location = 1) in vec4 rinf;
+layout (location = 1) in vec2 uv;
 
 layout( location = 0 ) out struct vert_out {
-    ivec4 rinf;
+    vec2 uv;
 } OUT;
 
+layout ( location = 1 ) out struct vert_out_sel {
+	int selected;
+} SEL;
+
+layout( std140, binding = 0 ) uniform UniformBufferObject {
+	mat4 view;
+	mat4 proj;
+
+	vec3 selected;
+} UBO;
+
 void main() {
-    gl_Position = vec4(pos.xyz, 1.0);
-	OUT.rinf = ivec4(int(rinf.x), int(rinf.y), int(rinf.z), int(rinf.w));
+    gl_Position = UBO.proj * UBO.view * vec4(pos.x, 0.5 - pos.y, pos.z, 1.0);
+	OUT.uv = uv;
+	SEL.selected = 0;
 }

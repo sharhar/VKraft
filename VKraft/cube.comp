@@ -73,71 +73,97 @@ void main() {
 	vec3 pos = vec3(posArray.data[0], posArray.data[1], posArray.data[2]);
 	vec3 norm = vec3(posArray.data[3], posArray.data[4], posArray.data[5]);
 
-	//Front Face
-	if(checkRayCast(cbps + vec3(0.5, -0.5, -0.5),
-					cbps + vec3(-0.5, 0.5, -0.5),
-					cbps + vec3(-0.5, -0.5, -0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	int rit = 0;
 
-	if(checkRayCast(cbps + vec3(0.5, 0.5, -0.5),
-					cbps + vec3(-0.5, 0.5, -0.5),
-					cbps + vec3(0.5, -0.5, -0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
-	
-	//Back Face
-	if(checkRayCast(cbps + vec3(-0.5, -0.5, 0.5),
-					cbps + vec3(-0.5, 0.5, 0.5),
-					cbps + vec3(0.5, -0.5, 0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	rit = rinf & 1;
 
-	if(checkRayCast(cbps + vec3(0.5, -0.5, 0.5),
-					cbps + vec3(-0.5, 0.5, 0.5),
-					cbps + vec3(0.5, 0.5, 0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	if(rit != 0) {
+		//Front Face
+		if(checkRayCast(cbps + vec3(0.5, -0.5, -0.5),
+						cbps + vec3(-0.5, 0.5, -0.5),
+						cbps + vec3(-0.5, -0.5, -0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
 
-	//Right Face
-	if(checkRayCast(cbps + vec3(0.5, -0.5, 0.5),
-					cbps + vec3(0.5, 0.5, -0.5),
-					cbps + vec3(0.5, -0.5, -0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+		if(checkRayCast(cbps + vec3(0.5, 0.5, -0.5),
+						cbps + vec3(-0.5, 0.5, -0.5),
+						cbps + vec3(0.5, -0.5, -0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	}
 
-	if(checkRayCast(cbps + vec3(0.5, 0.5, 0.5),
-					cbps + vec3(0.5, 0.5, -0.5),
-					cbps + vec3(0.5, -0.5, 0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
-	
-	//Left Face
-	if(checkRayCast(cbps + vec3(-0.5, -0.5, -0.5),
-					cbps + vec3(-0.5, 0.5, -0.5),
-					cbps + vec3(-0.5, -0.5, 0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	rit = rinf & 2;
 
-	if(checkRayCast(cbps + vec3(-0.5, -0.5, 0.5),
-					cbps + vec3(-0.5, 0.5, -0.5),
-					cbps + vec3(-0.5, 0.5, 0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
-	
-	//Top Face
-	if(checkRayCast(cbps + vec3(0.5, -0.5, 0.5),
-					cbps + vec3(-0.5, -0.5, -0.5),
-					cbps + vec3(-0.5, -0.5, 0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	if(rit != 0) {
+		//Back Face
+		if(checkRayCast(cbps + vec3(-0.5, -0.5, 0.5),
+						cbps + vec3(-0.5, 0.5, 0.5),
+						cbps + vec3(0.5, -0.5, 0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
 
-	if(checkRayCast(cbps + vec3(0.5, -0.5, -0.5),
-					cbps + vec3(-0.5, -0.5, -0.5),
-					cbps + vec3(0.5, -0.5, 0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+		if(checkRayCast(cbps + vec3(0.5, -0.5, 0.5),
+						cbps + vec3(-0.5, 0.5, 0.5),
+						cbps + vec3(0.5, 0.5, 0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	}
 
-	//Bottom Face
-	if(checkRayCast(cbps + vec3(-0.5, 0.5, 0.5),
-					cbps + vec3(-0.5, 0.5, -0.5),
-					cbps + vec3(0.5, 0.5, 0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	rit = rinf & 4;
 
-	if(checkRayCast(cbps + vec3(0.5, 0.5, 0.5),
-					cbps + vec3(-0.5, 0.5, -0.5),
-					cbps + vec3(0.5, 0.5, -0.5),
-					pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	if(rit != 0) {
+		//Right Face
+		if(checkRayCast(cbps + vec3(0.5, -0.5, 0.5),
+						cbps + vec3(0.5, 0.5, -0.5),
+						cbps + vec3(0.5, -0.5, -0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+
+		if(checkRayCast(cbps + vec3(0.5, 0.5, 0.5),
+						cbps + vec3(0.5, 0.5, -0.5),
+						cbps + vec3(0.5, -0.5, 0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	}
+
+	rit = rinf & 8;
+
+	if(rit != 0) {
+		//Left Face
+		if(checkRayCast(cbps + vec3(-0.5, -0.5, -0.5),
+						cbps + vec3(-0.5, 0.5, -0.5),
+						cbps + vec3(-0.5, -0.5, 0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+
+		if(checkRayCast(cbps + vec3(-0.5, -0.5, 0.5),
+						cbps + vec3(-0.5, 0.5, -0.5),
+						cbps + vec3(-0.5, 0.5, 0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	}
+
+	rit = rinf & 16;
+
+	if(rit != 0) {
+		//Top Face
+		if(checkRayCast(cbps + vec3(0.5, -0.5, 0.5),
+						cbps + vec3(-0.5, -0.5, -0.5),
+						cbps + vec3(-0.5, -0.5, 0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+
+		if(checkRayCast(cbps + vec3(0.5, -0.5, -0.5),
+						cbps + vec3(-0.5, -0.5, -0.5),
+						cbps + vec3(0.5, -0.5, 0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	}
+
+	rit = rinf & 32;
+
+	if(rit != 0) {
+		//Bottom Face
+		if(checkRayCast(cbps + vec3(-0.5, 0.5, 0.5),
+						cbps + vec3(-0.5, 0.5, -0.5),
+						cbps + vec3(0.5, 0.5, 0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+
+		if(checkRayCast(cbps + vec3(0.5, 0.5, 0.5),
+						cbps + vec3(-0.5, 0.5, -0.5),
+						cbps + vec3(0.5, 0.5, -0.5),
+						pos, norm)) {outArray.data[gl_GlobalInvocationID.x] = distance(cbps, pos); return;}
+	}
 
 	outArray.data[gl_GlobalInvocationID.x] = -1;
 }
