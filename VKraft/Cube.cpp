@@ -212,7 +212,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 					recalcChunksNextTo(temp);
 				}
 
-				if (closeChunks[i]->m_yn == NULL) {
+				if (closeChunks[i]->m_yp == NULL) {
 					Chunk* temp = new Chunk(closeChunks[i]->m_pos.add({ 0,  1, 0 }));
 					recalcChunksNextTo(temp);
 				}
