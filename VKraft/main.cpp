@@ -853,26 +853,25 @@ int main() {
 
 	Camera::init(window, uniformBuffer.view, &renderContext);
 
-	Cube::init();
 	Chunk::init(245325, window, &renderContext);
 
 	VLKTexture* texture = vlkCreateTexture(device, "pack.png");
 	vlkBindTexture(device, shader, texture);
 
 	float cursorVerts[] = {
-		-0.0328125f, -0.0046875f,
-		 0.0328125f, -0.0046875f,
-		-0.0328125f,  0.0046875f,
-		-0.0328125f,  0.0046875f,
-		 0.0328125f, -0.0046875f,
-		 0.0328125f,  0.0046875f,
+		-0.03125f, -0.003125f,
+		 0.03125f, -0.003125f,
+		-0.03125f,  0.003125f,
+		-0.03125f,  0.003125f,
+		 0.03125f, -0.003125f,
+		 0.03125f,  0.003125f,
 		
-		-0.0046875f, -0.0328125f,
-		 0.0046875f, -0.0328125f,
-		-0.0046875f,  0.0328125f,
-		-0.0046875f,  0.0328125f,
-		 0.0046875f, -0.0328125f,
-		 0.0046875f,  0.0328125f };
+		-0.003125f, -0.03125f,
+		 0.003125f, -0.03125f,
+		-0.003125f,  0.03125f,
+		-0.003125f,  0.03125f,
+		 0.003125f, -0.03125f,
+		 0.003125f,  0.03125f };
 
 	float backGroundVerts[] = {
 		-1, -1, 0, 0,

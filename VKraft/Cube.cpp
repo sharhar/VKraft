@@ -2,51 +2,15 @@
 #include <iostream>
 #include <assert.h>
 
-#define CHUNK_NUM 922
-#define CHUNK_RAD 6
-
-Vec3i** Cube::texts = 0;
-
-void Cube::init() {
-	texts = new Vec3i*[6];
-
-	texts[0] = (Vec3i*)malloc(sizeof(Vec3i));
-	texts[0]->x = 0;
-	texts[0]->y = 0;
-	texts[0]->z = 0;
-
-	texts[1] = (Vec3i*)malloc(sizeof(Vec3i));
-	texts[1]->x = 3;
-	texts[1]->y = 0;
-	texts[1]->z = 2;
-
-	texts[2] = (Vec3i*)malloc(sizeof(Vec3i));
-	texts[2]->x = 2;
-	texts[2]->y = 2;
-	texts[2]->z = 2;
-
-	texts[3] = (Vec3i*)malloc(sizeof(Vec3i));
-	texts[3]->x = 1;
-	texts[3]->y = 1;
-	texts[3]->z = 1;
-
-	texts[4] = (Vec3i*)malloc(sizeof(Vec3i));
-	texts[4]->x = 34;
-	texts[4]->y = 34;
-	texts[4]->z = 34;
-
-	texts[5] = (Vec3i*)malloc(sizeof(Vec3i));
-	texts[5]->x = 33;
-	texts[5]->y = 33;
-	texts[5]->z = 33;
-}
+#define CHUNK_NUM 4166
+#define CHUNK_RAD 10
 
 Cube::Cube(Vec3 pos, unsigned int t) {
 	m_pos = pos;
 	type = t;
 	visible = false;
 
-	tex = texts[t];
+	tex = Chunk::texts[t];
 	vid = 0;
 }
 
@@ -58,6 +22,7 @@ Cube::Cube(Cube* other) {
 	vid = other->vid;
 }
 
+Vec3i** Chunk::texts = 0;
 PerlinNoise* Chunk::noise = 0;
 int Chunk::m_fence = 0;
 std::vector<Chunk*> Chunk::chunks = std::vector<Chunk*>();
@@ -746,6 +711,38 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 }
 
 void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vulkanRenderContext) {
+	texts = new Vec3i*[6];
+
+	texts[0] = (Vec3i*)malloc(sizeof(Vec3i));
+	texts[0]->x = 0;
+	texts[0]->y = 0;
+	texts[0]->z = 0;
+
+	texts[1] = (Vec3i*)malloc(sizeof(Vec3i));
+	texts[1]->x = 3;
+	texts[1]->y = 0;
+	texts[1]->z = 2;
+
+	texts[2] = (Vec3i*)malloc(sizeof(Vec3i));
+	texts[2]->x = 2;
+	texts[2]->y = 2;
+	texts[2]->z = 2;
+
+	texts[3] = (Vec3i*)malloc(sizeof(Vec3i));
+	texts[3]->x = 1;
+	texts[3]->y = 1;
+	texts[3]->z = 1;
+
+	texts[4] = (Vec3i*)malloc(sizeof(Vec3i));
+	texts[4]->x = 34;
+	texts[4]->y = 34;
+	texts[4]->z = 34;
+
+	texts[5] = (Vec3i*)malloc(sizeof(Vec3i));
+	texts[5]->x = 33;
+	texts[5]->y = 33;
+	texts[5]->z = 33;
+
 	noise = new PerlinNoise(seed);
 
 	rcubes = new Cube*[0];

@@ -42,8 +42,6 @@ typedef struct ChunkThreadFreeInfo {
 
 class Cube {
 public:
-	static Vec3i** texts;
-
 	Vec3 m_pos;
 	Vec3i* tex;
 	int vid;
@@ -52,8 +50,6 @@ public:
 
 	Cube(Vec3 pos, unsigned int t);
 	Cube(Cube* other);
-
-	static void init();
 };
 
 class Chunk {
@@ -79,6 +75,7 @@ public:
 	static int rcubesSize;
 	static Cube** rcubes;
 	static int rsize;
+	static Vec3i** texts;
 
 	static uint32_t cubeNum;
 	static ChunkModelInfo* model;
