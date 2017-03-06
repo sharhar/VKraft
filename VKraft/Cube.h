@@ -40,17 +40,11 @@ typedef struct ChunkThreadFreeInfo {
 	ChunkModelInfo* pmodelInfo;
 } ChunkThreadFreeInfo;
 
-class Cube {
-public:
-	Vec3 m_pos;
-	Vec3i* tex;
-	int vid;
-	unsigned int type;
-	bool visible;
-
-	Cube(Vec3 pos, unsigned int t);
-	Cube(Cube* other);
-};
+typedef struct Cube {
+	Vec3 pos;
+	uint8_t vid;
+	uint16_t type;
+} Cube;
 
 class Chunk {
 private:
@@ -58,7 +52,7 @@ private:
 	static std::thread* chunkThread;
 	static std::vector<Chunk*> chunks;
 
-	Vec3 m_pos;
+	Vec3 pos;
 	Vec3 m_cubePos;
 
 	Chunk* m_xn;
