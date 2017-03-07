@@ -923,52 +923,119 @@ int main() {
 	double cts = glfwGetTime();
 	double dts = 0;
 
+	VkCommandBufferInheritanceInfo inheritanceInfo = {};
+	inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+	inheritanceInfo.pNext = NULL;
+	inheritanceInfo.occlusionQueryEnable = VK_FALSE;
+	inheritanceInfo.queryFlags = 0;
+	inheritanceInfo.pipelineStatistics = 0;
+	inheritanceInfo.renderPass = swapChain->renderPass;
+	inheritanceInfo.subpass = 0;
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+	beginInfo.pInheritanceInfo = &inheritanceInfo;
+
+	VkCommandBufferAllocateInfo commandBufferAllocationInfo = {};
+	commandBufferAllocationInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	commandBufferAllocationInfo.commandPool = device->commandPool;
+	commandBufferAllocationInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+	commandBufferAllocationInfo.commandBufferCount = swapChain->imageCount;
+
+	VkCommandBuffer* screenCmdBuffers = new VkCommandBuffer[swapChain->imageCount];
+	VLKCheck(vkAllocateCommandBuffers(device->device, &commandBufferAllocationInfo, screenCmdBuffers),
+		"Failed to allocate command buffers");
+
+	VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
+	VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
+	VkDeviceSize offsets = {};
+
+	for (int i = 0; i < swapChain->imageCount; i++) {
+		inheritanceInfo.framebuffer = swapChain->frameBuffers[i];
+
+		vkBeginCommandBuffer(screenCmdBuffers[i], &beginInfo);
+
+		vkCmdSetViewport(screenCmdBuffers[i], 0, 1, &viewport);
+		vkCmdSetScissor(screenCmdBuffers[i], 0, 1, &scissor);
+
+		vkCmdBindPipeline(screenCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, bgPipeline->pipeline);
+		vkCmdBindVertexBuffers(screenCmdBuffers[i], 0, 1, &bgModel->vertexInputBuffer, &offsets);
+		vkCmdBindDescriptorSets(screenCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+			bgPipeline->pipelineLayout, 0, 1, &bgShader->descriptorSet, 0, NULL);
+
+		vkCmdDraw(screenCmdBuffers[i], 6, 1, 0, 0);
+
+		vkCmdSetViewport(screenCmdBuffers[i], 0, 1, &viewport);
+		vkCmdSetScissor(screenCmdBuffers[i], 0, 1, &scissor);
+
+		vkCmdBindPipeline(screenCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
+		vkCmdBindVertexBuffers(screenCmdBuffers[i], 0, 1, &cursorModel->vertexInputBuffer, &offsets);
+		vkCmdBindDescriptorSets(screenCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
+
+		vkCmdDraw(screenCmdBuffers[i], 12, 1, 0, 0);
+
+		vkEndCommandBuffer(screenCmdBuffers[i]);
+	}
+
+	float accDT = 0;
+	uint32_t fps = 0;
+
+	double ctt = glfwGetTime();
+	double dtt = ctt;
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
+		/*
 		dts = glfwGetTime() - cts;
 
 		std::this_thread::sleep_for(std::chrono::nanoseconds((long)((1.0f/120.0f - dts - 0.001) * 1000000000L)));
 
 		cts = glfwGetTime();
+		*/
 
 		dt = glfwGetTime() - ct;
 		ct = glfwGetTime();
 
-		Camera::update(dt);
+		accDT += dt;
+		fps++;
 
-		VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
-		VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
-		VkDeviceSize offsets = {};
+		if (accDT > 1) {
+			std::cout << "FPS: " << fps << "\n";
+			fps = 0;
+			accDT = 0;
+		}
+		
+		Camera::update(dt);
+		
+		vlkClear(device, swapChain);
 
 		vlkStartFramebuffer(device, frameBuffer);
 
 		Chunk::render(device, swapChain);
 
 		vlkEndFramebuffer(device, frameBuffer);
-		
-		vlkClear(device, swapChain);
 
-		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
-		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
-		
-		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, bgPipeline->pipeline);
-		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &bgModel->vertexInputBuffer, &offsets);
-		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			bgPipeline->pipelineLayout, 0, 1, &bgShader->descriptorSet, 0, NULL);
+		VkClearValue clearValue[] = {
+			{ 0.25f, 0.45f, 1.0f, 1.0f },
+			{ 1.0, 0.0 } };
 
-		vkCmdDraw(device->drawCmdBuffer, 6, 1, 0, 0);
+		VkRenderPassBeginInfo renderPassBeginInfo = {};
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.renderPass = swapChain->renderPass;
+		renderPassBeginInfo.framebuffer = swapChain->frameBuffers[swapChain->nextImageIdx];
+		renderPassBeginInfo.renderArea = { 0, 0, swapChain->width, swapChain->height };
+		renderPassBeginInfo.clearValueCount = 2;
+		renderPassBeginInfo.pClearValues = clearValue;
+		vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
+			VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
-		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
-		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
+		vkCmdExecuteCommands(device->drawCmdBuffer, 1, &screenCmdBuffers[swapChain->nextImageIdx]);
 
-		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
-		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &cursorModel->vertexInputBuffer, &offsets);
-		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
+		vkCmdEndRenderPass(device->drawCmdBuffer);
 
-		vkCmdDraw(device->drawCmdBuffer, 12, 1, 0, 0);
-		
 		vlkSwap(device, swapChain);
 	}
 
@@ -993,5 +1060,6 @@ int main() {
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
+	exit(0);
 	return 0;
 }

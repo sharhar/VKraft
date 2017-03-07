@@ -852,12 +852,12 @@ void Chunk::render(VLKDevice* device, VLKSwapchain* swapChain) {
 	vlkUniforms(device, renderContext->shader, renderContext->uniformBuffer, sizeof(CubeUniformBuffer));
 
 	while (m_fence == 1) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		std::this_thread::sleep_for(std::chrono::microseconds(10));
 	}
 	m_fence = m_fence + 2;
 
 	if (model != NULL) {
-		vkCmdExecuteCommands(renderContext->framebuffer->drawCmdBuffer, 1, &model->commandBuffer);
+		vkCmdExecuteCommands(renderContext->device->drawCmdBuffer, 1, &model->commandBuffer);
 		model->start = true;
 	}
 

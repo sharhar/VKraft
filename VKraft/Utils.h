@@ -14,7 +14,7 @@ typedef struct Vec3 {
 		return{ x + input.x, y + input.y , z + input.z };
 	}
 
-	float dist(Vec3 other) {
+	inline float dist(Vec3 other) {
 		float xd = x - other.x;
 		float yd = y - other.y;
 		float zd = z - other.z;

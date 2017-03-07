@@ -29,6 +29,9 @@
 *.app
 
 *.sdf
+*.vspx
+*.psess
+
 /Debug
 /Release
 /x64

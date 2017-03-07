@@ -626,6 +626,7 @@ void Camera::update(float dt) {
 
 		yVel -= 33.3333f * dt;
 
+		
 		while (fence == 1) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
@@ -653,6 +654,7 @@ void Camera::update(float dt) {
 		}
 
 		fence = fence - 2;
+		
 
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);

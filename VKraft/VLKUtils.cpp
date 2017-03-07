@@ -634,6 +634,13 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext* context, VLKDev
 			"Failed to create framebuffer");
 	}
 
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.pNext = NULL;
+	fenceCreateInfo.flags = 0;
+
+	VLKCheck(vkCreateFence(device->device, &fenceCreateInfo, NULL, &swapChain->renderingCompleteFence), 
+		"Failed to create fence");
+
 	*pdevice = device;
 	*pswapChain = swapChain;
 }
@@ -1106,22 +1113,9 @@ void vlkClear(VLKDevice* device, VLKSwapchain* swapChain) {
 		0, NULL,
 		0, NULL,
 		1, &layoutTransitionBarrier);
-
-	VkClearValue clearValue[] = { { 0.25f, 0.45f, 1.0f, 1.0f },{ 1.0, 0.0 } };
-	VkRenderPassBeginInfo renderPassBeginInfo = {};
-	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassBeginInfo.renderPass = swapChain->renderPass;
-	renderPassBeginInfo.framebuffer = swapChain->frameBuffers[swapChain->nextImageIdx];
-	renderPassBeginInfo.renderArea = { 0, 0, swapChain->width, swapChain->height };
-	renderPassBeginInfo.clearValueCount = 2;
-	renderPassBeginInfo.pClearValues = clearValue;
-	vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
-		VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
-	vkCmdEndRenderPass(device->drawCmdBuffer);
-
 	VkImageMemoryBarrier prePresentBarrier = {};
 	prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
@@ -1143,11 +1137,6 @@ void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
 
 	vkEndCommandBuffer(device->drawCmdBuffer);
 
-	VkFence renderFence;
-	VkFenceCreateInfo fenceCreateInfo = {};
-	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	vkCreateFence(device->device, &fenceCreateInfo, NULL, &renderFence);
-
 	VkPipelineStageFlags waitStageMash = { VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1158,10 +1147,7 @@ void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
 	submitInfo.pCommandBuffers = &device->drawCmdBuffer;
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = &swapChain->renderingCompleteSemaphore;
-	vkQueueSubmit(device->presentQueue, 1, &submitInfo, renderFence);
-
-	vkWaitForFences(device->device, 1, &renderFence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(device->device, renderFence, NULL);
+	vkQueueSubmit(device->presentQueue, 1, &submitInfo, swapChain->renderingCompleteFence);
 
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1171,8 +1157,17 @@ void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
 	presentInfo.pSwapchains = &swapChain->swapChain;
 	presentInfo.pImageIndices = &swapChain->nextImageIdx;
 	presentInfo.pResults = NULL;
-	vkQueuePresentKHR(device->presentQueue, &presentInfo);
+	//double ctt = glfwGetTime();
 
+	vkQueuePresentKHR(device->presentQueue, &presentInfo);
+	
+	//double dtt = glfwGetTime() - ctt;
+
+	//std::cout << "ms: " << (dtt * 1000) << "\n";
+
+	vkWaitForFences(device->device, 1, &swapChain->renderingCompleteFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device->device, 1, &swapChain->renderingCompleteFence);
+	
 	vkDestroySemaphore(device->device, swapChain->presentCompleteSemaphore, NULL);
 	vkDestroySemaphore(device->device, swapChain->renderingCompleteSemaphore, NULL);
 }
@@ -1706,12 +1701,6 @@ void vlkDestroyFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
 }
 
 void vlkStartFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
-	VkCommandBufferBeginInfo beginInfo = {};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-	vkBeginCommandBuffer(frameBuffer->drawCmdBuffer, &beginInfo);
-
 	VkImageMemoryBarrier layoutTransitionBarrier = {};
 	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	layoutTransitionBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -1725,7 +1714,7 @@ void vlkStartFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
 	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 	layoutTransitionBarrier.subresourceRange = resourceRange;
 
-	vkCmdPipelineBarrier(frameBuffer->drawCmdBuffer,
+	vkCmdPipelineBarrier(device->drawCmdBuffer,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 		0,
@@ -1741,12 +1730,12 @@ void vlkStartFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
 	renderPassBeginInfo.renderArea = { 0, 0, frameBuffer->width, frameBuffer->height };
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValue;
-	vkCmdBeginRenderPass(frameBuffer->drawCmdBuffer, &renderPassBeginInfo,
-		VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
+		VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 }
 
 void vlkEndFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
-	vkCmdEndRenderPass(frameBuffer->drawCmdBuffer);
+	vkCmdEndRenderPass(device->drawCmdBuffer);
 
 	VkImageMemoryBarrier prePresentBarrier = {};
 	prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1759,35 +1748,11 @@ void vlkEndFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
 	prePresentBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 	prePresentBarrier.image = frameBuffer->colorImage;
 
-	vkCmdPipelineBarrier(frameBuffer->drawCmdBuffer,
+	vkCmdPipelineBarrier(device->drawCmdBuffer,
 		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 		0,
 		0, NULL,
 		0, NULL,
 		1, &prePresentBarrier);
-
-	vkEndCommandBuffer(frameBuffer->drawCmdBuffer);
-
-	VkFence renderFence;
-	VkFenceCreateInfo fenceCreateInfo = {};
-	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	vkCreateFence(device->device, &fenceCreateInfo, NULL, &renderFence);
-
-	VkPipelineStageFlags waitStageMash = { VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
-	VkSubmitInfo submitInfo = {};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.waitSemaphoreCount = 0;
-	submitInfo.pWaitSemaphores = NULL;
-	submitInfo.pWaitDstStageMask = &waitStageMash;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &frameBuffer->drawCmdBuffer;
-	submitInfo.signalSemaphoreCount = 0;
-	submitInfo.pSignalSemaphores = NULL;
-	vkQueueSubmit(device->presentQueue, 1, &submitInfo, renderFence);
-
-	vkWaitForFences(device->device, 1, &renderFence, VK_TRUE, UINT64_MAX);
-	vkDestroyFence(device->device, renderFence, NULL);
-
-	vkResetCommandBuffer(frameBuffer->drawCmdBuffer, 0);
 }
