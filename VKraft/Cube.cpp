@@ -5,6 +5,24 @@
 #define CHUNK_NUM 4166
 #define CHUNK_RAD 10
 
+inline uint8_t getVid(uint16_t num) {
+	return (uint8_t)(num & 0b0000000000111111);
+}
+
+inline uint16_t getType(uint16_t num) {
+	return (uint16_t)((num & 0b1111111111000000) >> 6);
+}
+
+inline uint16_t setVid(uint16_t num, uint8_t vid) {
+	return (num & 0b1111111111000000) +
+		(((uint16_t)vid) & 0b0000000000111111);
+}
+
+inline uint16_t setType(uint16_t num, uint16_t type) {
+	return (num & 0b0000000000111111) +
+		((type & 0b0000001111111111) << 6);
+}
+
 Vec3i** Chunk::texts = 0;
 PerlinNoise* Chunk::noise = 0;
 int Chunk::m_fence = 0;
@@ -154,12 +172,12 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 
 		rcsz = 0;
 
-		for (int i = 0; i < CHUNK_NUM; i++) {
+		for (uint32_t i = 0; i < CHUNK_NUM; i++) {
 			Chunk* tcchunk = closeChunks[i];
 			if (tcchunk != NULL && !tcchunk->m_air) {
-				uint32_t* tccubes = tcchunk->cubes;
-				for (int j = 0; j < 16 * 16 * 16; j++) {
-					uint32_t cb = tccubes[j];
+				uint16_t* tccubes = tcchunk->cubes;
+				for (uint32_t j = 0; j < 16 * 16 * 16; j++) {
+					uint16_t cb = tccubes[j];
 					if (getVid(cb)) {
 						rcsz = rcsz + 1;
 					}
@@ -174,14 +192,20 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 
 		rCubesPtr = new Cube[rcsz];
 
-		for (int i = 0; i < CHUNK_NUM; i++) {
+		for (uint32_t i = 0; i < CHUNK_NUM; i++) {
 			Chunk* tcchunk = closeChunks[i];
 			if (tcchunk != NULL && !tcchunk->m_air) {
-				uint32_t* tccubes = tcchunk->cubes;
-				for (int j = 0; j < 16 * 16 * 16; j++) {
-					uint32_t cb = tccubes[j];
+				uint16_t* tccubes = tcchunk->cubes;
+				for (uint32_t j = 0; j < 16 * 16 * 16; j++) {
+					uint16_t cb = tccubes[j];
 					if (getVid(cb)) {
-						rCubesPtr[rcszct].pos = getPos(cb).add(tcchunk->m_cubePos);
+						float z = (float)(j % 16);
+						float y = (float)(((j % 256) - z)/16);
+						float x = (float)((j - y*16 - z)/256);
+
+						rCubesPtr[rcszct].pos.x = x + tcchunk->m_cubePos.x;
+						rCubesPtr[rcszct].pos.y = y + tcchunk->m_cubePos.y;
+						rCubesPtr[rcszct].pos.z = z + tcchunk->m_cubePos.z;
 
 						rCubesPtr[rcszct].type = getType(cb);
 						rCubesPtr[rcszct].vid = getVid(cb);
@@ -221,7 +245,48 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 				}
 			}
 
-			Vertex* verts = new Vertex[rcct];
+			freeInfo->modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
+			freeInfo->modelInfo->start = false;
+			freeInfo->modelInfo->model = (VLKModel*)malloc(sizeof(VLKModel));
+
+			VkBufferCreateInfo vertexInputBufferInfo = {};
+			vertexInputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			vertexInputBufferInfo.size = rcct * sizeof(Vertex);
+			vertexInputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			vertexInputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+			VLKCheck(vkCreateBuffer(vrc->device->device, &vertexInputBufferInfo, NULL, &freeInfo->modelInfo->model->vertexInputBuffer),
+				"Failed to create vertex input buffer.");
+
+			VkMemoryRequirements vertexBufferMemoryRequirements = {};
+			vkGetBufferMemoryRequirements(vrc->device->device, freeInfo->modelInfo->model->vertexInputBuffer,
+				&vertexBufferMemoryRequirements);
+
+			VkMemoryAllocateInfo bufferAllocateInfo = {};
+			bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			bufferAllocateInfo.allocationSize = vertexBufferMemoryRequirements.size;
+
+			uint32_t vertexMemoryTypeBits = vertexBufferMemoryRequirements.memoryTypeBits;
+			VkMemoryPropertyFlags vertexDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+			for (uint32_t i = 0; i < 32; ++i) {
+				VkMemoryType memoryType = vrc->device->memoryProperties.memoryTypes[i];
+				if (vertexMemoryTypeBits & 1) {
+					if ((memoryType.propertyFlags & vertexDesiredMemoryFlags) == vertexDesiredMemoryFlags) {
+						bufferAllocateInfo.memoryTypeIndex = i;
+						break;
+					}
+				}
+				vertexMemoryTypeBits = vertexMemoryTypeBits >> 1;
+			}
+
+			VLKCheck(vkAllocateMemory(vrc->device->device, &bufferAllocateInfo, NULL, &freeInfo->modelInfo->model->vertexBufferMemory),
+				"Failed to allocate buffer memory");
+
+			void *mapped;
+			VLKCheck(vkMapMemory(vrc->device->device, freeInfo->modelInfo->model->vertexBufferMemory, 0, VK_WHOLE_SIZE, 0, &mapped),
+				"Failed to map buffer memory");
+
+			Vertex* verts = (Vertex*)mapped;
 
 			int rcp = 0;
 			for (int i = 0; i < rcsz; i++) {
@@ -614,9 +679,10 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 				}
 			}
 
-			freeInfo->modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
-			freeInfo->modelInfo->start = false;
-			freeInfo->modelInfo->model = vlkCreateModel(vrc->device, verts, rcct * sizeof(Vertex));
+			vkUnmapMemory(vrc->device->device, freeInfo->modelInfo->model->vertexBufferMemory);
+
+			VLKCheck(vkBindBufferMemory(vrc->device->device, freeInfo->modelInfo->model->vertexInputBuffer, freeInfo->modelInfo->model->vertexBufferMemory, 0),
+				"Failed to bind buffer memory");
 
 			VkCommandBufferInheritanceInfo inheritanceInfo = {};
 			inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
@@ -673,8 +739,6 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 			Chunk::rcubes = rCubesPtr;
 
 			Chunk::m_fence = 0;
-
-			delete[] verts;
 		}
 
 		if (freeInfo->pmodelInfo != NULL) {
@@ -804,7 +868,7 @@ Chunk::Chunk(Vec3 a_pos) {
 	pos = { a_pos.x, a_pos.y, a_pos.z };
 	m_cubePos = { a_pos.x * 16, a_pos.y * 16, a_pos.z * 16 };
 
-	cubes = new uint32_t[16 * 16 * 16];
+	cubes = new uint16_t[16 * 16 * 16];
 
 	for (uint8_t x = 0; x < 16; x++) {
 		float xf = m_cubePos.x + x;
@@ -852,7 +916,6 @@ Chunk::Chunk(Vec3 a_pos) {
 					}
 				}
 
-				cubes[x * 256 + y * 16 + z] = setPos(cubes[x * 256 + y * 16 + z], { x, y, z });
 				cubes[x * 256 + y * 16 + z] = setType(cubes[x * 256 + y * 16 + z], type);
 				cubes[x * 256 + y * 16 + z] = setVid(cubes[x * 256 + y * 16 + z], 0);
 			}
