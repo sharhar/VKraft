@@ -1,8 +1,7 @@
 #pragma once
 
 #include <iostream>
-#include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
+#include "vexl.h"
 #include <assert.h>
 
 void VLKCheck(VkResult result, char *msg);

@@ -44,8 +44,11 @@ VLKContext* vlkCreateContext() {
 	VLKContext* context = (VLKContext*)malloc(sizeof(VLKContext));
 
 #ifdef _DEBUG
+	PFN_vkEnumerateInstanceLayerProperties pfnEnumerateInstanceLayerProperties = (PFN_vkEnumerateInstanceLayerProperties)
+		glfwGetInstanceProcAddress(NULL, "vkEnumerateInstanceLayerProperties");
+	
 	uint32_t layerCount = 0;
-	vkEnumerateInstanceLayerProperties(&layerCount, NULL);
+	pfnEnumerateInstanceLayerProperties(&layerCount, NULL);
 	if (layerCount == 0) {
 		std::cout << "Could ont find any layers!\n";
 		system("PAUSE");
@@ -53,7 +56,7 @@ VLKContext* vlkCreateContext() {
 	}
 
 	VkLayerProperties* layersAvailable = new VkLayerProperties[layerCount];
-	vkEnumerateInstanceLayerProperties(&layerCount, layersAvailable);
+	pfnEnumerateInstanceLayerProperties(&layerCount, layersAvailable);
 
 	bool foundValidation = false;
 	for (int i = 0; i < layerCount; ++i) {
@@ -75,10 +78,13 @@ VLKContext* vlkCreateContext() {
 	char** extensionsGLFW = (char**)glfwGetRequiredInstanceExtensions(&extensionCountGLFW);
 
 #ifdef _DEBUG
+	PFN_vkEnumerateInstanceExtensionProperties pfnEnumerateInstanceExtensionProperties = (PFN_vkEnumerateInstanceExtensionProperties)
+		glfwGetInstanceProcAddress(NULL, "vkEnumerateInstanceExtensionProperties");
+
 	uint32_t extensionCountEXT = 0;
-	vkEnumerateInstanceExtensionProperties(NULL, &extensionCountEXT, NULL);
+	pfnEnumerateInstanceExtensionProperties(NULL, &extensionCountEXT, NULL);
 	VkExtensionProperties *extensionsAvailable = new VkExtensionProperties[extensionCountEXT];
-	vkEnumerateInstanceExtensionProperties(NULL, &extensionCountEXT, extensionsAvailable);
+	pfnEnumerateInstanceExtensionProperties(NULL, &extensionCountEXT, extensionsAvailable);
 
 	char *extentionEXT = "VK_EXT_debug_report";
 	uint32_t foundExtensions = 0;
@@ -136,6 +142,8 @@ VLKContext* vlkCreateContext() {
 
 	VLKCheck(pfnCreateInstance(&instanceInfo, NULL, &context->instance),
 		"Failed to create Vulkan Instance");
+
+	loadVKFuncs(context->instance);
 
 #ifdef _DEBUG
 	pfnCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)glfwGetInstanceProcAddress(context->instance, "vkCreateDebugReportCallbackEXT");
