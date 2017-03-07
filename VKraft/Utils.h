@@ -2,6 +2,7 @@
 
 #define DEG_TO_RAD 0.0174532925199
 
+#include <iostream>
 #include <fstream>
 #include <string>
 #include <math.h>
@@ -27,7 +28,23 @@ typedef struct Vec3i {
 	Vec3i add(Vec3i input) {
 		return{ x + input.x, y + input.y , z + input.z };
 	}
+
+	Vec3 add(Vec3 input) {
+		return{ x + input.x, y + input.y , z + input.z };
+	}
 } Vec3i;
+
+typedef struct Vec3i8 {
+	uint8_t x, y, z;
+
+	Vec3i8 add(Vec3i8 input) {
+		return { (uint8_t)(x + input.x),  (uint8_t)(y + input.y) ,  (uint8_t)(z + input.z) };
+	}
+
+	Vec3 add(Vec3 input) {
+		return{ x + input.x, y + input.y , z + input.z };
+	}
+} Vec3i8;
 
 static std::string readFile_c(std::string path) {
 	std::string result;

@@ -374,12 +374,14 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 
 		closeCubes.clear();
 		for (int i = 0; i < Chunk::rcubesSize; i++) {
-			Cube* cube = Chunk::rcubes[i];
-			if (Camera::pos.dist(cube->pos) <= 8) {
+			Cube cube = Chunk::rcubes[i];
+			if (Camera::pos.dist(cube.pos) <= 8) {
 				Cube* temp = (Cube*)malloc(sizeof(Cube));
-				temp->pos = cube->pos;
-				temp->type = cube->type;
-				temp->vid = cube->vid;
+				temp->pos.x = cube.pos.x;
+				temp->pos.y = cube.pos.y;
+				temp->pos.z = cube.pos.z;
+				temp->type = cube.type;
+				temp->vid = cube.vid;
 
 				closeCubes.push_back(temp);
 			}

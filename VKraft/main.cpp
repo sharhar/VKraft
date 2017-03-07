@@ -923,10 +923,7 @@ int main() {
 	double cts = glfwGetTime();
 	double dts = 0;
 
-	std::cout << sizeof(Vec3) << "\n";
-	std::cout << sizeof(uint16_t) << "\n";
-	std::cout << sizeof(uint8_t) << "\n";
-	std::cout << sizeof(Cube) << "\n";
+	std::cout << sizeof(RCube) << "\n";
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();

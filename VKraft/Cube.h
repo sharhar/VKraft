@@ -46,6 +46,12 @@ typedef struct Cube {
 	uint16_t type;
 } Cube;
 
+typedef struct RCube {
+	Vec3i8 pos;
+	uint8_t vid;
+	uint16_t type;
+} RCube;
+
 class Chunk {
 private:
 	static PerlinNoise* noise;
@@ -67,7 +73,7 @@ public:
 	static Chunk* getChunkAt(Vec3 pos);
 	static int m_fence;
 	static int rcubesSize;
-	static Cube** rcubes;
+	static Cube* rcubes;
 	static int rsize;
 	static Vec3i** texts;
 
@@ -76,7 +82,7 @@ public:
 	static ChunkThreadFreeInfo* freeInfo;
 	static VulkanRenderContext* renderContext;
 
-	Cube** cubes;
+	RCube* cubes;
 
 	static void init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vulkanRenderContext);
 	static void destroy(VLKDevice* device);
