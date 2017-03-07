@@ -923,8 +923,6 @@ int main() {
 	double cts = glfwGetTime();
 	double dts = 0;
 
-	std::cout << sizeof(RCube) << "\n";
-
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 

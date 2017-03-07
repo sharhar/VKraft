@@ -157,10 +157,10 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 		for (int i = 0; i < CHUNK_NUM; i++) {
 			Chunk* tcchunk = closeChunks[i];
 			if (tcchunk != NULL && !tcchunk->m_air) {
-				RCube* tccubes = tcchunk->cubes;
+				uint32_t* tccubes = tcchunk->cubes;
 				for (int j = 0; j < 16 * 16 * 16; j++) {
-					RCube cb = tccubes[j];
-					if (cb.vid) {
+					uint32_t cb = tccubes[j];
+					if (getVid(cb)) {
 						rcsz = rcsz + 1;
 					}
 				}
@@ -177,14 +177,14 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 		for (int i = 0; i < CHUNK_NUM; i++) {
 			Chunk* tcchunk = closeChunks[i];
 			if (tcchunk != NULL && !tcchunk->m_air) {
-				RCube* tccubes = tcchunk->cubes;
+				uint32_t* tccubes = tcchunk->cubes;
 				for (int j = 0; j < 16 * 16 * 16; j++) {
-					RCube cb = tccubes[j];
-					if (cb.vid) {
-						rCubesPtr[rcszct].pos = cb.pos.add(tcchunk->m_cubePos);
+					uint32_t cb = tccubes[j];
+					if (getVid(cb)) {
+						rCubesPtr[rcszct].pos = getPos(cb).add(tcchunk->m_cubePos);
 
-						rCubesPtr[rcszct].type = cb.type;
-						rCubesPtr[rcszct].vid = cb.vid;
+						rCubesPtr[rcszct].type = getType(cb);
+						rCubesPtr[rcszct].vid = getVid(cb);
 
 						rcszct = rcszct + 1;
 					}
@@ -804,7 +804,7 @@ Chunk::Chunk(Vec3 a_pos) {
 	pos = { a_pos.x, a_pos.y, a_pos.z };
 	m_cubePos = { a_pos.x * 16, a_pos.y * 16, a_pos.z * 16 };
 
-	cubes = new RCube[16 * 16 * 16];
+	cubes = new uint32_t[16 * 16 * 16];
 
 	for (uint8_t x = 0; x < 16; x++) {
 		float xf = m_cubePos.x + x;
@@ -852,9 +852,9 @@ Chunk::Chunk(Vec3 a_pos) {
 					}
 				}
 
-				cubes[x * 256 + y * 16 + z].pos = { x, y, z };
-				cubes[x * 256 + y * 16 + z].type = type;
-				cubes[x * 256 + y * 16 + z].vid = 0;
+				cubes[x * 256 + y * 16 + z] = setPos(cubes[x * 256 + y * 16 + z], { x, y, z });
+				cubes[x * 256 + y * 16 + z] = setType(cubes[x * 256 + y * 16 + z], type);
+				cubes[x * 256 + y * 16 + z] = setVid(cubes[x * 256 + y * 16 + z], 0);
 			}
 		}
 	}
@@ -874,55 +874,59 @@ void Chunk::findChunks() {
 }
 
 void Chunk::recalcqrid() {
+	uint8_t tempVid = 0;
+
 	for (int x = 0; x < 16; x++) {
 		for (int y = 0; y < 16; y++) {
 			for (int z = 0; z < 16; z++) {
 
 				bool xn = x == 0 ?
-					(m_xn == NULL ? true : (m_xn->cubes[15 * 256 + y * 16 + z].type == 0))
-					: cubes[(x - 1) * 256 + y * 16 + z].type == 0;
+					(m_xn == NULL ? true : (getType(m_xn->cubes[15 * 256 + y * 16 + z]) == 0))
+					: getType(cubes[(x - 1) * 256 + y * 16 + z]) == 0;
 
 				bool xp = x == 15 ?
-					(m_xp == NULL ? true : (m_xp->cubes[0 * 256 + y * 16 + z].type == 0))
-					: cubes[(x + 1) * 256 + y * 16 + z].type == 0;
+					(m_xp == NULL ? true : (getType(m_xp->cubes[0 * 256 + y * 16 + z]) == 0))
+					: getType(cubes[(x + 1) * 256 + y * 16 + z]) == 0;
 
 				bool yn = y == 0 ?
-					(m_yn == NULL ? true : (m_yn->cubes[x * 256 + 15 * 16 + z].type == 0))
-					: cubes[x * 256 + (y - 1) * 16 + z].type == 0;
+					(m_yn == NULL ? true : (getType(m_yn->cubes[x * 256 + 15 * 16 + z]) == 0))
+					: getType(cubes[x * 256 + (y - 1) * 16 + z]) == 0;
 
 				bool yp = y == 15 ?
-					(m_yp == NULL ? true : (m_yp->cubes[x * 256 + 0 * 16 + z].type == 0))
-					: cubes[x * 256 + (y + 1) * 16 + z].type == 0;
+					(m_yp == NULL ? true : (getType(m_yp->cubes[x * 256 + 0 * 16 + z]) == 0))
+					: getType(cubes[x * 256 + (y + 1) * 16 + z]) == 0;
 
 				bool zn = z == 0 ?
-					(m_zn == NULL ? true : (m_zn->cubes[x * 256 + y * 16 + 15].type == 0))
-					: cubes[x * 256 + y * 16 + (z - 1)].type == 0;
+					(m_zn == NULL ? true : (getType(m_zn->cubes[x * 256 + y * 16 + 15]) == 0))
+					: getType(cubes[x * 256 + y * 16 + (z - 1)]) == 0;
 
 				bool zp = z == 15 ?
-					(m_zp == NULL ? true : (m_zp->cubes[x * 256 + y * 16 + 0].type == 0))
-					: cubes[x * 256 + y * 16 + (z + 1)].type == 0;
+					(m_zp == NULL ? true : (getType(m_zp->cubes[x * 256 + y * 16 + 0]) == 0))
+					: getType(cubes[x * 256 + y * 16 + (z + 1)]) == 0;
 
-				cubes[x * 256 + y * 16 + z].vid = 0;
+				tempVid = 0;
 
-				cubes[x * 256 + y * 16 + z].vid += (zn ? 1 : 0);
-				cubes[x * 256 + y * 16 + z].vid += (zp ? 2 : 0);
+				tempVid += (zn ? 1 : 0);
+				tempVid += (zp ? 2 : 0);
 
-				cubes[x * 256 + y * 16 + z].vid += (xp ? 4 : 0);
-				cubes[x * 256 + y * 16 + z].vid += (xn ? 8 : 0);
+				tempVid += (xp ? 4 : 0);
+				tempVid += (xn ? 8 : 0);
 
-				cubes[x * 256 + y * 16 + z].vid += (yp ? 16 : 0);
-				cubes[x * 256 + y * 16 + z].vid += (yn ? 32 : 0);
+				tempVid += (yp ? 16 : 0);
+				tempVid += (yn ? 32 : 0);
 
-				if (!(xn || xp || yn || yp || zn || zp) || cubes[x * 256 + y * 16 + z].type == 0) {
-					cubes[x * 256 + y * 16 + z].vid = 0;
+				if (!(xn || xp || yn || yp || zn || zp) || getType(cubes[x * 256 + y * 16 + z]) == 0) {
+					tempVid = 0;
 				}
+
+				cubes[x * 256 + y * 16 + z] = setVid(cubes[x * 256 + y * 16 + z], tempVid);
 			}
 		}
 	}
 
 	m_air = true;
 	for (int i = 0; i < 16 * 16 * 16; i++) {
-		if (cubes[i].vid) {
+		if (getVid(cubes[i])) {
 			m_air = false;
 			break;
 		}
