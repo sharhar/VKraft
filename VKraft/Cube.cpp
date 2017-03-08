@@ -140,6 +140,28 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &freeInfo->commandPool),
 		"Failed to create command pool");
 
+	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	commandPoolCreateInfo.queueFamilyIndex = vrc->device->presentQueueIdx;
+
+	VkCommandPool transferCmdPool;
+	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &transferCmdPool),
+		"Failed to create command pool");
+
+	VkCommandBufferAllocateInfo transferCommandBufferAllocateInfo = {};
+	transferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	transferCommandBufferAllocateInfo.pNext = NULL;
+	transferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	transferCommandBufferAllocateInfo.commandPool = transferCmdPool;
+	transferCommandBufferAllocateInfo.commandBufferCount = 1;
+
+	VkCommandBuffer transferCmdBuffer;
+	VLKCheck(vkAllocateCommandBuffers(vrc->device->device, &transferCommandBufferAllocateInfo, &transferCmdBuffer), 
+		"Failed to allocate command buffer");
+
+	VkQueue transferQueue;
+	vkGetDeviceQueue(vrc->device->device, vrc->device->presentQueueIdx, 2, &transferQueue);
+
 	while (!glfwWindowShouldClose(window)) {
 		Vec3 playerPos = { floor(Camera::pos.x / 16.0f), floor(Camera::pos.y / 16.0f), floor(Camera::pos.z / 16.0f) };
 
@@ -217,57 +239,28 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 		}
 
 		if (rcsz != 0) {
-			int rcct = 0;
-
-			for (int i = 0; i < rcsz; i++) {
-				if (rCubesPtr[i].vid & 1) {
-					rcct = rcct + 6;
-				}
-				
-				if (rCubesPtr[i].vid & 2) {
-					rcct = rcct + 6;
-				}
-
-				if (rCubesPtr[i].vid & 4) {
-					rcct = rcct + 6;
-				}
-
-				if (rCubesPtr[i].vid & 8) {
-					rcct = rcct + 6;
-				}
-
-				if (rCubesPtr[i].vid & 16) {
-					rcct = rcct + 6;
-				}
-
-				if (rCubesPtr[i].vid & 32) {
-					rcct = rcct + 6;
-				}
-			}
-
 			freeInfo->modelInfo = (ChunkModelInfo*)malloc(sizeof(ChunkModelInfo));
 			freeInfo->modelInfo->start = false;
 			freeInfo->modelInfo->model = (VLKModel*)malloc(sizeof(VLKModel));
 
 			VkBufferCreateInfo vertexInputBufferInfo = {};
 			vertexInputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			vertexInputBufferInfo.size = rcct * sizeof(Vertex);
-			vertexInputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			vertexInputBufferInfo.size = rcsz * sizeof(Vertex);
 			vertexInputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			vertexInputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 			VLKCheck(vkCreateBuffer(vrc->device->device, &vertexInputBufferInfo, NULL, &freeInfo->modelInfo->model->vertexInputBuffer),
 				"Failed to create vertex input buffer.");
 
 			VkMemoryRequirements vertexBufferMemoryRequirements = {};
-			vkGetBufferMemoryRequirements(vrc->device->device, freeInfo->modelInfo->model->vertexInputBuffer,
-				&vertexBufferMemoryRequirements);
+			vkGetBufferMemoryRequirements(vrc->device->device, freeInfo->modelInfo->model->vertexInputBuffer, &vertexBufferMemoryRequirements);
 
 			VkMemoryAllocateInfo bufferAllocateInfo = {};
 			bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 			bufferAllocateInfo.allocationSize = vertexBufferMemoryRequirements.size;
 
 			uint32_t vertexMemoryTypeBits = vertexBufferMemoryRequirements.memoryTypeBits;
-			VkMemoryPropertyFlags vertexDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+			VkMemoryPropertyFlags vertexDesiredMemoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 			for (uint32_t i = 0; i < 32; ++i) {
 				VkMemoryType memoryType = vrc->device->memoryProperties.memoryTypes[i];
 				if (vertexMemoryTypeBits & 1) {
@@ -282,407 +275,99 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 			VLKCheck(vkAllocateMemory(vrc->device->device, &bufferAllocateInfo, NULL, &freeInfo->modelInfo->model->vertexBufferMemory),
 				"Failed to allocate buffer memory");
 
+			VLKCheck(vkBindBufferMemory(vrc->device->device, freeInfo->modelInfo->model->vertexInputBuffer, freeInfo->modelInfo->model->vertexBufferMemory, 0),
+				"Failed to bind buffer memory");
+
+			vertexInputBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+			VkBuffer srcBuffer;
+			VLKCheck(vkCreateBuffer(vrc->device->device, &vertexInputBufferInfo, NULL, &srcBuffer),
+				"Failed to create vertex input buffer.");
+
+			vkGetBufferMemoryRequirements(vrc->device->device, srcBuffer, &vertexBufferMemoryRequirements);
+
+			bufferAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			bufferAllocateInfo.allocationSize = vertexBufferMemoryRequirements.size;
+
+			vertexMemoryTypeBits = vertexBufferMemoryRequirements.memoryTypeBits;
+			vertexDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+			for (uint32_t i = 0; i < 32; ++i) {
+				VkMemoryType memoryType = vrc->device->memoryProperties.memoryTypes[i];
+				if (vertexMemoryTypeBits & 1) {
+					if ((memoryType.propertyFlags & vertexDesiredMemoryFlags) == vertexDesiredMemoryFlags) {
+						bufferAllocateInfo.memoryTypeIndex = i;
+						break;
+					}
+				}
+				vertexMemoryTypeBits = vertexMemoryTypeBits >> 1;
+			}
+
+			VkDeviceMemory srcMemory;
+			VLKCheck(vkAllocateMemory(vrc->device->device, &bufferAllocateInfo, NULL, &srcMemory),
+				"Failed to allocate buffer memory");
+
 			void *mapped;
-			VLKCheck(vkMapMemory(vrc->device->device, freeInfo->modelInfo->model->vertexBufferMemory, 0, VK_WHOLE_SIZE, 0, &mapped),
+			VLKCheck(vkMapMemory(vrc->device->device, srcMemory, 0, VK_WHOLE_SIZE, 0, &mapped),
 				"Failed to map buffer memory");
 
 			Vertex* verts = (Vertex*)mapped;
 
-			int rcp = 0;
+			Vec3i* tex = NULL;
+
 			for (int i = 0; i < rcsz; i++) {
-				if (rCubesPtr[i].type > 20) {
-				}
-
-				Vec3i* tex = Chunk::texts[rCubesPtr[i].type];
-
-				if (rCubesPtr[i].vid & 15) {
-					int sx = tex->x % 16;
-					int sy = (tex->x - sx) / 16;
-
-					float tex0u = (sx + 0.0) / 16.0;
-					float tex0v = (sy + 1.0) / 16.0;
-
-					float tex1u = (sx + 0.0) / 16.0;
-					float tex1v = (sy + 0.0) / 16.0;
-
-					float tex2u = (sx + 1.0) / 16.0;
-					float tex2v = (sy + 0.0) / 16.0;
-
-					float tex3u = (sx + 1.0) / 16.0;
-					float tex3v = (sy + 1.0) / 16.0;
-
-					if (rCubesPtr[i].vid & 1) {
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 4;
-						verts[rcp].u = tex3u;
-						verts[rcp].v = tex3v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 2;
-						verts[rcp].u = tex1u;
-						verts[rcp].v = tex1v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 0;
-						verts[rcp].u = tex0u;
-						verts[rcp].v = tex0v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 6;
-						verts[rcp].u = tex2u;
-						verts[rcp].v = tex2v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 2;
-						verts[rcp].u = tex1u;
-						verts[rcp].v = tex1v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 4;
-						verts[rcp].u = tex3u;
-						verts[rcp].v = tex3v;
-
-						rcp = rcp + 1;
-					}
-
-					if (rCubesPtr[i].vid & 2) {
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 1;
-						verts[rcp].u = tex0u;
-						verts[rcp].v = tex0v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 3;
-						verts[rcp].u = tex1u;
-						verts[rcp].v = tex1v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 5;
-						verts[rcp].u = tex3u;
-						verts[rcp].v = tex3v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 5;
-						verts[rcp].u = tex3u;
-						verts[rcp].v = tex3v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 3;
-						verts[rcp].u = tex1u;
-						verts[rcp].v = tex1v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 7;
-						verts[rcp].u = tex2u;
-						verts[rcp].v = tex2v;
-
-						rcp = rcp + 1;
-					}
-
-					if (rCubesPtr[i].vid & 4) {
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 5;
-						verts[rcp].u = tex3u;
-						verts[rcp].v = tex3v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 6;
-						verts[rcp].u = tex1u;
-						verts[rcp].v = tex1v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 4;
-						verts[rcp].u = tex0u;
-						verts[rcp].v = tex0v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 7;
-						verts[rcp].u = tex2u;
-						verts[rcp].v = tex2v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 6;
-						verts[rcp].u = tex1u;
-						verts[rcp].v = tex1v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 5;
-						verts[rcp].u = tex3u;
-						verts[rcp].v = tex3v;
-
-						rcp = rcp + 1;
-					}
-
-					if (rCubesPtr[i].vid & 8) {
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 0;
-						verts[rcp].u = tex0u;
-						verts[rcp].v = tex0v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 2;
-						verts[rcp].u = tex1u;
-						verts[rcp].v = tex1v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 1;
-						verts[rcp].u = tex3u;
-						verts[rcp].v = tex3v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 1;
-						verts[rcp].u = tex3u;
-						verts[rcp].v = tex3v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-						verts[rcp].w = 2;
-						verts[rcp].u = tex1u;
-						verts[rcp].v = tex1v;
-
-						rcp = rcp + 1;
-
-						verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-						verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-						verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-						verts[rcp].w = 3;
-						verts[rcp].u = tex2u;
-						verts[rcp].v = tex2v;
-
-						rcp = rcp + 1;
-					}
-				}
-
-				if (rCubesPtr[i].vid & 16) {
-					int sx = tex->y % 16;
-					int sy = (tex->y - sx) / 16;
-
-					float tex0u = (sx + 0.0) / 16.0;
-					float tex0v = (sy + 1.0) / 16.0;
-
-					float tex1u = (sx + 0.0) / 16.0;
-					float tex1v = (sy + 0.0) / 16.0;
-
-					float tex2u = (sx + 1.0) / 16.0;
-					float tex2v = (sy + 0.0) / 16.0;
-
-					float tex3u = (sx + 1.0) / 16.0;
-					float tex3v = (sy + 1.0) / 16.0;
-
-					verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-					verts[rcp].w = 3;
-					verts[rcp].u = tex1u;
-					verts[rcp].v = tex1v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-					verts[rcp].w = 2;
-					verts[rcp].u = tex0u;
-					verts[rcp].v = tex0v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-					verts[rcp].w = 7;
-					verts[rcp].u = tex2u;
-					verts[rcp].v = tex2v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-					verts[rcp].w = 7;
-					verts[rcp].u = tex2u;
-					verts[rcp].v = tex2v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-					verts[rcp].w = 2;
-					verts[rcp].u = tex0u;
-					verts[rcp].v = tex0v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y + 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-					verts[rcp].w = 6;
-					verts[rcp].u = tex3u;
-					verts[rcp].v = tex3v;
-
-					rcp = rcp + 1;
-				}
-
-				if (rCubesPtr[i].vid & 32) {
-					int sx = tex->z % 16;
-					int sy = (tex->z - sx) / 16;
-
-					float tex0u = (sx + 0.0) / 16.0;
-					float tex0v = (sy + 1.0) / 16.0;
-
-					float tex1u = (sx + 0.0) / 16.0;
-					float tex1v = (sy + 0.0) / 16.0;
-
-					float tex2u = (sx + 1.0) / 16.0;
-					float tex2v = (sy + 0.0) / 16.0;
-
-					float tex3u = (sx + 1.0) / 16.0;
-					float tex3v = (sy + 1.0) / 16.0;
-
-					verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-					verts[rcp].w = 5;
-					verts[rcp].u = tex2u;
-					verts[rcp].v = tex2v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-					verts[rcp].w = 0;
-					verts[rcp].u = tex0u;
-					verts[rcp].v = tex0v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-					verts[rcp].w = 1;
-					verts[rcp].u = tex1u;
-					verts[rcp].v = tex1v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-					verts[rcp].w = 4;
-					verts[rcp].u = tex3u;
-					verts[rcp].v = tex3v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x - 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z - 0.5f;
-					verts[rcp].w = 0;
-					verts[rcp].u = tex0u;
-					verts[rcp].v = tex0v;
-
-					rcp = rcp + 1;
-
-					verts[rcp].x = rCubesPtr[i].pos.x + 0.5f;
-					verts[rcp].y = rCubesPtr[i].pos.y - 0.5f;
-					verts[rcp].z = rCubesPtr[i].pos.z + 0.5f;
-					verts[rcp].w = 5;
-					verts[rcp].u = tex2u;
-					verts[rcp].v = tex2v;
-
-					rcp = rcp + 1;
-				}
+				verts[i].x = rCubesPtr[i].pos.x;
+				verts[i].y = rCubesPtr[i].pos.y;
+				verts[i].z = rCubesPtr[i].pos.z;
+
+				tex = Chunk::texts[rCubesPtr[i].type];
+
+				verts[i].tx = tex->x;
+				verts[i].ty = tex->y;
+				verts[i].tz = tex->z;
+				verts[i].rinf = rCubesPtr[i].vid;
 			}
 
-			vkUnmapMemory(vrc->device->device, freeInfo->modelInfo->model->vertexBufferMemory);
+			vkUnmapMemory(vrc->device->device, srcMemory);
 
-			VLKCheck(vkBindBufferMemory(vrc->device->device, freeInfo->modelInfo->model->vertexInputBuffer, freeInfo->modelInfo->model->vertexBufferMemory, 0),
+			VLKCheck(vkBindBufferMemory(vrc->device->device, srcBuffer, srcMemory, 0),
 				"Failed to bind buffer memory");
+
+			VkCommandBufferBeginInfo beginInfo = {};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+			vkBeginCommandBuffer(transferCmdBuffer, &beginInfo);
+
+			VkBufferCopy bufferCopy = {};
+			bufferCopy.dstOffset = 0;
+			bufferCopy.srcOffset = 0;
+			bufferCopy.size = rcsz * sizeof(Vertex);
+
+			vkCmdCopyBuffer(transferCmdBuffer, srcBuffer, 
+				freeInfo->modelInfo->model->vertexInputBuffer, 1, &bufferCopy);
+
+			vkEndCommandBuffer(transferCmdBuffer);
+
+			VkFenceCreateInfo fenceCreateInfo = {};
+			fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+			VkFence submitFence;
+			vkCreateFence(vrc->device->device, &fenceCreateInfo, NULL, &submitFence);
+
+			VkSubmitInfo submitInfo = {};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &transferCmdBuffer;
+			VLKCheck(vkQueueSubmit(transferQueue, 1, &submitInfo, submitFence),
+				"Could not submit Queue");
+
+			vkQueueWaitIdle(transferQueue);
+
+			vkWaitForFences(vrc->device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
+			vkDestroyFence(vrc->device->device, submitFence, NULL);
+			vkResetCommandBuffer(vrc->device->setupCmdBuffer, 0);
+
+			vkFreeMemory(vrc->device->device, srcMemory, NULL);
+			vkDestroyBuffer(vrc->device->device, srcBuffer, NULL);
 
 			VkCommandBufferInheritanceInfo inheritanceInfo = {};
 			inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
@@ -694,7 +379,6 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 			inheritanceInfo.subpass = 0;
 			inheritanceInfo.framebuffer = vrc->framebuffer->frameBuffer;
 
-			VkCommandBufferBeginInfo beginInfo = {};
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
 			beginInfo.pInheritanceInfo = &inheritanceInfo;
@@ -730,7 +414,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 			vkCmdBindDescriptorSets(freeInfo->modelInfo->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				vrc->pipeline->pipelineLayout, 0, 1, &vrc->shader->descriptorSet, 0, NULL);
 
-			vkCmdDraw(freeInfo->modelInfo->commandBuffer, rcct, 1, 0, 0);
+			vkCmdDraw(freeInfo->modelInfo->commandBuffer, rcsz, 1, 0, 0);
 
 			vkEndCommandBuffer(freeInfo->modelInfo->commandBuffer);
 			

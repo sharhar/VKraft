@@ -1,23 +1,17 @@
-#version 400
+#version 450
 #extension GL_ARB_separate_shader_objects : enable
-#extension GL_ARB_shading_language_420pack : enable
 
 layout ( set = 0, binding = 1 ) uniform sampler2D tex;
 
-layout (location = 0) out vec4 uFragColor;
+layout ( location = 0 ) out vec4 uFragColor;
 
-layout ( location = 0 ) in struct fragment_in {
-    vec2 uv;
-} IN;
-
-layout ( location = 1 ) in flat struct fragment_in_sel {
-	int selected;
-} SEL;
+layout ( location = 0 ) in vec2 uv;
+layout ( location = 1 ) in flat int selected;
 
 void main() {
-	if(SEL.selected == 1) {
-		uFragColor = texture(tex, IN.uv)*1.35;
+	if(selected == 1) {
+		uFragColor = texture(tex, uv)*1.35;
 	} else {
-		uFragColor = texture(tex, IN.uv);
+		uFragColor = texture(tex, uv);
 	}
 }

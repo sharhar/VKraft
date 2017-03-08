@@ -218,12 +218,12 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext* context, VLKDev
 
 	assert(device->physicalDevice, "No physical device detected that can render and present!");
 
-	float queuePriorities[] = { 1.0f, 1.0f };
+	float queuePriorities[] = { 1.0f, 1.0f, 1.0f };
 
 	VkDeviceQueueCreateInfo queueCreateInfo = {};
 	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 	queueCreateInfo.queueFamilyIndex = device->presentQueueIdx;
-	queueCreateInfo.queueCount = 2;
+	queueCreateInfo.queueCount = 3;
 	queueCreateInfo.pQueuePriorities = queuePriorities;
 
 	VkDeviceCreateInfo deviceInfo = {};
@@ -689,7 +689,7 @@ VLKModel* vlkCreateModel(VLKDevice* device, void* verts, uint32_t vertsSize) {
 	bufferAllocateInfo.allocationSize = vertexBufferMemoryRequirements.size;
 
 	uint32_t vertexMemoryTypeBits = vertexBufferMemoryRequirements.memoryTypeBits;
-	VkMemoryPropertyFlags vertexDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	VkMemoryPropertyFlags vertexDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 	for (uint32_t i = 0; i < 32; ++i) {
 		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
 		if (vertexMemoryTypeBits & 1) {
@@ -724,7 +724,7 @@ void vlkDestroyModel(VLKDevice* device, VLKModel* model) {
 	free(model);
 }
 
-VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
+VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* geomPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
 	VLKShader* shader = (VLKShader*)malloc(sizeof(VLKShader));
 
 	uint32_t codeSize;
@@ -746,6 +746,22 @@ VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* fragPath, vo
 
 	VLKCheck(vkCreateShaderModule(device->device, &vertexShaderCreationInfo, NULL, &shader->vertexShaderModule),
 		"Failed to create vertex shader module");
+
+	fileHandle = CreateFile(geomPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (fileHandle == INVALID_HANDLE_VALUE) {
+		OutputDebugStringA("Failed to open shader file.");
+		exit(1);
+	}
+	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
+	CloseHandle(fileHandle);
+
+	VkShaderModuleCreateInfo geometryShaderCreationInfo = {};
+	geometryShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	geometryShaderCreationInfo.codeSize = codeSize;
+	geometryShaderCreationInfo.pCode = (uint32_t *)code;
+
+	VLKCheck(vkCreateShaderModule(device->device, &geometryShaderCreationInfo, NULL, &shader->geometryShaderModule),
+		"Could not create Fragment shader");
 
 	fileHandle = CreateFile(fragPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (fileHandle == INVALID_HANDLE_VALUE) {
@@ -812,7 +828,7 @@ VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* fragPath, vo
 	bindings[0].binding = 0;
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	bindings[0].descriptorCount = 1;
-	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	bindings[0].stageFlags = VK_SHADER_STAGE_GEOMETRY_BIT;
 	bindings[0].pImmutableSamplers = NULL;
 
 	bindings[1].binding = 1;
@@ -899,6 +915,7 @@ void vlkDestroyShader(VLKDevice* device, VLKShader* shader) {
 	vkDestroyBuffer(device->device, shader->buffer, NULL);
 
 	vkDestroyShaderModule(device->device, shader->vertexShaderModule, NULL);
+	vkDestroyShaderModule(device->device, shader->geometryShaderModule, NULL);
 	vkDestroyShaderModule(device->device, shader->fragmentShaderModule, NULL);
 
 	free(shader);
@@ -917,7 +934,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	VLKCheck(vkCreatePipelineLayout(device->device, &layoutCreateInfo, NULL, &pipeline->pipelineLayout),
 		"Failed to create pipeline layout");
 
-	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[2] = {};
+	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3] = {};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shaderStageCreateInfo[0].module = shader->vertexShaderModule;
@@ -925,10 +942,16 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	shaderStageCreateInfo[0].pSpecializationInfo = NULL;
 
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shaderStageCreateInfo[1].module = shader->fragmentShaderModule;
+	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_GEOMETRY_BIT;
+	shaderStageCreateInfo[1].module = shader->geometryShaderModule;
 	shaderStageCreateInfo[1].pName = "main";
 	shaderStageCreateInfo[1].pSpecializationInfo = NULL;
+
+	shaderStageCreateInfo[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStageCreateInfo[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shaderStageCreateInfo[2].module = shader->fragmentShaderModule;
+	shaderStageCreateInfo[2].pName = "main";
+	shaderStageCreateInfo[2].pSpecializationInfo = NULL;
 
 	VkVertexInputBindingDescription vertexBindingDescription = {};
 	vertexBindingDescription.binding = 0;
@@ -938,13 +961,13 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	VkVertexInputAttributeDescription vertexAttributeDescritpion[2];
 	vertexAttributeDescritpion[0].location = 0;
 	vertexAttributeDescritpion[0].binding = 0;
-	vertexAttributeDescritpion[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	vertexAttributeDescritpion[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 	vertexAttributeDescritpion[0].offset = 0;
 
 	vertexAttributeDescritpion[1].location = 1;
 	vertexAttributeDescritpion[1].binding = 0;
-	vertexAttributeDescritpion[1].format = VK_FORMAT_R32G32_SFLOAT;
-	vertexAttributeDescritpion[1].offset = 4 * sizeof(float);
+	vertexAttributeDescritpion[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	vertexAttributeDescritpion[1].offset = 3 * sizeof(float);
 
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -955,7 +978,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
 	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
 	VkViewport viewport = {};
@@ -982,7 +1005,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	rasterizationState.depthClampEnable = VK_FALSE;
 	rasterizationState.rasterizerDiscardEnable = VK_FALSE;
 	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
+	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizationState.depthBiasEnable = VK_FALSE;
 	rasterizationState.depthBiasConstantFactor = 0;
@@ -1049,7 +1072,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineCreateInfo.stageCount = 2;
+	pipelineCreateInfo.stageCount = 3;
 	pipelineCreateInfo.pStages = shaderStageCreateInfo;
 	pipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
 	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
@@ -1157,13 +1180,7 @@ void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
 	presentInfo.pSwapchains = &swapChain->swapChain;
 	presentInfo.pImageIndices = &swapChain->nextImageIdx;
 	presentInfo.pResults = NULL;
-	//double ctt = glfwGetTime();
-
 	vkQueuePresentKHR(device->presentQueue, &presentInfo);
-	
-	//double dtt = glfwGetTime() - ctt;
-
-	//std::cout << "ms: " << (dtt * 1000) << "\n";
 
 	vkWaitForFences(device->device, 1, &swapChain->renderingCompleteFence, VK_TRUE, UINT64_MAX);
 	vkResetFences(device->device, 1, &swapChain->renderingCompleteFence);
@@ -1187,6 +1204,8 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
 
 	VkImageCreateInfo textureCreateInfo = {};
 	textureCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	textureCreateInfo.pNext = NULL;
+	textureCreateInfo.flags = 0;
 	textureCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	textureCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
 	textureCreateInfo.extent = { texture->width, texture->height, 1 };
@@ -1194,22 +1213,23 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
 	textureCreateInfo.arrayLayers = 1;
 	textureCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	textureCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
-	textureCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+	textureCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	textureCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	textureCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 
-	VLKCheck(vkCreateImage(device->device, &textureCreateInfo, NULL, &texture->textureImage),
+	VkImage srcImage;
+	VLKCheck(vkCreateImage(device->device, &textureCreateInfo, NULL, &srcImage),
 		"Failed to create texture image");
 
 	VkMemoryRequirements textureMemoryRequirements = {};
-	vkGetImageMemoryRequirements(device->device, texture->textureImage, &textureMemoryRequirements);
+	vkGetImageMemoryRequirements(device->device, srcImage, &textureMemoryRequirements);
 
 	VkMemoryAllocateInfo textureImageAllocateInfo = {};
 	textureImageAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	textureImageAllocateInfo.allocationSize = textureMemoryRequirements.size;
 
 	uint32_t textureMemoryTypeBits = textureMemoryRequirements.memoryTypeBits;
-	VkMemoryPropertyFlags tDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	VkMemoryPropertyFlags tDesiredMemoryFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 	for (uint32_t i = 0; i < 32; ++i) {
 		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
 		if (textureMemoryTypeBits & 1) {
@@ -1221,29 +1241,89 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
 		textureMemoryTypeBits = textureMemoryTypeBits >> 1;
 	}
 
+	VkDeviceMemory srcMemory;
+	VLKCheck(vkAllocateMemory(device->device, &textureImageAllocateInfo, NULL, &srcMemory),
+		"Failed to allocate device memory");
+
+	VLKCheck(vkBindImageMemory(device->device, srcImage, srcMemory, 0),
+		"Failed to bind image memory");
 	
+	void *imageMapped;
+	VLKCheck(vkMapMemory(device->device, srcMemory, 0, VK_WHOLE_SIZE, 0, &imageMapped),
+		"Failed to map image memory.");
+
+	VkImageSubresource subresource = {};
+	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource.mipLevel = 0;
+	subresource.arrayLayer = 0;
+
+	VkSubresourceLayout stagingImageLayout;
+	vkGetImageSubresourceLayout(device->device, srcImage, &subresource, &stagingImageLayout);
+
+	if (stagingImageLayout.rowPitch == texture->width * 4) {
+		memcpy(imageMapped, texture->data, texture->width * texture->height * 4);
+	} else {
+		uint8_t* dataBytes = (uint8_t*)imageMapped;
+
+		for (int y = 0; y < texture->height; y++) {
+			memcpy(
+				&dataBytes[y * stagingImageLayout.rowPitch],
+				&texture->data[y * texture->width * 4],
+				texture->width * 4);
+		}
+	}
+
+	VkMappedMemoryRange memoryRange = {};
+	memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+	memoryRange.memory = srcMemory;
+	memoryRange.offset = 0;
+	memoryRange.size = VK_WHOLE_SIZE;
+	vkFlushMappedMemoryRanges(device->device, 1, &memoryRange);
+
+	vkUnmapMemory(device->device, srcMemory);
+
+	imageData.clear();
+
+	textureCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	textureCreateInfo.pNext = NULL;
+	textureCreateInfo.flags = 0;
+	textureCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	textureCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	textureCreateInfo.extent = { texture->width, texture->height, 1 };
+	textureCreateInfo.mipLevels = 1;
+	textureCreateInfo.arrayLayers = 1;
+	textureCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	textureCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	textureCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	textureCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	textureCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+
+	VLKCheck(vkCreateImage(device->device, &textureCreateInfo, NULL, &texture->textureImage),
+		"Failed to create texture image");
+
+	vkGetImageMemoryRequirements(device->device, texture->textureImage, &textureMemoryRequirements);
+
+	textureImageAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	textureImageAllocateInfo.allocationSize = textureMemoryRequirements.size;
+
+	textureMemoryTypeBits = textureMemoryRequirements.memoryTypeBits;
+	tDesiredMemoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	for (uint32_t i = 0; i < 32; ++i) {
+		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
+		if (textureMemoryTypeBits & 1) {
+			if ((memoryType.propertyFlags & tDesiredMemoryFlags) == tDesiredMemoryFlags) {
+				textureImageAllocateInfo.memoryTypeIndex = i;
+				break;
+			}
+		}
+		textureMemoryTypeBits = textureMemoryTypeBits >> 1;
+	}
+
 	VLKCheck(vkAllocateMemory(device->device, &textureImageAllocateInfo, NULL, &texture->textureImageMemory),
 		"Failed to allocate device memory");
 
 	VLKCheck(vkBindImageMemory(device->device, texture->textureImage, texture->textureImageMemory, 0),
 		"Failed to bind image memory");
-	
-	void *imageMapped;
-	VLKCheck(vkMapMemory(device->device, texture->textureImageMemory, 0, VK_WHOLE_SIZE, 0, &imageMapped),
-		"Failed to map image memory.");
-
-	memcpy(imageMapped, texture->data, texture->width * texture->height * 4);
-
-	VkMappedMemoryRange memoryRange = {};
-	memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-	memoryRange.memory = texture->textureImageMemory;
-	memoryRange.offset = 0;
-	memoryRange.size = VK_WHOLE_SIZE;
-	vkFlushMappedMemoryRanges(device->device, 1, &memoryRange);
-
-	vkUnmapMemory(device->device, texture->textureImageMemory);
-
-	imageData.clear();
 
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1254,13 +1334,70 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
 	VkImageMemoryBarrier layoutTransitionBarrier = {};
 	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	layoutTransitionBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-	layoutTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	layoutTransitionBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 	layoutTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+	layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.image = srcImage;
+	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	layoutTransitionBarrier.subresourceRange = resourceRange;
+
+	vkCmdPipelineBarrier(device->setupCmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &layoutTransitionBarrier);
+
+	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	layoutTransitionBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+	layoutTransitionBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	layoutTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+	layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.image = texture->textureImage;
+	layoutTransitionBarrier.subresourceRange = resourceRange;
+
+	vkCmdPipelineBarrier(device->setupCmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &layoutTransitionBarrier);
+
+	VkImageSubresourceLayers subResource = {};
+	subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subResource.baseArrayLayer = 0;
+	subResource.mipLevel = 0;
+	subResource.layerCount = 1;
+
+	VkImageCopy region = {};
+	region.srcSubresource = subResource;
+	region.dstSubresource = subResource;
+	region.srcOffset = { 0, 0, 0 };
+	region.dstOffset = { 0, 0, 0 };
+	region.extent.width = width;
+	region.extent.height = height;
+	region.extent.depth = 1;
+
+	vkCmdCopyImage(
+		device->setupCmdBuffer,
+		srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		texture->textureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &region);
+
+	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	layoutTransitionBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	layoutTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	layoutTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.image = texture->textureImage;
-	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 	layoutTransitionBarrier.subresourceRange = resourceRange;
 
 	vkCmdPipelineBarrier(device->setupCmdBuffer,
@@ -1293,9 +1430,11 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
 		"Could not submit Queue");
 
 	vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(device->device, 1, &submitFence);
 	vkDestroyFence(device->device, submitFence, NULL);
 	vkResetCommandBuffer(device->setupCmdBuffer, 0);
+
+	vkFreeMemory(device->device, srcMemory, NULL);
+	vkDestroyImage(device->device, srcImage, NULL);
 
 	VkImageViewCreateInfo textureImageViewCreateInfo = {};
 	textureImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1325,9 +1464,10 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
 	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	samplerCreateInfo.mipLodBias = 0;
 	samplerCreateInfo.anisotropyEnable = VK_FALSE;
+	samplerCreateInfo.maxAnisotropy = 0;
 	samplerCreateInfo.minLod = 0;
-	samplerCreateInfo.maxLod = 5;
-	samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+	samplerCreateInfo.maxLod = 0;
+	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
 
 	VLKCheck(vkCreateSampler(device->device, &samplerCreateInfo, NULL, &texture->sampler),
@@ -1731,7 +1871,7 @@ void vlkStartFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValue;
 	vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
-		VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+		VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void vlkEndFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
