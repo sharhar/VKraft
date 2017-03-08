@@ -646,6 +646,8 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext* context, VLKDev
 }
 
 void vlkDestroyDeviceAndSwapchain(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain) {
+	vkDestroyFence(device->device, swapChain->renderingCompleteFence, NULL);
+	
 	vkFreeMemory(device->device, swapChain->imageMemory, NULL);
 
 	for (uint32_t i = 0; i < swapChain->imageCount; ++i) {

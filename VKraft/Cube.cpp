@@ -137,15 +137,14 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	commandPoolCreateInfo.queueFamilyIndex = vrc->device->presentQueueIdx;
 
-	VkCommandPool commandPool;
-	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &commandPool),
+	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &freeInfo->commandPool),
 		"Failed to create command pool");
 
 	VkCommandBufferAllocateInfo transferCommandBufferAllocateInfo = {};
 	transferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	transferCommandBufferAllocateInfo.pNext = NULL;
 	transferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	transferCommandBufferAllocateInfo.commandPool = commandPool;
+	transferCommandBufferAllocateInfo.commandPool = freeInfo->commandPool;
 	transferCommandBufferAllocateInfo.commandBufferCount = 1;
 
 	VkCommandBuffer transferCmdBuffer;
@@ -447,7 +446,7 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vul
 void Chunk::destroy(VLKDevice* device) {
 	chunkThread->join();
 
-	//vkDestroyCommandPool(device->device, freeInfo->commandPool, NULL);
+	vkDestroyCommandPool(device->device, freeInfo->commandPool, NULL);
 
 	if (freeInfo->pmodelInfo == freeInfo->modelInfo) {
 		if (freeInfo->modelInfo != NULL) {

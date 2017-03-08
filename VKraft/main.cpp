@@ -738,18 +738,10 @@ VLKTexture* createCursorTexture(VLKDevice* device, char* path) {
 	submitInfo.pCommandBuffers = &device->setupCmdBuffer;
 	submitInfo.signalSemaphoreCount = 0;
 	submitInfo.pSignalSemaphores = NULL;
-
-	VkFenceCreateInfo fenceCreateInfo = {};
-	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	VkFence submitFence;
-	vkCreateFence(device->device, &fenceCreateInfo, NULL, &submitFence);
-
-	VLKCheck(vkQueueSubmit(device->presentQueue, 1, &submitInfo, submitFence),
+	VLKCheck(vkQueueSubmit(device->presentQueue, 1, &submitInfo, VK_NULL_HANDLE),
 		"Could not submit Queue");
+	vkQueueWaitIdle(device->presentQueue);
 
-	vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(device->device, 1, &submitFence);
-	vkDestroyFence(device->device, submitFence, NULL);
 	vkResetCommandBuffer(device->setupCmdBuffer, 0);
 
 	VkImageViewCreateInfo textureImageViewCreateInfo = {};
@@ -1027,7 +1019,7 @@ int main() {
 	glfwDestroyWindow(window);
 	glfwTerminate();
 	
-	//system("PAUSE");
+	system("PAUSE");
 
 	return 0;
 }

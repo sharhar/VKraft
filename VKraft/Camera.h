@@ -24,8 +24,6 @@ typedef struct VLKComputeContext {
 	VkCommandPool commandPool;
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet descriptorSet;
-
-	VkFence fence;
 } VLKComputeContext;
 
 class Camera {
