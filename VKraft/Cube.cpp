@@ -137,22 +137,15 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	commandPoolCreateInfo.queueFamilyIndex = vrc->device->presentQueueIdx;
 
-	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &freeInfo->commandPool),
-		"Failed to create command pool");
-
-	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	commandPoolCreateInfo.queueFamilyIndex = vrc->device->presentQueueIdx;
-
-	VkCommandPool transferCmdPool;
-	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &transferCmdPool),
+	VkCommandPool commandPool;
+	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &commandPool),
 		"Failed to create command pool");
 
 	VkCommandBufferAllocateInfo transferCommandBufferAllocateInfo = {};
 	transferCommandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	transferCommandBufferAllocateInfo.pNext = NULL;
 	transferCommandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	transferCommandBufferAllocateInfo.commandPool = transferCmdPool;
+	transferCommandBufferAllocateInfo.commandPool = commandPool;
 	transferCommandBufferAllocateInfo.commandBufferCount = 1;
 
 	VkCommandBuffer transferCmdBuffer;
@@ -348,50 +341,17 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 
 			vkEndCommandBuffer(transferCmdBuffer);
 
-			VkFenceCreateInfo fenceCreateInfo = {};
-			fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-			VkFence submitFence;
-			vkCreateFence(vrc->device->device, &fenceCreateInfo, NULL, &submitFence);
-
 			VkSubmitInfo submitInfo = {};
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.commandBufferCount = 1;
 			submitInfo.pCommandBuffers = &transferCmdBuffer;
-			VLKCheck(vkQueueSubmit(transferQueue, 1, &submitInfo, submitFence),
+			VLKCheck(vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE),
 				"Could not submit Queue");
 
 			vkQueueWaitIdle(transferQueue);
 
-			vkWaitForFences(vrc->device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
-			vkDestroyFence(vrc->device->device, submitFence, NULL);
-			vkResetCommandBuffer(vrc->device->setupCmdBuffer, 0);
-
 			vkFreeMemory(vrc->device->device, srcMemory, NULL);
 			vkDestroyBuffer(vrc->device->device, srcBuffer, NULL);
-
-			VkCommandBufferInheritanceInfo inheritanceInfo = {};
-			inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-			inheritanceInfo.pNext = NULL;
-			inheritanceInfo.occlusionQueryEnable = VK_FALSE;
-			inheritanceInfo.queryFlags = 0;
-			inheritanceInfo.pipelineStatistics = 0;
-			inheritanceInfo.renderPass = vrc->framebuffer->renderPass;
-			inheritanceInfo.subpass = 0;
-			inheritanceInfo.framebuffer = vrc->framebuffer->frameBuffer;
-
-			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-			beginInfo.pInheritanceInfo = &inheritanceInfo;
-
-			VkViewport viewport = { 0, 0, vrc->swapChain->width, vrc->swapChain->height, 0, 1 };
-			VkRect2D scissor = { 0, 0, vrc->swapChain->width, vrc->swapChain->height };
-			VkDeviceSize offsets = {};
-
-			VkCommandBufferAllocateInfo commandBufferAllocationInfo = {};
-			commandBufferAllocationInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-			commandBufferAllocationInfo.commandPool = freeInfo->commandPool;
-			commandBufferAllocationInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-			commandBufferAllocationInfo.commandBufferCount = 1;
 
 			while (Chunk::m_fence > 0) {
 				if (glfwWindowShouldClose(window)) {
@@ -402,22 +362,6 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 			}
 			Chunk::m_fence = 1;
 
-			VLKCheck(vkAllocateCommandBuffers(vrc->device->device, &commandBufferAllocationInfo, &freeInfo->modelInfo->commandBuffer),
-				"Failed to allocate command buffers");
-
-			vkBeginCommandBuffer(freeInfo->modelInfo->commandBuffer, &beginInfo);
-
-			vkCmdSetViewport(freeInfo->modelInfo->commandBuffer, 0, 1, &viewport);
-			vkCmdSetScissor(freeInfo->modelInfo->commandBuffer, 0, 1, &scissor);
-			vkCmdBindPipeline(freeInfo->modelInfo->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vrc->pipeline->pipeline);
-			vkCmdBindVertexBuffers(freeInfo->modelInfo->commandBuffer, 0, 1, &freeInfo->modelInfo->model->vertexInputBuffer, &offsets);
-			vkCmdBindDescriptorSets(freeInfo->modelInfo->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-				vrc->pipeline->pipelineLayout, 0, 1, &vrc->shader->descriptorSet, 0, NULL);
-
-			vkCmdDraw(freeInfo->modelInfo->commandBuffer, rcsz, 1, 0, 0);
-
-			vkEndCommandBuffer(freeInfo->modelInfo->commandBuffer);
-			
 			Chunk::model = freeInfo->modelInfo;
 			Chunk::rcubesSize = rcsz;
 			Chunk::rcubes = rCubesPtr;
@@ -426,7 +370,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 		}
 
 		if (freeInfo->pmodelInfo != NULL) {
-			while (!freeInfo->modelInfo->start || Chunk::m_fence > 0) {
+			while (!freeInfo->modelInfo->start) {
 				if (glfwWindowShouldClose(window)) {
 					return;
 				}
@@ -434,12 +378,6 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 				std::this_thread::sleep_for(std::chrono::microseconds(10));
 			}
 
-			Chunk::m_fence = 1;
-
-			vkFreeCommandBuffers(vrc->device->device, freeInfo->commandPool, 1, &freeInfo->pmodelInfo->commandBuffer);
-
-			Chunk::m_fence = 0;
-			
 			vlkDestroyModel(vrc->device, freeInfo->pmodelInfo->model);
 
 			free(freeInfo->pmodelInfo);
@@ -509,7 +447,7 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vul
 void Chunk::destroy(VLKDevice* device) {
 	chunkThread->join();
 
-	vkDestroyCommandPool(device->device, freeInfo->commandPool, NULL);
+	//vkDestroyCommandPool(device->device, freeInfo->commandPool, NULL);
 
 	if (freeInfo->pmodelInfo == freeInfo->modelInfo) {
 		if (freeInfo->modelInfo != NULL) {
@@ -541,7 +479,18 @@ void Chunk::render(VLKDevice* device, VLKSwapchain* swapChain) {
 	m_fence = m_fence + 2;
 
 	if (model != NULL) {
-		vkCmdExecuteCommands(renderContext->device->drawCmdBuffer, 1, &model->commandBuffer);
+		VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
+		VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
+		VkDeviceSize offsets = {};
+		
+		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
+		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderContext->pipeline->pipeline);
+		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &model->model->vertexInputBuffer, &offsets);
+		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			renderContext->pipeline->pipelineLayout, 0, 1, &renderContext->shader->descriptorSet, 0, NULL);
+
+		vkCmdDraw(device->drawCmdBuffer, rcubesSize, 1, 0, 0);
 		model->start = true;
 	}
 

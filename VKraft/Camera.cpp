@@ -5,7 +5,7 @@
 float* Camera::worldviewMat = 0;
 GLFWwindow* Camera::window = 0;
 Vec3 Camera::pos = { 0, 3.1, 0 };
-Vec3 Camera::renderPos = {0, 0, 0};
+Vec3 Camera::renderPos = { 0, 0, 0 };
 Vec3 Camera::rot = { 0, 0, 0 };
 double Camera::prev_x = 0;
 double Camera::prev_y = 0;
@@ -18,7 +18,7 @@ bool Camera::grounded = false;
 VLKComputeContext Camera::context = {};
 
 VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
-	VLKComputeContext context = { };
+	VLKComputeContext context = {};
 
 	vkGetDeviceQueue(vrc->device->device, vrc->device->presentQueueIdx, 1, &context.computeQueue);
 
@@ -98,7 +98,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	memoryAllocateInfo.pNext = NULL;
 	memoryAllocateInfo.allocationSize = memorySize;
 	memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
-	
+
 	VLKCheck(vkAllocateMemory(vrc->device->device, &memoryAllocateInfo, 0, &context.outMemory),
 		"Could not allocate memory");
 
@@ -339,7 +339,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 
 void destroyComputeContext(VLKDevice* device, VLKComputeContext& context) {
 	vkDestroyFence(device->device, context.fence, NULL);
-	
+
 	vkFreeCommandBuffers(device->device, context.commandPool, 1, &context.computeCmdBuffer);
 	vkDestroyCommandPool(device->device, context.commandPool, NULL);
 
@@ -404,18 +404,16 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			float ny = sin(tx*DEG_TO_RAD);
 			float nz = -cos(ty*DEG_TO_RAD)*cos(tx*DEG_TO_RAD);
 
-			float* posData = new float[6];
+			void *mapped;
+			vkMapMemory(vrc->device->device, context->posMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
+
+			float* posData = (float*)mapped;
 			posData[0] = Camera::pos.x;
 			posData[1] = Camera::pos.y + 0.5f;
 			posData[2] = Camera::pos.z;
 			posData[3] = nx;
 			posData[4] = ny;
 			posData[5] = nz;
-
-			void *mapped;
-			vkMapMemory(vrc->device->device, context->posMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
-
-			memcpy(mapped, posData, 6 * sizeof(float));
 
 			VkMappedMemoryRange memoryRange = {};
 			memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
@@ -426,7 +424,9 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 
 			vkUnmapMemory(vrc->device->device, context->posMemory);
 
-			float* inputData = new float[4 * cbsz];
+			vkMapMemory(vrc->device->device, context->inMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
+
+			float* inputData = (float*)mapped;
 
 			for (int i = 0; i < cbsz; i++) {
 				inputData[i * 4 + 0] = vecs[i].x;
@@ -435,10 +435,6 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 				inputData[i * 4 + 3] = (float)closeCubes[i]->vid;
 			}
 
-			vkMapMemory(vrc->device->device, context->inMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
-
-			memcpy(mapped, inputData, cbsz * 4 * sizeof(float));
-
 			memoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 			memoryRange.memory = context->inMemory;
 			memoryRange.offset = 0;
@@ -446,9 +442,6 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			vkFlushMappedMemoryRanges(vrc->device->device, 1, &memoryRange);
 
 			vkUnmapMemory(vrc->device->device, context->inMemory);
-
-			delete[] posData;
-			delete[] inputData;
 
 			VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 			commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -504,7 +497,8 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 				vrc->uniformBuffer->selected.x = vecs[id].x;
 				vrc->uniformBuffer->selected.y = vecs[id].y;
 				vrc->uniformBuffer->selected.z = vecs[id].z;
-			} else {
+			}
+			else {
 				vrc->uniformBuffer->selected.x = 0.25f;
 				vrc->uniformBuffer->selected.y = 0.25f;
 				vrc->uniformBuffer->selected.z = 0.25f;
@@ -626,7 +620,7 @@ void Camera::update(float dt) {
 
 		yVel -= 33.3333f * dt;
 
-		
+
 		while (fence == 1) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
@@ -654,7 +648,7 @@ void Camera::update(float dt) {
 		}
 
 		fence = fence - 2;
-		
+
 
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);

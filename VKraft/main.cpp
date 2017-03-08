@@ -923,62 +923,6 @@ int main() {
 	double cts = glfwGetTime();
 	double dts = 0;
 
-	VkCommandBufferInheritanceInfo inheritanceInfo = {};
-	inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-	inheritanceInfo.pNext = NULL;
-	inheritanceInfo.occlusionQueryEnable = VK_FALSE;
-	inheritanceInfo.queryFlags = 0;
-	inheritanceInfo.pipelineStatistics = 0;
-	inheritanceInfo.renderPass = swapChain->renderPass;
-	inheritanceInfo.subpass = 0;
-
-	VkCommandBufferBeginInfo beginInfo = {};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-	beginInfo.pInheritanceInfo = &inheritanceInfo;
-
-	VkCommandBufferAllocateInfo commandBufferAllocationInfo = {};
-	commandBufferAllocationInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	commandBufferAllocationInfo.commandPool = device->commandPool;
-	commandBufferAllocationInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-	commandBufferAllocationInfo.commandBufferCount = swapChain->imageCount;
-
-	VkCommandBuffer* screenCmdBuffers = new VkCommandBuffer[swapChain->imageCount];
-	VLKCheck(vkAllocateCommandBuffers(device->device, &commandBufferAllocationInfo, screenCmdBuffers),
-		"Failed to allocate command buffers");
-
-	VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
-	VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
-	VkDeviceSize offsets = {};
-
-	for (int i = 0; i < swapChain->imageCount; i++) {
-		inheritanceInfo.framebuffer = swapChain->frameBuffers[i];
-
-		vkBeginCommandBuffer(screenCmdBuffers[i], &beginInfo);
-
-		vkCmdSetViewport(screenCmdBuffers[i], 0, 1, &viewport);
-		vkCmdSetScissor(screenCmdBuffers[i], 0, 1, &scissor);
-
-		vkCmdBindPipeline(screenCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, bgPipeline->pipeline);
-		vkCmdBindVertexBuffers(screenCmdBuffers[i], 0, 1, &bgModel->vertexInputBuffer, &offsets);
-		vkCmdBindDescriptorSets(screenCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-			bgPipeline->pipelineLayout, 0, 1, &bgShader->descriptorSet, 0, NULL);
-
-		vkCmdDraw(screenCmdBuffers[i], 6, 1, 0, 0);
-
-		vkCmdSetViewport(screenCmdBuffers[i], 0, 1, &viewport);
-		vkCmdSetScissor(screenCmdBuffers[i], 0, 1, &scissor);
-
-		vkCmdBindPipeline(screenCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
-		vkCmdBindVertexBuffers(screenCmdBuffers[i], 0, 1, &cursorModel->vertexInputBuffer, &offsets);
-		vkCmdBindDescriptorSets(screenCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
-
-		vkCmdDraw(screenCmdBuffers[i], 12, 1, 0, 0);
-
-		vkEndCommandBuffer(screenCmdBuffers[i]);
-	}
-
 	float accDT = 0;
 	uint32_t fps = 0;
 
@@ -1032,7 +976,29 @@ int main() {
 		vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
 			VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
-		vkCmdExecuteCommands(device->drawCmdBuffer, 1, &screenCmdBuffers[swapChain->nextImageIdx]);
+		VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
+		VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
+		VkDeviceSize offsets = {};
+
+		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
+
+		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, bgPipeline->pipeline);
+		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &bgModel->vertexInputBuffer, &offsets);
+		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			bgPipeline->pipelineLayout, 0, 1, &bgShader->descriptorSet, 0, NULL);
+
+		vkCmdDraw(device->drawCmdBuffer, 6, 1, 0, 0);
+
+		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
+
+		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
+		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &cursorModel->vertexInputBuffer, &offsets);
+		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
+
+		vkCmdDraw(device->drawCmdBuffer, 12, 1, 0, 0);
 
 		vkCmdEndRenderPass(device->drawCmdBuffer);
 
