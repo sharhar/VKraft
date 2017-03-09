@@ -71,7 +71,8 @@ private:
 public:
 	static Chunk* getChunkAt(Vec3 pos);
 	static int m_fence;
-	static int rcubesSize;
+	static uint32_t rcubesSize;
+	static uint32_t rcubestSize;
 	static Cube* rcubes;
 	static int rsize;
 	static Vec3i** texts;

@@ -72,5 +72,6 @@
     <None Include="cube.geom" />
     <None Include="cube.frag" />
     <None Include="cube.vert" />
+    <None Include="raycast.comp" />
   </ItemGroup>
 </Project>

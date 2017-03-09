@@ -819,7 +819,7 @@ int main() {
 	CubeUniformBuffer uniformBuffer;
 	memcpy(uniformBuffer.proj, getPerspective(), sizeof(float) * 16);
 
-	VLKShader* shader = vlkCreateShader(device, "cube-vert.spv", "cube-geom.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
+	VLKShader* shader = vlkCreateShader(device, "cube-vert.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
 	VLKPipeline* pipeline = vlkCreatePipeline(device, swapChain, shader);
 	
 	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width, swapChain->height);
@@ -1019,7 +1019,7 @@ int main() {
 	glfwDestroyWindow(window);
 	glfwTerminate();
 	
-	system("PAUSE");
+	//system("PAUSE");
 
 	return 0;
 }

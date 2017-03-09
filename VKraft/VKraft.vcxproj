@@ -161,6 +161,7 @@
     <None Include="cube.vert" />
     <None Include="cursor.frag" />
     <None Include="cursor.vert" />
+    <None Include="raycast.comp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

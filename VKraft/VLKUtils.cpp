@@ -240,7 +240,7 @@ void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext* context, VLKDev
 	VkPhysicalDeviceFeatures features;
 	vkGetPhysicalDeviceFeatures(device->physicalDevice, &features);
 
-	if (features.shaderClipDistance != VK_TRUE || features.geometryShader != VK_TRUE) {
+	if (features.shaderClipDistance != VK_TRUE) {
 		std::cout << "Device does not support required features!\n";
 		exit(-1);
 	}
@@ -726,7 +726,7 @@ void vlkDestroyModel(VLKDevice* device, VLKModel* model) {
 	free(model);
 }
 
-VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* geomPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
+VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
 	VLKShader* shader = (VLKShader*)malloc(sizeof(VLKShader));
 
 	uint32_t codeSize;
@@ -748,22 +748,6 @@ VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* geomPath, ch
 
 	VLKCheck(vkCreateShaderModule(device->device, &vertexShaderCreationInfo, NULL, &shader->vertexShaderModule),
 		"Failed to create vertex shader module");
-
-	fileHandle = CreateFile(geomPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE) {
-		OutputDebugStringA("Failed to open shader file.");
-		exit(1);
-	}
-	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
-	CloseHandle(fileHandle);
-
-	VkShaderModuleCreateInfo geometryShaderCreationInfo = {};
-	geometryShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	geometryShaderCreationInfo.codeSize = codeSize;
-	geometryShaderCreationInfo.pCode = (uint32_t *)code;
-
-	VLKCheck(vkCreateShaderModule(device->device, &geometryShaderCreationInfo, NULL, &shader->geometryShaderModule),
-		"Could not create Fragment shader");
 
 	fileHandle = CreateFile(fragPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (fileHandle == INVALID_HANDLE_VALUE) {
@@ -830,7 +814,7 @@ VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* geomPath, ch
 	bindings[0].binding = 0;
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	bindings[0].descriptorCount = 1;
-	bindings[0].stageFlags = VK_SHADER_STAGE_GEOMETRY_BIT;
+	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	bindings[0].pImmutableSamplers = NULL;
 
 	bindings[1].binding = 1;
@@ -917,7 +901,6 @@ void vlkDestroyShader(VLKDevice* device, VLKShader* shader) {
 	vkDestroyBuffer(device->device, shader->buffer, NULL);
 
 	vkDestroyShaderModule(device->device, shader->vertexShaderModule, NULL);
-	vkDestroyShaderModule(device->device, shader->geometryShaderModule, NULL);
 	vkDestroyShaderModule(device->device, shader->fragmentShaderModule, NULL);
 
 	free(shader);
@@ -936,7 +919,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	VLKCheck(vkCreatePipelineLayout(device->device, &layoutCreateInfo, NULL, &pipeline->pipelineLayout),
 		"Failed to create pipeline layout");
 
-	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3] = {};
+	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[2] = {};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shaderStageCreateInfo[0].module = shader->vertexShaderModule;
@@ -944,16 +927,10 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	shaderStageCreateInfo[0].pSpecializationInfo = NULL;
 
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_GEOMETRY_BIT;
-	shaderStageCreateInfo[1].module = shader->geometryShaderModule;
+	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shaderStageCreateInfo[1].module = shader->fragmentShaderModule;
 	shaderStageCreateInfo[1].pName = "main";
 	shaderStageCreateInfo[1].pSpecializationInfo = NULL;
-
-	shaderStageCreateInfo[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStageCreateInfo[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shaderStageCreateInfo[2].module = shader->fragmentShaderModule;
-	shaderStageCreateInfo[2].pName = "main";
-	shaderStageCreateInfo[2].pSpecializationInfo = NULL;
 
 	VkVertexInputBindingDescription vertexBindingDescription = {};
 	vertexBindingDescription.binding = 0;
@@ -963,13 +940,13 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	VkVertexInputAttributeDescription vertexAttributeDescritpion[2];
 	vertexAttributeDescritpion[0].location = 0;
 	vertexAttributeDescritpion[0].binding = 0;
-	vertexAttributeDescritpion[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	vertexAttributeDescritpion[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	vertexAttributeDescritpion[0].offset = 0;
 
 	vertexAttributeDescritpion[1].location = 1;
 	vertexAttributeDescritpion[1].binding = 0;
-	vertexAttributeDescritpion[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	vertexAttributeDescritpion[1].offset = 3 * sizeof(float);
+	vertexAttributeDescritpion[1].format = VK_FORMAT_R32G32_SFLOAT;
+	vertexAttributeDescritpion[1].offset = 4 * sizeof(float);
 
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -980,7 +957,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
 	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
 	VkViewport viewport = {};
@@ -1007,7 +984,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	rasterizationState.depthClampEnable = VK_FALSE;
 	rasterizationState.rasterizerDiscardEnable = VK_FALSE;
 	rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
 	rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizationState.depthBiasEnable = VK_FALSE;
 	rasterizationState.depthBiasConstantFactor = 0;
@@ -1074,7 +1051,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineCreateInfo.stageCount = 3;
+	pipelineCreateInfo.stageCount = 2;
 	pipelineCreateInfo.pStages = shaderStageCreateInfo;
 	pipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
 	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;

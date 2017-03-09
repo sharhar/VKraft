@@ -7,8 +7,8 @@
 void VLKCheck(VkResult result, char *msg);
 
 typedef struct Vertex {
-	float x, y, z;
-	float tx, ty, tz, rinf;
+	float x, y, z, w;
+	float u, v;
 } Vertex;
 
 typedef struct VLKContext {
@@ -54,7 +54,6 @@ typedef struct VLKModel {
 
 typedef struct VLKShader {
 	VkShaderModule vertexShaderModule;
-	VkShaderModule geometryShaderModule;
 	VkShaderModule fragmentShaderModule;
 
 	VkBuffer buffer;
@@ -107,7 +106,7 @@ void vlkDestroyDeviceAndSwapchain(VLKContext* context, VLKDevice* device, VLKSwa
 VLKModel* vlkCreateModel(VLKDevice* device, void* verts, uint32_t vertsSize);
 void vlkDestroyModel(VLKDevice* device, VLKModel* model);
 
-VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* geomPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize);
+VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize);
 void vlkUniforms(VLKDevice* device, VLKShader* shader, void* uniformBuffer, uint32_t uniformSize);
 void vlkDestroyShader(VLKDevice* device, VLKShader* shader);
 

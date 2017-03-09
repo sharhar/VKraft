@@ -73,7 +73,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	char* code = new char[20000];
 	HANDLE fileHandle = 0;
 
-	fileHandle = CreateFile("comp.spv", GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	fileHandle = CreateFile("raycast-comp.spv", GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (fileHandle == INVALID_HANDLE_VALUE) {
 		OutputDebugStringA("Failed to open shader file.");
 		exit(1);
