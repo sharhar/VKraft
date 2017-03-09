@@ -3,8 +3,10 @@
 #include <iostream>
 #include "vexl.h"
 #include <assert.h>
+#include <vector>
 
 void VLKCheck(VkResult result, char *msg);
+std::vector<char> readFile(const std::string& filename);
 
 typedef struct Vertex {
 	float x, y, z, w;

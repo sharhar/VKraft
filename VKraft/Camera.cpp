@@ -1,6 +1,5 @@
 #include "master.h"
 #include <assert.h>
-#include <windows.h>
 
 float* Camera::worldviewMat = 0;
 GLFWwindow* Camera::window = 0;
@@ -68,28 +67,18 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	vkUnmapMemory(vrc->device->device, context.posMemory);
 
 	vkBindBufferMemory(vrc->device->device, context.posBuffer, context.posMemory, 0);
-
-	uint32_t codeSize;
-	char* code = new char[20000];
-	HANDLE fileHandle = 0;
-
-	fileHandle = CreateFile("raycast-comp.spv", GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE) {
-		OutputDebugStringA("Failed to open shader file.");
-		exit(1);
-	}
-	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
-	CloseHandle(fileHandle);
+	
+	std::vector<char> shaderCode = readFile("raycast-comp.spv");
 
 	VkShaderModuleCreateInfo vertexShaderCreationInfo = {};
 	vertexShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	vertexShaderCreationInfo.codeSize = codeSize;
-	vertexShaderCreationInfo.pCode = (uint32_t *)code;
+	vertexShaderCreationInfo.codeSize = shaderCode.size();
+	vertexShaderCreationInfo.pCode = (uint32_t *)shaderCode.data();
 
 	VLKCheck(vkCreateShaderModule(vrc->device->device, &vertexShaderCreationInfo, NULL, &context.shader),
 		"Failed to create vertex shader module");
 
-	delete[] code;
+	shaderCode.clear();
 
 	VkDescriptorSetLayoutBinding bindings[3];
 	bindings[0].binding = 0;

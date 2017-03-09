@@ -1,7 +1,6 @@
 #include "master.h"
 #include <chrono>
 #include <thread>
-#include <windows.h>
 #include "lodepng.h"
 
 static void window_focus_callback(GLFWwindow* window, int focused) {
@@ -22,43 +21,30 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
 VLKShader* createBGShader(VLKDevice* device, char* vertPath, char* fragPath) {
 	VLKShader* shader = (VLKShader*)malloc(sizeof(VLKShader));
 
-	uint32_t codeSize;
-	char* code = new char[20000];
-	HANDLE fileHandle = 0;
-
-	fileHandle = CreateFile(vertPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE) {
-		OutputDebugStringA("Failed to open shader file.");
-		exit(1);
-	}
-	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
-	CloseHandle(fileHandle);
+	std::vector<char> vertCode = readFile(vertPath);
 
 	VkShaderModuleCreateInfo vertexShaderCreationInfo = {};
 	vertexShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	vertexShaderCreationInfo.codeSize = codeSize;
-	vertexShaderCreationInfo.pCode = (uint32_t *)code;
+	vertexShaderCreationInfo.codeSize = vertCode.size();
+	vertexShaderCreationInfo.pCode = (uint32_t *)vertCode.data();
 
 	VLKCheck(vkCreateShaderModule(device->device, &vertexShaderCreationInfo, NULL, &shader->vertexShaderModule),
 		"Failed to create vertex shader module");
 
-	fileHandle = CreateFile(fragPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE) {
-		OutputDebugStringA("Failed to open shader file.");
-		exit(1);
-	}
-	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
-	CloseHandle(fileHandle);
+	vertCode.clear();
+
+
+	std::vector<char> fragCode = readFile(fragPath);
 
 	VkShaderModuleCreateInfo fragmentShaderCreationInfo = {};
 	fragmentShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	fragmentShaderCreationInfo.codeSize = codeSize;
-	fragmentShaderCreationInfo.pCode = (uint32_t *)code;
+	fragmentShaderCreationInfo.codeSize = fragCode.size();
+	fragmentShaderCreationInfo.pCode = (uint32_t *)fragCode.data();
 
 	VLKCheck(vkCreateShaderModule(device->device, &fragmentShaderCreationInfo, NULL, &shader->fragmentShaderModule),
 		"Could not create Fragment shader");
 
-	delete[] code;
+	fragCode.clear();
 
 	VkDescriptorSetLayoutBinding binding;
 	binding.binding = 0;
@@ -112,44 +98,30 @@ void destroyBGShader(VLKDevice* device, VLKShader* shader) {
 VLKShader* createCursorShader(VLKDevice* device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
 	VLKShader* shader = (VLKShader*)malloc(sizeof(VLKShader));
 
-	uint32_t codeSize;
-	char* code = new char[20000];
-	HANDLE fileHandle = 0;
-
-	fileHandle = CreateFile(vertPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE) {
-		OutputDebugStringA("Failed to open shader file.");
-		exit(1);
-	}
-	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
-	CloseHandle(fileHandle);
+	std::vector<char> vertCode = readFile(vertPath);
 
 	VkShaderModuleCreateInfo vertexShaderCreationInfo = {};
 	vertexShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	vertexShaderCreationInfo.codeSize = codeSize;
-	vertexShaderCreationInfo.pCode = (uint32_t *)code;
+	vertexShaderCreationInfo.codeSize = vertCode.size();
+	vertexShaderCreationInfo.pCode = (uint32_t *)vertCode.data();
 
 	VLKCheck(vkCreateShaderModule(device->device, &vertexShaderCreationInfo, NULL, &shader->vertexShaderModule),
 		"Failed to create vertex shader module");
 
-	fileHandle = CreateFile(fragPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE) {
-		OutputDebugStringA("Failed to open shader file.");
-		exit(1);
-	}
-	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
-	CloseHandle(fileHandle);
+	vertCode.clear();
+
+	std::vector<char> fragCode = readFile(fragPath);
 
 	VkShaderModuleCreateInfo fragmentShaderCreationInfo = {};
 	fragmentShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	fragmentShaderCreationInfo.codeSize = codeSize;
-	fragmentShaderCreationInfo.pCode = (uint32_t *)code;
+	fragmentShaderCreationInfo.codeSize = fragCode.size();
+	fragmentShaderCreationInfo.pCode = (uint32_t *)fragCode.data();
 
 	VLKCheck(vkCreateShaderModule(device->device, &fragmentShaderCreationInfo, NULL, &shader->fragmentShaderModule),
 		"Could not create Fragment shader");
 
-	delete[] code;
-
+	fragCode.clear();
+	
 	VkBufferCreateInfo bufferCreateInfo = {};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferCreateInfo.size = uniformSize;

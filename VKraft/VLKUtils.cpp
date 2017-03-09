@@ -1,24 +1,22 @@
 #include "VLKUtils.h"
-#include <windows.h>
 #include <vector>
+#include <fstream>
 #include "lodepng.h"
 
-static char* readFile(char* path, uint32_t* size) {
-	char *buffer = NULL;
-	int read_size;
-	FILE *handler = fopen(path, "r");
+std::vector<char> readFile(const std::string& filename) {
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
-	fseek(handler, 0, SEEK_END);
-	read_size = ftell(handler);
-	rewind(handler);
-	buffer = (char*)malloc(sizeof(char) * (read_size) + 1);
-	fread(buffer, sizeof(char), read_size, handler);
+	if (!file.is_open()) {
+		throw std::runtime_error("failed to open file!");
+	}
 
-	buffer[read_size] = NULL;
+	size_t fileSize = (size_t)file.tellg();
+	std::vector<char> buffer(fileSize);
 
-	fclose(handler);
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
 
-	*size = (uint32_t)read_size;
+	file.close();
 
 	return buffer;
 }
@@ -729,43 +727,29 @@ void vlkDestroyModel(VLKDevice* device, VLKModel* model) {
 VLKShader* vlkCreateShader(VLKDevice* device, char* vertPath, char* fragPath, void* uniformBuffer, uint32_t uniformSize) {
 	VLKShader* shader = (VLKShader*)malloc(sizeof(VLKShader));
 
-	uint32_t codeSize;
-	char* code = new char[20000];
-	HANDLE fileHandle = 0;
-
-	fileHandle = CreateFile(vertPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE) {
-		OutputDebugStringA("Failed to open shader file.");
-		exit(1);
-	}
-	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
-	CloseHandle(fileHandle);
+	std::vector<char>  vertCode = readFile(vertPath);
 
 	VkShaderModuleCreateInfo vertexShaderCreationInfo = {};
 	vertexShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	vertexShaderCreationInfo.codeSize = codeSize;
-	vertexShaderCreationInfo.pCode = (uint32_t *)code;
+	vertexShaderCreationInfo.codeSize = vertCode.size();
+	vertexShaderCreationInfo.pCode = (uint32_t *)vertCode.data();
 
 	VLKCheck(vkCreateShaderModule(device->device, &vertexShaderCreationInfo, NULL, &shader->vertexShaderModule),
 		"Failed to create vertex shader module");
 
-	fileHandle = CreateFile(fragPath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (fileHandle == INVALID_HANDLE_VALUE) {
-		OutputDebugStringA("Failed to open shader file.");
-		exit(1);
-	}
-	ReadFile((HANDLE)fileHandle, code, 20000, (LPDWORD)&codeSize, 0);
-	CloseHandle(fileHandle);
+	vertCode.clear();
+
+	std::vector<char>  fragCode = readFile(fragPath);
 
 	VkShaderModuleCreateInfo fragmentShaderCreationInfo = {};
 	fragmentShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	fragmentShaderCreationInfo.codeSize = codeSize;
-	fragmentShaderCreationInfo.pCode = (uint32_t *)code;
+	fragmentShaderCreationInfo.codeSize = fragCode.size();
+	fragmentShaderCreationInfo.pCode = (uint32_t *)fragCode.data();
 
 	VLKCheck(vkCreateShaderModule(device->device, &fragmentShaderCreationInfo, NULL, &shader->fragmentShaderModule),
-		"Could not create Fragment shader");
+		"Failed to create vertex shader module");
 
-	delete[] code;
+	fragCode.clear();
 
 	VkBufferCreateInfo bufferCreateInfo = {};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
