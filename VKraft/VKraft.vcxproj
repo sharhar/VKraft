@@ -155,12 +155,12 @@
   <ItemGroup>
     <None Include="bg.frag" />
     <None Include="bg.vert" />
-    <None Include="cube.comp" />
     <None Include="cube.frag" />
-    <None Include="cube.geom" />
     <None Include="cube.vert" />
     <None Include="cursor.frag" />
     <None Include="cursor.vert" />
+    <None Include="font.frag" />
+    <None Include="font.vert" />
     <None Include="raycast.comp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
