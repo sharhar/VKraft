@@ -1073,7 +1073,7 @@ int main() {
 	VLKShader* shader = vlkCreateShader(device, "cube-vert.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
 	VLKPipeline* pipeline = vlkCreatePipeline(device, swapChain, shader);
 	
-	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width, swapChain->height);
+	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width*2, swapChain->height*2);
 
 	Vec3 pos = {0, 0, 1};
 	Vec3 rot = {0, 0, 0};

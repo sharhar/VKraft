@@ -1767,8 +1767,8 @@ VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t imageCount, uin
 
 	VkSamplerCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
-	samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+	samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
 	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -1776,7 +1776,7 @@ VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t imageCount, uin
 	samplerCreateInfo.mipLodBias = 0;
 	samplerCreateInfo.anisotropyEnable = VK_FALSE;
 	samplerCreateInfo.minLod = 0;
-	samplerCreateInfo.maxLod = 5;
+	samplerCreateInfo.maxLod = 0;
 	samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
 
