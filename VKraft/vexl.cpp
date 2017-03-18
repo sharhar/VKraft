@@ -154,7 +154,6 @@ PFN_vkCreateDisplayModeKHR g_pvkCreateDisplayModeKHR;
 PFN_vkGetDisplayPlaneCapabilitiesKHR g_pvkGetDisplayPlaneCapabilitiesKHR;
 PFN_vkCreateDisplayPlaneSurfaceKHR g_pvkCreateDisplayPlaneSurfaceKHR;
 
-
 VkResult loadVKFuncs(VkInstance instance) {
 	g_pvkDestroyInstance = (PFN_vkDestroyInstance)glfwGetInstanceProcAddress(instance, "vkDestroyInstance");
 	g_pvkEnumeratePhysicalDevices = (PFN_vkEnumeratePhysicalDevices)glfwGetInstanceProcAddress(instance, "vkEnumeratePhysicalDevices");
@@ -310,6 +309,5 @@ VkResult loadVKFuncs(VkInstance instance) {
 	g_pvkGetDisplayPlaneCapabilitiesKHR = (PFN_vkGetDisplayPlaneCapabilitiesKHR)glfwGetInstanceProcAddress(instance, "vkGetDisplayPlaneCapabilitiesKHR");
 	g_pvkCreateDisplayPlaneSurfaceKHR = (PFN_vkCreateDisplayPlaneSurfaceKHR)glfwGetInstanceProcAddress(instance, "vkCreateDisplayPlaneSurfaceKHR");
 
-	
 	return VK_SUCCESS;
 }

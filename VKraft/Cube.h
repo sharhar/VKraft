@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PerlinNoise.h"
+#include "FastNoise.h"
 #include "VLKUtils.h"
 #include "Utils.h"
 #include <thread>
@@ -53,7 +53,9 @@ typedef struct Cube {
 
 class Chunk {
 private:
-	static PerlinNoise* noise;
+	static FastNoise* heightNoise;
+	static FastNoise* caveNoise;
+	static FastNoise* oreNoise;
 	static std::thread* chunkThread;
 	static std::vector<Chunk*> chunks;
 

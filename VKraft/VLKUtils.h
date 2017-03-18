@@ -118,7 +118,7 @@ void vlkDestroyPipeline(VLKDevice* device, VLKPipeline* pipeline);
 void vlkClear(VLKDevice* device, VLKSwapchain* swapChain);
 void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain);
 
-VLKTexture* vlkCreateTexture(VLKDevice* device, char* path);
+VLKTexture* vlkCreateTexture(VLKDevice* device, char* path, VkFilter filter);
 void vlkBindTexture(VLKDevice* device, VLKShader* shader, VLKTexture* texture);
 void vlkDestroyTexture(VLKDevice* device, VLKTexture* texture);
 

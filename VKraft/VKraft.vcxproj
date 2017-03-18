@@ -136,18 +136,18 @@
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Cube.cpp" />
+    <ClCompile Include="FastNoise.cpp" />
     <ClCompile Include="lodepng.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PerlinNoise.cpp" />
     <ClCompile Include="vexl.cpp" />
     <ClCompile Include="VLKUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Cube.h" />
+    <ClInclude Include="FastNoise.h" />
     <ClInclude Include="lodepng.h" />
     <ClInclude Include="master.h" />
-    <ClInclude Include="PerlinNoise.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="vexl.h" />
     <ClInclude Include="VLKUtils.h" />

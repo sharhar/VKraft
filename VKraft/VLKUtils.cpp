@@ -1152,7 +1152,7 @@ void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
 	vkDestroySemaphore(device->device, swapChain->renderingCompleteSemaphore, NULL);
 }
 
-VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
+VLKTexture* vlkCreateTexture(VLKDevice* device, char* path, VkFilter filter) {
 	VLKTexture* texture = (VLKTexture*)malloc(sizeof(VLKTexture));
 
 	uint32_t width, height;
@@ -1419,8 +1419,8 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path) {
 
 	VkSamplerCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
-	samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.magFilter = filter;
+	samplerCreateInfo.minFilter = filter;
 	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -1592,7 +1592,7 @@ VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t imageCount, uin
 
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageCreateInfo.format = VK_FORMAT_D16_UNORM;
+	imageCreateInfo.format = VK_FORMAT_D32_SFLOAT;
 	imageCreateInfo.extent = { frameBuffer->width, frameBuffer->height, 1 };
 	imageCreateInfo.mipLevels = 1;
 	imageCreateInfo.arrayLayers = 1;

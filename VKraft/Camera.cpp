@@ -3,7 +3,7 @@
 
 float* Camera::worldviewMat = 0;
 GLFWwindow* Camera::window = 0;
-Vec3 Camera::pos = { 0, 3.1, 0 };
+Vec3 Camera::pos = { 0, 5.1, 0 };
 Vec3 Camera::renderPos = { 0, 0, 0 };
 Vec3 Camera::rot = { 0, 0, 0 };
 double Camera::prev_x = 0;

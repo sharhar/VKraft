@@ -24,7 +24,9 @@ inline uint16_t setType(uint16_t num, uint16_t type) {
 }
 
 Vec3i** Chunk::texts = 0;
-PerlinNoise* Chunk::noise = 0;
+FastNoise* Chunk::heightNoise = 0;
+FastNoise* Chunk::caveNoise = 0;
+FastNoise* Chunk::oreNoise = 0;
 int Chunk::m_fence = 0;
 std::vector<Chunk*> Chunk::chunks = std::vector<Chunk*>();
 std::thread* Chunk::chunkThread = 0;
@@ -834,7 +836,12 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vul
 	texts[5]->y = 33;
 	texts[5]->z = 33;
 
-	noise = new PerlinNoise(seed);
+	heightNoise = new FastNoise(seed);
+	caveNoise = new FastNoise(seed);
+	caveNoise->SetFrequency(0.02);
+	caveNoise->SetCellularDistanceFunction(FastNoise::Euclidean);
+	caveNoise->SetCellularReturnType(FastNoise::Distance2Add);
+	oreNoise = new FastNoise(seed);
 
 	rcubes = new Cube[0];
 	rcubesSize = 0;
@@ -913,8 +920,8 @@ Chunk::Chunk(Vec3 a_pos) {
 		float xf = m_cubePos.x + x;
 		for (uint8_t z = 0; z < 16; z++) {
 			float zf = m_cubePos.z + z;
-			float nz1 = (noise->noise(xf / 100.0f, 0.8f, zf / 100.0f) - 0.5) * 64;
-			float nz2 = (noise->noise(xf / 25.0f, 2.7f, zf / 25.0f) - 0.5) * 16;
+			float nz1 = heightNoise->GetPerlin(xf / 1.2f, 0.8f, zf / 1.2f) * 64;
+			float nz2 = heightNoise->GetPerlin(xf * 2, 2.7f, zf * 2) * 16;
 
 			float nz = nz1 + nz2;
 
@@ -926,9 +933,9 @@ Chunk::Chunk(Vec3 a_pos) {
 				int type = 0;
 
 				if (yh <= 0) {
-					float nzc = noise->noise(xf / 25.0f, yf / 25.0f, zf / 25.0f);
+					float nzc = caveNoise->GetCellular(xf, yf, zf);
 
-					if (nzc < 0.7) {
+					if (nzc < 0.45) {
 						if (yh <= 0 && yh > -1) {
 							type = 1;
 						}
@@ -936,8 +943,8 @@ Chunk::Chunk(Vec3 a_pos) {
 							type = 2;
 						}
 						else {
-							float cnzc = noise->noise(xf / 5.0f, yf / 5.0f, zf / 5.0f);
-							float inzc = noise->noise(xf / 2.50f, yf / 2.50f, zf / 2.50f);
+							float cnzc = oreNoise->GetSimplex(xf / 0.5f, yf / 0.5f, zf / 0.5f);
+							float inzc = oreNoise->GetSimplex(xf / 0.25f, yf / 0.25f, zf / 0.25f);
 
 							if (cnzc > 0.8) {
 								type = 4;

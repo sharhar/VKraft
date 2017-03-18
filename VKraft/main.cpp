@@ -1068,9 +1068,9 @@ int main() {
 
 	Camera::init(window, uniformBuffer.view, &renderContext);
 
-	Chunk::init(245325, window, &renderContext);
+	Chunk::init(1337, window, &renderContext);
 
-	VLKTexture* texture = vlkCreateTexture(device, "pack.png");
+	VLKTexture* texture = vlkCreateTexture(device, "pack.png", VK_FILTER_NEAREST);
 	vlkBindTexture(device, shader, texture);
 
 	float cursorVerts[] = {
@@ -1148,7 +1148,7 @@ int main() {
 
 	VLKShader* fontShader = vlkCreateShader(device, "font-vert.spv", "font-frag.spv", fontProj, 16 * sizeof(float));
 	VLKPipeline* fontPipeline = createFontPipeline(device, swapChain, fontShader);
-	VLKTexture* font = vlkCreateTexture(device, "font.png");
+	VLKTexture* font = vlkCreateTexture(device, "font.png", VK_FILTER_LINEAR);
 	vlkBindTexture(device, fontShader, font);
 
 	double ct = glfwGetTime();
@@ -1226,6 +1226,10 @@ int main() {
 
 		vlkDestroyModel(device, fontModel);
 	}
+
+	destroyFontPipeline(device, fontPipeline);
+	vlkDestroyShader(device, fontShader);
+	vlkDestroyTexture(device, font);
 
 	destroyCursorTexture(device, cursorTexture);
 	destroyCursorPipeline(device, cursorPipeline);
