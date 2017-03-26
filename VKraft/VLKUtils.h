@@ -113,6 +113,7 @@ void vlkUniforms(VLKDevice* device, VLKShader* shader, void* uniformBuffer, uint
 void vlkDestroyShader(VLKDevice* device, VLKShader* shader);
 
 VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKShader* shader);
+VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKFramebuffer* frameBuffer, VLKShader* shader);
 void vlkDestroyPipeline(VLKDevice* device, VLKPipeline* pipeline);
 
 void vlkClear(VLKDevice* device, VLKSwapchain* swapChain);

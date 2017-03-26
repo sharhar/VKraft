@@ -27,7 +27,7 @@ VLKComputeContext getComputeContext(VulkanRenderContext* vrc) {
 	VkBufferCreateInfo posBufferInfo = {};
 	posBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	posBufferInfo.size = sizeof(float) * 6;
-	posBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	posBufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 	posBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	posBufferInfo.queueFamilyIndexCount = 1;
 	posBufferInfo.pQueueFamilyIndices = &vrc->device->presentQueueIdx;
@@ -262,7 +262,7 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			float nx = sin(ty*DEG_TO_RAD)*cos(tx*DEG_TO_RAD);
 			float ny = sin(tx*DEG_TO_RAD);
 			float nz = -cos(ty*DEG_TO_RAD)*cos(tx*DEG_TO_RAD);
-
+			
 			void *mapped;
 			vkMapMemory(vrc->device->device, context->posMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
 
@@ -289,7 +289,7 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			VkBufferCreateInfo inputBufferInfo = {};
 			inputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 			inputBufferInfo.size = sizeof(float) * 4 * 3068;
-			inputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			inputBufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 			inputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			inputBufferInfo.queueFamilyIndexCount = 1;
 			inputBufferInfo.pQueueFamilyIndices = &vrc->device->presentQueueIdx;
@@ -339,7 +339,7 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			VkBufferCreateInfo outputBufferInfo = {};
 			outputBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 			outputBufferInfo.size = sizeof(float) * 3068;
-			outputBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			outputBufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 			outputBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			outputBufferInfo.queueFamilyIndexCount = 1;
 			outputBufferInfo.pQueueFamilyIndices = &vrc->device->presentQueueIdx;
@@ -411,6 +411,7 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			writeDescriptorSet[1].pImageInfo = NULL;
 			writeDescriptorSet[1].pTexelBufferView = NULL;
 
+			
 			vkUpdateDescriptorSets(vrc->device->device, 2, writeDescriptorSet, 0, 0);
 
 			vkResetCommandBuffer(context->computeCmdBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
@@ -474,12 +475,13 @@ static void cameraThreadRun(GLFWwindow* win, VulkanRenderContext* vrc, VLKComput
 			}
 
 			vkUnmapMemory(vrc->device->device, context->outMemory);
-
+			
 			vkFreeMemory(vrc->device->device, context->inMemory, NULL);
 			vkFreeMemory(vrc->device->device, context->outMemory, NULL);
 
 			vkDestroyBuffer(vrc->device->device, context->inBuffer, NULL);
 			vkDestroyBuffer(vrc->device->device, context->outBuffer, NULL);
+
 		}
 
 		while (Camera::fence > 0) {

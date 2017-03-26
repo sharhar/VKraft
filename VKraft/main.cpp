@@ -1043,9 +1043,8 @@ int main() {
 	memcpy(uniformBuffer.proj, getPerspective(), sizeof(float) * 16);
 
 	VLKShader* shader = vlkCreateShader(device, "cube-vert.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
-	VLKPipeline* pipeline = vlkCreatePipeline(device, swapChain, shader);
-	
-	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width*2, swapChain->height*2);
+	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width * 2, swapChain->height * 2);
+	VLKPipeline* pipeline = vlkCreatePipeline(device, frameBuffer, shader);
 
 	Vec3 pos = {0, 0, 1};
 	Vec3 rot = {0, 0, 0};
@@ -1182,7 +1181,7 @@ int main() {
 		Chunk::render(device, swapChain);
 	
 		vlkEndFramebuffer(device, frameBuffer);
-
+		
 		VkClearValue clearValue[] = {
 			{ 0.25f, 0.45f, 1.0f, 1.0f },
 			{ 1.0, 0.0 } };
@@ -1195,7 +1194,7 @@ int main() {
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValue;
 		vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
-			VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+			VK_SUBPASS_CONTENTS_INLINE);
 
 		VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
 		VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
@@ -1217,7 +1216,7 @@ int main() {
 			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
 
 		vkCmdDraw(device->drawCmdBuffer, 12, 1, 0, 0);
-
+		
 		VLKModel* fontModel = drawText(device, std::string("FPS:") + std::to_string(fps), 10, 10, 16, fontShader, fontPipeline);
 
 		vkCmdEndRenderPass(device->drawCmdBuffer);
