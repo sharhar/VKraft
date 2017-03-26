@@ -13,10 +13,20 @@ layout ( location = 1 ) in flat struct fragment_in_sel {
 	int selected;
 } SEL;
 
+layout( location = 2 ) in struct fragment_in_vis {
+    float visibility;
+} VIS;
+
 void main() {
+	vec4 cbColor = vec4(0.0, 0.0, 0.0, 1.0);
+
 	if(SEL.selected == 1) {
-		uFragColor = texture(tex, IN.uv)*1.35;
+		cbColor = texture(tex, IN.uv)*1.35;
 	} else {
-		uFragColor = texture(tex, IN.uv);
+		cbColor = texture(tex, IN.uv);
 	}
+
+	cbColor = mix(vec4(0.25, 0.45, 1.0, 1.0), cbColor, VIS.visibility);
+
+	uFragColor = cbColor;
 }

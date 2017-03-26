@@ -21,7 +21,10 @@ typedef struct CubeUniformBuffer {
 		0, 0, 1, 0,
 		0, 0, 0, 1 };
 
-	Vec3 selected = { 0, -9, 0 };
+	Vec3 selected = { 0.5f, 0.5f, 0.5f };
+
+	float density = 1.0f / 200.0f;
+	float gradient = 25;
 } CubeUniformBuffer;
 
 typedef struct ChunkModelInfo {

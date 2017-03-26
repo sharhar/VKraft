@@ -2,8 +2,8 @@
 #include <iostream>
 #include <assert.h>
 
-#define CHUNK_NUM 4166
-#define CHUNK_RAD 10
+#define CHUNK_NUM 14144
+#define CHUNK_RAD 15
 
 inline uint8_t getVid(uint16_t num) {
 	return (uint8_t)(num & 0b0000000000111111);
