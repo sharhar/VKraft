@@ -138,7 +138,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	commandPoolCreateInfo.queueFamilyIndex = vrc->device->presentQueueIdx;
+	commandPoolCreateInfo.queueFamilyIndex = vrc->device->queueIdx;
 
 	VLKCheck(vkCreateCommandPool(vrc->device->device, &commandPoolCreateInfo, NULL, &freeInfo->commandPool),
 		"Failed to create command pool");
@@ -155,7 +155,7 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 		"Failed to allocate command buffer");
 
 	VkQueue transferQueue;
-	vkGetDeviceQueue(vrc->device->device, vrc->device->presentQueueIdx, 2, &transferQueue);
+	vkGetDeviceQueue(vrc->device->device, vrc->device->queueIdx, 1, &transferQueue);
 
 	while (!glfwWindowShouldClose(window)) {
 		Vec3 playerPos = { floor(Camera::pos.x / 16.0f), floor(Camera::pos.y / 16.0f), floor(Camera::pos.z / 16.0f) };

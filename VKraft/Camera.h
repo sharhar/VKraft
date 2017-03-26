@@ -5,7 +5,8 @@
 #include <thread>
 
 typedef struct VLKComputeContext {
-	VkQueue computeQueue;
+	VLKContext* context;
+	VLKDevice* device;
 
 	VkBuffer inBuffer;
 	VkBuffer outBuffer;
@@ -33,9 +34,9 @@ private:
 public:
 	static int fence;
 	static bool grounded;
-	static float* worldviewMat;
+	static CubeUniformBuffer* uniforms;
 	static GLFWwindow* window;
-	static VLKComputeContext context;
+	static VLKComputeContext* computeContext;
 
 	static Vec3* poss;
 	static int possSize;
@@ -45,7 +46,7 @@ public:
 	static Vec3 renderPos;
 	static Vec3 rot;
 
-	static void init(GLFWwindow* win, float* viewMat, VulkanRenderContext* vrc);
+	static void init(GLFWwindow* win, CubeUniformBuffer* puniforms, VLKContext* context);
 	static void update(float dt);
 	static void destroy(VLKDevice* device);
 };

@@ -25,16 +25,17 @@ typedef struct VLKDevice {
 	VkPhysicalDevice physicalDevice;
 	VkPhysicalDeviceProperties physicalDeviceProperties;
 	VkPhysicalDeviceMemoryProperties memoryProperties;
-	uint32_t presentQueueIdx;
+	uint32_t queueIdx;
 	VkDevice device;
-	VkQueue presentQueue;
+	VkQueue queue;
 	VkCommandBuffer setupCmdBuffer;
 	VkCommandBuffer drawCmdBuffer;
 	VkCommandPool commandPool;
+
+	VkSurfaceKHR surface;
 } VLKDevice;
 
 typedef struct VLKSwapchain {
-	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
 	VkImage* presentImages;
 	VkImageView *presentImageViews;
@@ -102,8 +103,14 @@ typedef struct VLKFramebuffer {
 VLKContext* vlkCreateContext();
 void vlkDestroyContext(VLKContext* context);
 
-void vlkCreateDeviceAndSwapchain(GLFWwindow* window, VLKContext* context, VLKDevice** device, VLKSwapchain** swapChain);
-void vlkDestroyDeviceAndSwapchain(VLKContext* context, VLKDevice* device, VLKSwapchain* swapChain);
+VLKDevice* vlkCreateRenderDevice(VLKContext* context, GLFWwindow* window, uint32_t queueCount);
+void vlkDestroyRenderDevice(VLKContext* context, VLKDevice* device);
+
+VLKDevice* vlkCreateComputeDevice(VLKContext* context, uint32_t queueCount);
+void vlkDestroyComputeDevice(VLKContext* context, VLKDevice* device);
+
+VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window);
+void vlkDestroySwapchain(VLKDevice* device, VLKSwapchain* swapChain);
 
 VLKModel* vlkCreateModel(VLKDevice* device, void* verts, uint32_t vertsSize);
 void vlkDestroyModel(VLKDevice* device, VLKModel* model);

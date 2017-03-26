@@ -710,9 +710,9 @@ VLKTexture* createCursorTexture(VLKDevice* device, char* path) {
 	submitInfo.pCommandBuffers = &device->setupCmdBuffer;
 	submitInfo.signalSemaphoreCount = 0;
 	submitInfo.pSignalSemaphores = NULL;
-	VLKCheck(vkQueueSubmit(device->presentQueue, 1, &submitInfo, VK_NULL_HANDLE),
+	VLKCheck(vkQueueSubmit(device->queue, 1, &submitInfo, VK_NULL_HANDLE),
 		"Could not submit Queue");
-	vkQueueWaitIdle(device->presentQueue);
+	vkQueueWaitIdle(device->queue);
 
 	vkResetCommandBuffer(device->setupCmdBuffer, 0);
 
@@ -1035,9 +1035,8 @@ int main() {
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
 	VLKContext* context = vlkCreateContext();
-	VLKDevice* device;
-	VLKSwapchain* swapChain;
-	vlkCreateDeviceAndSwapchain(window, context, &device, &swapChain);
+	VLKDevice* device = vlkCreateRenderDevice(context, window, 2);
+	VLKSwapchain* swapChain = vlkCreateSwapchain(device, window);
 
 	CubeUniformBuffer uniformBuffer;
 	memcpy(uniformBuffer.proj, getPerspective(), sizeof(float) * 16);
@@ -1065,7 +1064,7 @@ int main() {
 	renderContext.pipeline = pipeline;
 	renderContext.framebuffer = frameBuffer;
 
-	Camera::init(window, uniformBuffer.view, &renderContext);
+	Camera::init(window, &uniformBuffer, context);
 
 	Chunk::init(1337, window, &renderContext);
 
@@ -1246,7 +1245,8 @@ int main() {
 	vlkDestroyTexture(device, texture);
 	vlkDestroyPipeline(device, pipeline);
 	vlkDestroyShader(device, shader);
-	vlkDestroyDeviceAndSwapchain(context, device, swapChain);
+	vlkDestroySwapchain(device, swapChain);
+	vlkDestroyRenderDevice(context, device);
 	vlkDestroyContext(context);
 
 	glfwDestroyWindow(window);
