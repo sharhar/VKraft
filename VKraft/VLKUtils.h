@@ -48,6 +48,8 @@ typedef struct VLKSwapchain {
 	VkFence renderingCompleteFence;
 
 	uint32_t width, height, nextImageIdx, imageCount;
+
+	GLFWwindow* window;
 } VLKSwapchain;
 
 typedef struct VLKModel {
@@ -109,7 +111,8 @@ void vlkDestroyRenderDevice(VLKContext* context, VLKDevice* device);
 VLKDevice* vlkCreateComputeDevice(VLKContext* context, uint32_t queueCount);
 void vlkDestroyComputeDevice(VLKContext* context, VLKDevice* device);
 
-VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window);
+VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSync);
+void vlkRecreateSwapchain(VLKDevice* device, VLKSwapchain** pSwapChain, bool vSync);
 void vlkDestroySwapchain(VLKDevice* device, VLKSwapchain* swapChain);
 
 VLKModel* vlkCreateModel(VLKDevice* device, void* verts, uint32_t vertsSize);
@@ -123,8 +126,8 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKFramebuffer* frameBuffer, VLKShader* shader);
 void vlkDestroyPipeline(VLKDevice* device, VLKPipeline* pipeline);
 
-void vlkClear(VLKDevice* device, VLKSwapchain* swapChain);
-void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain);
+void vlkClear(VLKDevice* device, VLKSwapchain** pSwapChain);
+void vlkSwap(VLKDevice* device, VLKSwapchain** pSwapChain);
 
 VLKTexture* vlkCreateTexture(VLKDevice* device, char* path, VkFilter filter);
 void vlkBindTexture(VLKDevice* device, VLKShader* shader, VLKTexture* texture);

@@ -1027,7 +1027,6 @@ int main() {
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	GLFWwindow* window = glfwCreateWindow(1280, 720, "VKraft", NULL, NULL);
 
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -1036,10 +1035,10 @@ int main() {
 
 	VLKContext* context = vlkCreateContext();
 	VLKDevice* device = vlkCreateRenderDevice(context, window, 2);
-	VLKSwapchain* swapChain = vlkCreateSwapchain(device, window);
+	VLKSwapchain* swapChain = vlkCreateSwapchain(device, window, false);
 
 	CubeUniformBuffer uniformBuffer;
-	memcpy(uniformBuffer.proj, getPerspective(), sizeof(float) * 16);
+	memcpy(uniformBuffer.proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
 
 	VLKShader* shader = vlkCreateShader(device, "cube-vert.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
 	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width * 2, swapChain->height * 2);
@@ -1156,8 +1155,73 @@ int main() {
 	uint32_t frames = 0;
 	uint32_t fps = 0;
 
+	int width, height;
+	int pwidth, pheight;
+
+	glfwGetWindowSize(window, &width, &height);
+	pwidth = width;
+	pheight = height;
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
+
+		glfwGetWindowSize(window, &width, &height);
+
+		if (pwidth != width || pheight != height) {
+			vlkRecreateSwapchain(device, &swapChain, false);
+
+			float r2 = swapChain->width;
+			float l2 = 0;
+			float t2 = swapChain->height;
+			float b2 = 0;
+			float f2 = 1;
+			float n2 = -1;
+
+			float fontProj2[16] = {
+				2 / (r2 - l2), 0, 0, 0,
+				0, 2 / (t2 - b2), 0, 0,
+				0, 0, -2 / (f2 - n2), 0,
+				-(r2 + l2) / (r2 - l2), -(t2 + b2) / (t2 - b2), -(f2 + n2) / (f2 - n2), 1
+			};
+
+			vlkUniforms(device, fontShader, fontProj2, 16 * sizeof(float));
+
+			float aspect2 = ((float)swapChain->width) / ((float)swapChain->height);
+
+			vlkUniforms(device, cursorShader, &aspect2, sizeof(float));
+
+			memcpy(uniformBuffer.proj, getPerspective(aspect2, 90), sizeof(float) * 16);
+
+			vlkDestroyFramebuffer(device, frameBuffer);
+			frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width * 2, swapChain->height * 2);
+
+			writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescriptor.dstSet = bgShader->descriptorSet;
+			writeDescriptor.dstBinding = 0;
+			writeDescriptor.dstArrayElement = 0;
+			writeDescriptor.descriptorCount = 1;
+			writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writeDescriptor.pImageInfo = &frameBuffer->descriptorImageInfo;
+			writeDescriptor.pBufferInfo = NULL;
+			writeDescriptor.pTexelBufferView = NULL;
+
+			vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
+
+			writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescriptor.dstSet = cursorShader->descriptorSet;
+			writeDescriptor.dstBinding = 1;
+			writeDescriptor.dstArrayElement = 0;
+			writeDescriptor.descriptorCount = 1;
+			writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writeDescriptor.pImageInfo = &frameBuffer->descriptorImageInfo;
+			writeDescriptor.pBufferInfo = NULL;
+			writeDescriptor.pTexelBufferView = NULL;
+
+			vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
+		}
+
+		pwidth = width;
+		pheight = height;
 
 		dt = glfwGetTime() - ct;
 		ct = glfwGetTime();
@@ -1173,7 +1237,7 @@ int main() {
 		
 		Camera::update(dt);
 
-		vlkClear(device, swapChain);
+		vlkClear(device, &swapChain);
 
 		vlkStartFramebuffer(device, frameBuffer);
 
@@ -1220,7 +1284,7 @@ int main() {
 
 		vkCmdEndRenderPass(device->drawCmdBuffer);
 
-		vlkSwap(device, swapChain);
+		vlkSwap(device, &swapChain);
 
 		vlkDestroyModel(device, fontModel);
 	}

@@ -62,9 +62,7 @@ static std::string readFile_c(std::string path) {
 	return result;
 }
 
-static float* getPerspective() {
-	float aspect = 16.0f / 9.0f;
-	float fov = 90;
+static float* getPerspective(float aspect, float fov) {
 	float farr = 1000;
 	float nearr = 0.01f;
 

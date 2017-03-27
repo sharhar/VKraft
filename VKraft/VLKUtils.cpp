@@ -380,8 +380,10 @@ void vlkDestroyComputeDevice(VLKContext* context, VLKDevice* device) {
 	free(device);
 }
 
-VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window) {
+VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSync) {
 	VLKSwapchain* swapChain = (VLKSwapchain*)malloc(sizeof(VLKSwapchain));
+
+	swapChain->window = window;
 
 	uint32_t formatCount = 0;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physicalDevice, device->surface,
@@ -393,10 +395,10 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window) {
 	VkFormat colorFormat;
 	if (formatCount == 1 && surfaceFormats[0].format == VK_FORMAT_UNDEFINED) {
 		colorFormat = VK_FORMAT_B8G8R8_UNORM;
-	}
-	else {
+	} else {
 		colorFormat = surfaceFormats[0].format;
 	}
+
 	VkColorSpaceKHR colorSpace;
 	colorSpace = surfaceFormats[0].colorSpace;
 	delete[] surfaceFormats;
@@ -443,10 +445,12 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window) {
 		&presentModeCount, presentModes);
 
 	VkPresentModeKHR presentationMode = VK_PRESENT_MODE_FIFO_KHR;
-	for (uint32_t i = 0; i < presentModeCount; ++i) {
-		if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
-			presentationMode = VK_PRESENT_MODE_MAILBOX_KHR;
-			break;
+	if (!vSync) {
+		for (uint32_t i = 0; i < presentModeCount; ++i) {
+			if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+				presentationMode = VK_PRESENT_MODE_MAILBOX_KHR;
+				break;
+			}
 		}
 	}
 	delete[] presentModes;
@@ -496,79 +500,49 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window) {
 	VkFence submitFence;
 	vkCreateFence(device->device, &fenceCreateInfo, NULL, &submitFence);
 
-	bool *transitioned = new bool[swapChain->imageCount];
-	memset(transitioned, 0, sizeof(bool) * swapChain->imageCount);
-	uint32_t doneCount = 0;
-	while (doneCount != swapChain->imageCount) {
-		VkSemaphore presentCompleteSemaphore;
-		VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, 0, 0 };
-		vkCreateSemaphore(device->device, &semaphoreCreateInfo, NULL, &presentCompleteSemaphore);
+	VkImageMemoryBarrier* layoutTransitionBarriers = new VkImageMemoryBarrier[swapChain->imageCount];
+	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 
-		uint32_t nextImageIdx;
-		vkAcquireNextImageKHR(device->device, swapChain->swapChain, UINT64_MAX,
-			presentCompleteSemaphore, VK_NULL_HANDLE, &nextImageIdx);
-
-		if (!transitioned[nextImageIdx]) {
-			vkBeginCommandBuffer(device->setupCmdBuffer, &beginInfo);
-
-			VkImageMemoryBarrier layoutTransitionBarrier = {};
-			layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			layoutTransitionBarrier.srcAccessMask = 0;
-			layoutTransitionBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-			layoutTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-			layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			layoutTransitionBarrier.image = swapChain->presentImages[nextImageIdx];
-			VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-			layoutTransitionBarrier.subresourceRange = resourceRange;
-
-			vkCmdPipelineBarrier(device->setupCmdBuffer,
-				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-				0,
-				0, NULL,
-				0, NULL,
-				1, &layoutTransitionBarrier);
-
-			vkEndCommandBuffer(device->setupCmdBuffer);
-
-			VkPipelineStageFlags waitStageMash[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-			VkSubmitInfo submitInfo = {};
-			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			submitInfo.waitSemaphoreCount = 1;
-			submitInfo.pWaitSemaphores = &presentCompleteSemaphore;
-			submitInfo.pWaitDstStageMask = waitStageMash;
-			submitInfo.commandBufferCount = 1;
-			submitInfo.pCommandBuffers = &device->setupCmdBuffer;
-			submitInfo.signalSemaphoreCount = 0;
-			submitInfo.pSignalSemaphores = NULL;
-			VLKCheck(vkQueueSubmit(device->queue, 1, &submitInfo, submitFence),
-				"Could not submit queue");
-
-			vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
-			vkResetFences(device->device, 1, &submitFence);
-
-			vkDestroySemaphore(device->device, presentCompleteSemaphore, NULL);
-
-			vkResetCommandBuffer(device->setupCmdBuffer, 0);
-
-			transitioned[nextImageIdx] = true;
-			doneCount++;
-
-		}
-
-		VkPresentInfoKHR presentInfo = {};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 0;
-		presentInfo.pWaitSemaphores = NULL;
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &swapChain->swapChain;
-		presentInfo.pImageIndices = &nextImageIdx;
-		vkQueuePresentKHR(device->queue, &presentInfo);
-
+	for (int i = 0; i < swapChain->imageCount;i++) {
+		layoutTransitionBarriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		layoutTransitionBarriers[i].pNext = NULL;
+		layoutTransitionBarriers[i].srcAccessMask = 0;
+		layoutTransitionBarriers[i].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		layoutTransitionBarriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		layoutTransitionBarriers[i].newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		layoutTransitionBarriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		layoutTransitionBarriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		layoutTransitionBarriers[i].image = swapChain->presentImages[i];
+		layoutTransitionBarriers[i].subresourceRange = resourceRange;	
 	}
-	delete[] transitioned;
+
+	vkBeginCommandBuffer(device->setupCmdBuffer, &beginInfo);
+
+	vkCmdPipelineBarrier(device->setupCmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		swapChain->imageCount, layoutTransitionBarriers);
+
+	vkEndCommandBuffer(device->setupCmdBuffer);
+
+	VkPipelineStageFlags waitStageMash[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = NULL;
+	submitInfo.pWaitDstStageMask = waitStageMash;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &device->setupCmdBuffer;
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = NULL;
+	VLKCheck(vkQueueSubmit(device->queue, 1, &submitInfo, submitFence),
+		"Could not submit queue");
+
+	vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device->device, 1, &submitFence);
 
 	swapChain->presentImageViews = new VkImageView[swapChain->imageCount];
 	for (uint32_t i = 0; i < swapChain->imageCount; ++i) {
@@ -636,7 +610,7 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window) {
 	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.image = swapChain->depthImage;
-	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+	resourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
 	layoutTransitionBarrier.subresourceRange = resourceRange;
 
 	vkCmdPipelineBarrier(device->setupCmdBuffer,
@@ -650,7 +624,7 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window) {
 	vkEndCommandBuffer(device->setupCmdBuffer);
 
 	VkPipelineStageFlags waitStageMask[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	VkSubmitInfo submitInfo = {};
+	submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.waitSemaphoreCount = 0;
 	submitInfo.pWaitSemaphores = NULL;
@@ -754,6 +728,360 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window) {
 		"Failed to create fence");
 
 	return swapChain;
+}
+
+void vlkRecreateSwapchain(VLKDevice* device, VLKSwapchain** pSwapChain, bool vSync) {
+	VLKSwapchain* swapChain = (VLKSwapchain*)malloc(sizeof(VLKSwapchain));
+
+	swapChain->window = (*pSwapChain)->window;
+
+	uint32_t formatCount = 0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physicalDevice, device->surface,
+		&formatCount, NULL);
+	VkSurfaceFormatKHR *surfaceFormats = new VkSurfaceFormatKHR[formatCount];
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physicalDevice, device->surface,
+		&formatCount, surfaceFormats);
+
+	VkFormat colorFormat;
+	if (formatCount == 1 && surfaceFormats[0].format == VK_FORMAT_UNDEFINED) {
+		colorFormat = VK_FORMAT_B8G8R8_UNORM;
+	}
+	else {
+		colorFormat = surfaceFormats[0].format;
+	}
+
+	VkColorSpaceKHR colorSpace;
+	colorSpace = surfaceFormats[0].colorSpace;
+	delete[] surfaceFormats;
+
+	VkSurfaceCapabilitiesKHR surfaceCapabilities = {};
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physicalDevice, device->surface,
+		&surfaceCapabilities);
+
+	uint32_t desiredImageCount = 2;
+	if (desiredImageCount < surfaceCapabilities.minImageCount) {
+		desiredImageCount = surfaceCapabilities.minImageCount;
+	}
+	else if (surfaceCapabilities.maxImageCount != 0 &&
+		desiredImageCount > surfaceCapabilities.maxImageCount) {
+		desiredImageCount = surfaceCapabilities.maxImageCount;
+	}
+
+	int wW, wH;
+	glfwGetWindowSize(swapChain->window, &wW, &wH);
+
+	swapChain->width = (uint32_t)wW;
+	swapChain->height = (uint32_t)wH;
+
+	VkExtent2D surfaceResolution = surfaceCapabilities.currentExtent;
+	if (surfaceResolution.width == -1) {
+		surfaceResolution.width = swapChain->width;
+		surfaceResolution.height = swapChain->height;
+	}
+	else {
+		swapChain->width = surfaceResolution.width;
+		swapChain->height = surfaceResolution.height;
+	}
+
+	VkSurfaceTransformFlagBitsKHR preTransform = surfaceCapabilities.currentTransform;
+	if (surfaceCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
+		preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	}
+
+	uint32_t presentModeCount = 0;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device->physicalDevice, device->surface,
+		&presentModeCount, NULL);
+	VkPresentModeKHR *presentModes = new VkPresentModeKHR[presentModeCount];
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device->physicalDevice, device->surface,
+		&presentModeCount, presentModes);
+
+	VkPresentModeKHR presentationMode = VK_PRESENT_MODE_FIFO_KHR;
+	if (!vSync) {
+		for (uint32_t i = 0; i < presentModeCount; ++i) {
+			if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+				presentationMode = VK_PRESENT_MODE_MAILBOX_KHR;
+				break;
+			}
+		}
+	}
+	delete[] presentModes;
+
+	VkSwapchainCreateInfoKHR swapChainCreateInfo = {};
+	swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapChainCreateInfo.surface = device->surface;
+	swapChainCreateInfo.minImageCount = desiredImageCount;
+	swapChainCreateInfo.imageFormat = colorFormat;
+	swapChainCreateInfo.imageColorSpace = colorSpace;
+	swapChainCreateInfo.imageExtent = surfaceResolution;
+	swapChainCreateInfo.imageArrayLayers = 1;
+	swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	swapChainCreateInfo.preTransform = preTransform;
+	swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapChainCreateInfo.presentMode = presentationMode;
+	swapChainCreateInfo.clipped = true;
+	swapChainCreateInfo.oldSwapchain = (*pSwapChain)->swapChain;
+
+	VLKCheck(vkCreateSwapchainKHR(device->device, &swapChainCreateInfo, NULL, &swapChain->swapChain),
+		"Failed to create swapchain");
+
+	vkGetSwapchainImagesKHR(device->device, swapChain->swapChain, &swapChain->imageCount, NULL);
+	swapChain->presentImages = new VkImage[swapChain->imageCount];
+	vkGetSwapchainImagesKHR(device->device, swapChain->swapChain, &swapChain->imageCount, swapChain->presentImages);
+
+	VkImageViewCreateInfo presentImagesViewCreateInfo = {};
+	presentImagesViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	presentImagesViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	presentImagesViewCreateInfo.format = colorFormat;
+	presentImagesViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R,
+		VK_COMPONENT_SWIZZLE_G,
+		VK_COMPONENT_SWIZZLE_B,
+		VK_COMPONENT_SWIZZLE_A };
+	presentImagesViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	presentImagesViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	presentImagesViewCreateInfo.subresourceRange.levelCount = 1;
+	presentImagesViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	presentImagesViewCreateInfo.subresourceRange.layerCount = 1;
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	VkFence submitFence;
+	vkCreateFence(device->device, &fenceCreateInfo, NULL, &submitFence);
+
+	VkImageMemoryBarrier* layoutTransitionBarriers = new VkImageMemoryBarrier[swapChain->imageCount];
+	VkImageSubresourceRange resourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+	for (int i = 0; i < swapChain->imageCount; i++) {
+		layoutTransitionBarriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		layoutTransitionBarriers[i].pNext = NULL;
+		layoutTransitionBarriers[i].srcAccessMask = 0;
+		layoutTransitionBarriers[i].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		layoutTransitionBarriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		layoutTransitionBarriers[i].newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		layoutTransitionBarriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		layoutTransitionBarriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		layoutTransitionBarriers[i].image = swapChain->presentImages[i];
+		layoutTransitionBarriers[i].subresourceRange = resourceRange;
+	}
+
+	vkBeginCommandBuffer(device->setupCmdBuffer, &beginInfo);
+
+	vkCmdPipelineBarrier(device->setupCmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		swapChain->imageCount, layoutTransitionBarriers);
+
+	vkEndCommandBuffer(device->setupCmdBuffer);
+
+	VkPipelineStageFlags waitStageMash[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = NULL;
+	submitInfo.pWaitDstStageMask = waitStageMash;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &device->setupCmdBuffer;
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = NULL;
+	VLKCheck(vkQueueSubmit(device->queue, 1, &submitInfo, submitFence),
+		"Could not submit queue");
+
+	vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device->device, 1, &submitFence);
+
+	swapChain->presentImageViews = new VkImageView[swapChain->imageCount];
+	for (uint32_t i = 0; i < swapChain->imageCount; ++i) {
+		presentImagesViewCreateInfo.image = swapChain->presentImages[i];
+
+		VLKCheck(vkCreateImageView(device->device, &presentImagesViewCreateInfo, NULL, &swapChain->presentImageViews[i]),
+			"Coud not create image view");
+	}
+
+	vkGetPhysicalDeviceMemoryProperties(device->physicalDevice, &device->memoryProperties);
+
+	VkImageCreateInfo imageCreateInfo = {};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.format = VK_FORMAT_D16_UNORM;
+	imageCreateInfo.extent = { swapChain->width, swapChain->height, 1 };
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.queueFamilyIndexCount = 0;
+	imageCreateInfo.pQueueFamilyIndices = NULL;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VLKCheck(vkCreateImage(device->device, &imageCreateInfo, NULL, &swapChain->depthImage),
+		"Failed to create depth image");
+
+	VkMemoryRequirements memoryRequirements = {};
+	vkGetImageMemoryRequirements(device->device, swapChain->depthImage, &memoryRequirements);
+
+	VkMemoryAllocateInfo imageAllocateInfo = {};
+	imageAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	imageAllocateInfo.allocationSize = memoryRequirements.size;
+
+	uint32_t memoryTypeBits = memoryRequirements.memoryTypeBits;
+	VkMemoryPropertyFlags desiredMemoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	for (uint32_t i = 0; i < 32; ++i) {
+		VkMemoryType memoryType = device->memoryProperties.memoryTypes[i];
+		if (memoryTypeBits & 1) {
+			if ((memoryType.propertyFlags & desiredMemoryFlags) == desiredMemoryFlags) {
+				imageAllocateInfo.memoryTypeIndex = i;
+				break;
+			}
+		}
+		memoryTypeBits = memoryTypeBits >> 1;
+	}
+
+	VLKCheck(vkAllocateMemory(device->device, &imageAllocateInfo, NULL, &swapChain->imageMemory),
+		"Failed to allocate device memory");
+
+	VLKCheck(vkBindImageMemory(device->device, swapChain->depthImage, swapChain->imageMemory, 0),
+		"Failed to bind image memory");
+
+	vkBeginCommandBuffer(device->setupCmdBuffer, &beginInfo);
+
+	VkImageMemoryBarrier layoutTransitionBarrier = {};
+	layoutTransitionBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	layoutTransitionBarrier.srcAccessMask = 0;
+	layoutTransitionBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+		VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	layoutTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	layoutTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	layoutTransitionBarrier.image = swapChain->depthImage;
+	resourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+	layoutTransitionBarrier.subresourceRange = resourceRange;
+
+	vkCmdPipelineBarrier(device->setupCmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &layoutTransitionBarrier);
+
+	vkEndCommandBuffer(device->setupCmdBuffer);
+
+	VkPipelineStageFlags waitStageMask[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = NULL;
+	submitInfo.pWaitDstStageMask = waitStageMask;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &device->setupCmdBuffer;
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = NULL;
+	VLKCheck(vkQueueSubmit(device->queue, 1, &submitInfo, submitFence),
+		"Could not submit Queue");
+
+	vkWaitForFences(device->device, 1, &submitFence, VK_TRUE, UINT64_MAX);
+	vkResetFences(device->device, 1, &submitFence);
+	vkDestroyFence(device->device, submitFence, NULL);
+	vkResetCommandBuffer(device->setupCmdBuffer, 0);
+
+	VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	VkImageViewCreateInfo imageViewCreateInfo = {};
+	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.image = swapChain->depthImage;
+	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imageViewCreateInfo.format = imageCreateInfo.format;
+	imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+	imageViewCreateInfo.subresourceRange.aspectMask = aspectMask;
+	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	imageViewCreateInfo.subresourceRange.levelCount = 1;
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	imageViewCreateInfo.subresourceRange.layerCount = 1;
+
+	VLKCheck(vkCreateImageView(device->device, &imageViewCreateInfo, NULL, &swapChain->depthImageView),
+		"Failed to create image view");
+
+	VkAttachmentDescription passAttachments[2] = {};
+	passAttachments[0].format = colorFormat;
+	passAttachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+	passAttachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	passAttachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	passAttachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	passAttachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	passAttachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	passAttachments[1].format = VK_FORMAT_D16_UNORM;
+	passAttachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+	passAttachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	passAttachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	passAttachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	passAttachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference colorAttachmentReference = {};
+	colorAttachmentReference.attachment = 0;
+	colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depthAttachmentReference = {};
+	depthAttachmentReference.attachment = 1;
+	depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorAttachmentReference;
+	subpass.pDepthStencilAttachment = &depthAttachmentReference;
+
+	VkRenderPassCreateInfo renderPassCreateInfo = {};
+	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassCreateInfo.attachmentCount = 2;
+	renderPassCreateInfo.pAttachments = passAttachments;
+	renderPassCreateInfo.subpassCount = 1;
+	renderPassCreateInfo.pSubpasses = &subpass;
+
+	VLKCheck(vkCreateRenderPass(device->device, &renderPassCreateInfo, NULL, &swapChain->renderPass),
+		"Failed to create renderpass");
+
+	VkImageView frameBufferAttachments[2];
+	frameBufferAttachments[1] = swapChain->depthImageView;
+
+	VkFramebufferCreateInfo frameBufferCreateInfo = {};
+	frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	frameBufferCreateInfo.renderPass = swapChain->renderPass;
+	frameBufferCreateInfo.attachmentCount = 2;
+	frameBufferCreateInfo.pAttachments = frameBufferAttachments;
+	frameBufferCreateInfo.width = swapChain->width;
+	frameBufferCreateInfo.height = swapChain->height;
+	frameBufferCreateInfo.layers = 1;
+
+	swapChain->frameBuffers = new VkFramebuffer[swapChain->imageCount];
+	for (uint32_t i = 0; i < swapChain->imageCount; ++i) {
+		frameBufferAttachments[0] = swapChain->presentImageViews[i];
+		VLKCheck(vkCreateFramebuffer(device->device, &frameBufferCreateInfo, NULL, &swapChain->frameBuffers[i]),
+			"Failed to create framebuffer");
+	}
+
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.pNext = NULL;
+	fenceCreateInfo.flags = 0;
+
+	VLKCheck(vkCreateFence(device->device, &fenceCreateInfo, NULL, &swapChain->renderingCompleteFence),
+		"Failed to create fence");
+
+	vlkDestroySwapchain(device, *pSwapChain);
+
+	*pSwapChain = swapChain;
 }
 
 void vlkDestroySwapchain(VLKDevice* device, VLKSwapchain* swapChain) {
@@ -1340,13 +1668,21 @@ void vlkDestroyPipeline(VLKDevice* device, VLKPipeline* pipeline) {
 	free(pipeline);
 }
 
-void vlkClear(VLKDevice* device, VLKSwapchain* swapChain) {
+void vlkClear(VLKDevice* device, VLKSwapchain** pSwapChain) {
+	VLKSwapchain* swapChain = *pSwapChain;
+
 	VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, 0, 0 };
 	vkCreateSemaphore(device->device, &semaphoreCreateInfo, NULL, &swapChain->presentCompleteSemaphore);
 	vkCreateSemaphore(device->device, &semaphoreCreateInfo, NULL, &swapChain->renderingCompleteSemaphore);
 
-	vkAcquireNextImageKHR(device->device, swapChain->swapChain, UINT64_MAX,
+	VkResult result = vkAcquireNextImageKHR(device->device, swapChain->swapChain, UINT64_MAX,
 		swapChain->presentCompleteSemaphore, VK_NULL_HANDLE, &swapChain->nextImageIdx);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		vlkRecreateSwapchain(device, pSwapChain, false);
+	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		assert(false, "failed to acquire swap chain image!");
+	}
 
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1376,8 +1712,11 @@ void vlkClear(VLKDevice* device, VLKSwapchain* swapChain) {
 		1, &layoutTransitionBarrier);
 }
 
-void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
+void vlkSwap(VLKDevice* device, VLKSwapchain** pSwapChain) {
 	VkImageMemoryBarrier prePresentBarrier = {};
+
+	VLKSwapchain* swapChain = *pSwapChain;
+
 	prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 	prePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
@@ -1418,7 +1757,14 @@ void vlkSwap(VLKDevice* device, VLKSwapchain* swapChain) {
 	presentInfo.pSwapchains = &swapChain->swapChain;
 	presentInfo.pImageIndices = &swapChain->nextImageIdx;
 	presentInfo.pResults = NULL;
-	vkQueuePresentKHR(device->queue, &presentInfo);
+	VkResult result = vkQueuePresentKHR(device->queue, &presentInfo);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+		vlkRecreateSwapchain(device, pSwapChain, false);
+	}
+	else if (result != VK_SUCCESS) {
+		assert(false, "failed to acquire swap chain image!");
+	}
 
 	vkWaitForFences(device->device, 1, &swapChain->renderingCompleteFence, VK_TRUE, UINT64_MAX);
 	vkResetFences(device->device, 1, &swapChain->renderingCompleteFence);
@@ -1746,10 +2092,10 @@ void vlkDestroyTexture(VLKDevice* device, VLKTexture* texture) {
 	free(texture);
 }
 
-VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t imageCount, uint32_t width, uint32_t height) {
+VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t image5Count, uint32_t width, uint32_t height) {
 	VLKFramebuffer* frameBuffer = (VLKFramebuffer*)malloc(sizeof(VLKFramebuffer));
 
-	frameBuffer->imageCount = imageCount;
+	frameBuffer->imageCount = image5Count;
 	frameBuffer->width = width;
 	frameBuffer->height = height;
 
