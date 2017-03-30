@@ -12,7 +12,7 @@ layout ( location = 0 ) in struct fragment_in {
 void main() {
 	vec4 ftColor = texture(tex, IN.uv);
 
-	if(ftColor.a == 0) {
+	if(ftColor.a < 0.5) {
 		discard;
 	}
 

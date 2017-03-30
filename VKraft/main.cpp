@@ -1070,21 +1070,6 @@ int main() {
 	VLKTexture* texture = vlkCreateTexture(device, "pack.png", VK_FILTER_NEAREST);
 	vlkBindTexture(device, shader, texture);
 
-	float cursorVerts[] = {
-		-0.03125f, -0.003125f,
-		 0.03125f, -0.003125f,
-		-0.03125f,  0.003125f,
-		-0.03125f,  0.003125f,
-		 0.03125f, -0.003125f,
-		 0.03125f,  0.003125f,
-		
-		-0.003125f, -0.03125f,
-		 0.003125f, -0.03125f,
-		-0.003125f,  0.03125f,
-		-0.003125f,  0.03125f,
-		 0.003125f, -0.03125f,
-		 0.003125f,  0.03125f };
-
 	float backGroundVerts[] = {
 		-1, -1, 0, 0,
 		 1, -1, 1, 0,
@@ -1093,41 +1078,24 @@ int main() {
 		 1, -1, 1, 0,
 		 1,  1, 1, 1 };
 
-	float aspect = 16.0f / 9.0f;
-
 	VLKModel* bgModel = vlkCreateModel(device, backGroundVerts, 6 * 4 * sizeof(float));
 	VLKShader* bgShader = createBGShader(device, "bg-vert.spv", "bg-frag.spv");
 	VLKPipeline* bgPipeline = createBGPipeline(device, swapChain, bgShader);
 
-	VkWriteDescriptorSet writeDescriptor = {};
-	writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writeDescriptor.dstSet = bgShader->descriptorSet;
-	writeDescriptor.dstBinding = 0;
-	writeDescriptor.dstArrayElement = 0;
-	writeDescriptor.descriptorCount = 1;
-	writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	writeDescriptor.pImageInfo = &frameBuffer->descriptorImageInfo;
-	writeDescriptor.pBufferInfo = NULL;
-	writeDescriptor.pTexelBufferView = NULL;
+	float cursorVerts[] = {
+		-25, -2.5f,
+		 25, -2.5f,
+		-25,  2.5f,
+		-25,  2.5f,
+		 25, -2.5f,
+		 25,  2.5f,
 
-	vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
-
-	VLKModel* cursorModel = vlkCreateModel(device, cursorVerts, 12 * 2 * sizeof(float));
-	VLKShader* cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", &aspect, sizeof(float));
-	VLKPipeline* cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
-	VLKTexture* cursorTexture = createCursorTexture(device, "Cursor.png");
-
-	writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writeDescriptor.dstSet = cursorShader->descriptorSet;
-	writeDescriptor.dstBinding = 1;
-	writeDescriptor.dstArrayElement = 0;
-	writeDescriptor.descriptorCount = 1;
-	writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	writeDescriptor.pImageInfo = &frameBuffer->descriptorImageInfo;
-	writeDescriptor.pBufferInfo = NULL;
-	writeDescriptor.pTexelBufferView = NULL;
-
-	vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
+		-2.5f, -25,
+		 2.5f, -25,
+		-2.5f,  25,
+		-2.5f,  25,
+		 2.5f, -25,
+		 2.5f,  25 };
 
 	float r = swapChain->width;
 	float l = 0;
@@ -1136,14 +1104,46 @@ int main() {
 	float f = 1;
 	float n = -1;
 
-	float fontProj[16] = {
-		2/(r - l), 0, 0, 0,
-		0, 2/(t - b), 0, 0,
-		0, 0, -2/(f - n), 0,
-		-(r + l) / (r - l), -(t + b) / (t - b), -(f + n) / (f - n), 1
+	float cursorUniform[] = {
+		2 / (r - l), 0, 0, 0,
+		0, 2 / (t - b), 0, 0,
+		0, 0, -2 / (f - n), 0,
+		-(r + l) / (r - l), -(t + b) / (t - b), -(f + n) / (f - n), 1,
+
+		640, 360
 	};
 
-	VLKShader* fontShader = vlkCreateShader(device, "font-vert.spv", "font-frag.spv", fontProj, 16 * sizeof(float));
+	VLKModel* cursorModel = vlkCreateModel(device, cursorVerts, 12 * 2 * sizeof(float));
+	VLKShader* cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", cursorUniform, sizeof(float) * 18);
+	VLKPipeline* cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
+	VLKTexture* cursorTexture = createCursorTexture(device, "Cursor.png");
+
+	VkWriteDescriptorSet writeDescriptors[2];
+	writeDescriptors[0] = {};
+	writeDescriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeDescriptors[0].dstSet = bgShader->descriptorSet;
+	writeDescriptors[0].dstBinding = 0;
+	writeDescriptors[0].dstArrayElement = 0;
+	writeDescriptors[0].descriptorCount = 1;
+	writeDescriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writeDescriptors[0].pImageInfo = &frameBuffer->descriptorImageInfo;
+	writeDescriptors[0].pBufferInfo = NULL;
+	writeDescriptors[0].pTexelBufferView = NULL;
+
+	writeDescriptors[1] = {};
+	writeDescriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeDescriptors[1].dstSet = cursorShader->descriptorSet;
+	writeDescriptors[1].dstBinding = 1;
+	writeDescriptors[1].dstArrayElement = 0;
+	writeDescriptors[1].descriptorCount = 1;
+	writeDescriptors[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writeDescriptors[1].pImageInfo = &frameBuffer->descriptorImageInfo;
+	writeDescriptors[1].pBufferInfo = NULL;
+	writeDescriptors[1].pTexelBufferView = NULL;
+
+	vkUpdateDescriptorSets(device->device, 2, writeDescriptors, 0, NULL);
+
+	VLKShader* fontShader = vlkCreateShader(device, "font-vert.spv", "font-frag.spv", cursorUniform, 16 * sizeof(float));
 	VLKPipeline* fontPipeline = createFontPipeline(device, swapChain, fontShader);
 	VLKTexture* font = vlkCreateTexture(device, "font.png", VK_FILTER_LINEAR);
 	vlkBindTexture(device, fontShader, font);
@@ -1177,47 +1177,29 @@ int main() {
 			float f2 = 1;
 			float n2 = -1;
 
-			float fontProj2[16] = {
+			float aspect = ((float)swapChain->width) / ((float)swapChain->height);
+
+			float cursorUniform2[] = {
 				2 / (r2 - l2), 0, 0, 0,
 				0, 2 / (t2 - b2), 0, 0,
 				0, 0, -2 / (f2 - n2), 0,
-				-(r2 + l2) / (r2 - l2), -(t2 + b2) / (t2 - b2), -(f2 + n2) / (f2 - n2), 1
+				-(r2 + l2) / (r2 - l2), -(t2 + b2) / (t2 - b2), -(f2 + n2) / (f2 - n2), 1,
+
+				swapChain->width/2, swapChain->height/2
 			};
+			
+			vlkUniforms(device, fontShader, cursorUniform2, sizeof(float) * 16);
+			vlkUniforms(device, cursorShader, cursorUniform2, sizeof(float) * 18);
 
-			vlkUniforms(device, fontShader, fontProj2, 16 * sizeof(float));
-
-			float aspect2 = ((float)swapChain->width) / ((float)swapChain->height);
-
-			vlkUniforms(device, cursorShader, &aspect2, sizeof(float));
-
-			memcpy(uniformBuffer.proj, getPerspective(aspect2, 90), sizeof(float) * 16);
+			memcpy(uniformBuffer.proj, getPerspective(aspect, 90), sizeof(float) * 16);
 
 			vlkDestroyFramebuffer(device, frameBuffer);
 			frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width * 2, swapChain->height * 2);
 
-			writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writeDescriptor.dstSet = bgShader->descriptorSet;
-			writeDescriptor.dstBinding = 0;
-			writeDescriptor.dstArrayElement = 0;
-			writeDescriptor.descriptorCount = 1;
-			writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			writeDescriptor.pImageInfo = &frameBuffer->descriptorImageInfo;
-			writeDescriptor.pBufferInfo = NULL;
-			writeDescriptor.pTexelBufferView = NULL;
-
-			vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
-
-			writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writeDescriptor.dstSet = cursorShader->descriptorSet;
-			writeDescriptor.dstBinding = 1;
-			writeDescriptor.dstArrayElement = 0;
-			writeDescriptor.descriptorCount = 1;
-			writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			writeDescriptor.pImageInfo = &frameBuffer->descriptorImageInfo;
-			writeDescriptor.pBufferInfo = NULL;
-			writeDescriptor.pTexelBufferView = NULL;
-
-			vkUpdateDescriptorSets(device->device, 1, &writeDescriptor, 0, NULL);
+			writeDescriptors[0].pImageInfo = &frameBuffer->descriptorImageInfo;
+			writeDescriptors[1].pImageInfo = &frameBuffer->descriptorImageInfo;
+			
+			vkUpdateDescriptorSets(device->device, 2, writeDescriptors, 0, NULL);
 		}
 
 		pwidth = width;
