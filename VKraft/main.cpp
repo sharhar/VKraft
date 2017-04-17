@@ -1035,7 +1035,7 @@ int main() {
 
 	VLKContext* context = vlkCreateContext();
 	VLKDevice* device = vlkCreateRenderDevice(context, window, 2);
-	VLKSwapchain* swapChain = vlkCreateSwapchain(device, window, false);
+	VLKSwapchain* swapChain = vlkCreateSwapchain(device, window, true);
 
 	CubeUniformBuffer uniformBuffer;
 	memcpy(uniformBuffer.proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);

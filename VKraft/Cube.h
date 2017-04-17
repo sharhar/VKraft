@@ -54,6 +54,12 @@ typedef struct Cube {
 	uint16_t type;
 } Cube;
 
+typedef struct CubeDataNode {
+	void* data;
+	int32_t len;
+	int32_t offset;
+} CubeDataNode;
+
 class Chunk {
 private:
 	static FastNoise* heightNoise;
@@ -62,8 +68,8 @@ private:
 	static std::thread* chunkThread;
 	static std::vector<Chunk*> chunks;
 
-	Vec3 pos;
-	Vec3 m_cubePos;
+	Vec3i pos;
+	Vec3i m_cubePos;
 
 	Chunk* m_xn;
 	Chunk* m_xp;
@@ -74,13 +80,13 @@ private:
 
 	bool m_air;
 public:
-	static Chunk* getChunkAt(Vec3 pos);
 	static int m_fence;
 	static uint32_t rcubesSize;
 	static uint32_t rcubestSize;
 	static Cube* rcubes;
 	static int rsize;
 	static Vec3i** texts;
+	static CubeDataNode* dataNode;
 
 	static uint32_t cubeNum;
 	static ChunkModelInfo* model;
@@ -93,12 +99,15 @@ public:
 	static void destroy(VLKDevice* device);
 	static void render(VLKDevice* device, VLKSwapchain* swapChain);
 
-	Chunk(Vec3 pos);
+	Chunk(Vec3i pos);
 
 	void recalcqrid();
 	void findChunks();
 
 	friend static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vulkanRenderContext, ChunkThreadFreeInfo* freeInfo);
 	friend static void recalcChunksNextTo(Chunk* chunk);
-	friend static void addNext(Chunk* chunk, Vec3 pos);
+	friend static int addNext(Chunk* chunk, Vec3i pos);
 };
+
+inline Chunk* getChunkAt(Vec3i pos);
+void putChunkAt(Chunk* chunk, Vec3i pos);

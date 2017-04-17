@@ -720,13 +720,6 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSy
 			"Failed to create framebuffer");
 	}
 
-	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fenceCreateInfo.pNext = NULL;
-	fenceCreateInfo.flags = 0;
-
-	VLKCheck(vkCreateFence(device->device, &fenceCreateInfo, NULL, &swapChain->renderingCompleteFence),
-		"Failed to create fence");
-
 	return swapChain;
 }
 
@@ -1072,21 +1065,12 @@ void vlkRecreateSwapchain(VLKDevice* device, VLKSwapchain** pSwapChain, bool vSy
 			"Failed to create framebuffer");
 	}
 
-	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fenceCreateInfo.pNext = NULL;
-	fenceCreateInfo.flags = 0;
-
-	VLKCheck(vkCreateFence(device->device, &fenceCreateInfo, NULL, &swapChain->renderingCompleteFence),
-		"Failed to create fence");
-
 	vlkDestroySwapchain(device, *pSwapChain);
 
 	*pSwapChain = swapChain;
 }
 
 void vlkDestroySwapchain(VLKDevice* device, VLKSwapchain* swapChain) {
-	vkDestroyFence(device->device, swapChain->renderingCompleteFence, NULL);
-
 	vkFreeMemory(device->device, swapChain->imageMemory, NULL);
 
 	for (uint32_t i = 0; i < swapChain->imageCount; ++i) {
@@ -1638,6 +1622,7 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKFramebuffer* frameBuffer, V
 
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineCreateInfo.pNext = NULL;
 	pipelineCreateInfo.stageCount = 2;
 	pipelineCreateInfo.pStages = shaderStageCreateInfo;
 	pipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
@@ -1747,7 +1732,7 @@ void vlkSwap(VLKDevice* device, VLKSwapchain** pSwapChain) {
 	submitInfo.pCommandBuffers = &device->drawCmdBuffer;
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = &swapChain->renderingCompleteSemaphore;
-	vkQueueSubmit(device->queue, 1, &submitInfo, swapChain->renderingCompleteFence);
+	vkQueueSubmit(device->queue, 1, &submitInfo, NULL);
 
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1759,15 +1744,14 @@ void vlkSwap(VLKDevice* device, VLKSwapchain** pSwapChain) {
 	presentInfo.pResults = NULL;
 	VkResult result = vkQueuePresentKHR(device->queue, &presentInfo);
 
+	vkQueueWaitIdle(device->queue);
+
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 		vlkRecreateSwapchain(device, pSwapChain, false);
 	}
 	else if (result != VK_SUCCESS) {
 		assert(false, "failed to acquire swap chain image!");
 	}
-
-	vkWaitForFences(device->device, 1, &swapChain->renderingCompleteFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(device->device, 1, &swapChain->renderingCompleteFence);
 	
 	vkDestroySemaphore(device->device, swapChain->presentCompleteSemaphore, NULL);
 	vkDestroySemaphore(device->device, swapChain->renderingCompleteSemaphore, NULL);
@@ -1781,6 +1765,11 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path, VkFilter filter) {
 	std::vector<unsigned char> imageData;
 
 	unsigned int error = lodepng::decode(imageData, width, height, path);
+
+	if (error != 0) {
+		std::cout << "Error loading image: " << error << "\n";
+		return NULL;
+	}
 
 	texture->width = width;
 	texture->height = height;

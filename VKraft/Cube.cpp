@@ -38,17 +38,12 @@ uint32_t Chunk::cubeNum = 0;
 ChunkModelInfo* Chunk::model = 0;
 VulkanRenderContext* Chunk::renderContext = 0;
 ChunkThreadFreeInfo* Chunk::freeInfo = 0;
+CubeDataNode* Chunk::dataNode = NULL;
 
-Chunk* Chunk::getChunkAt(Vec3 pos) {
-	int sz = chunks.size();
-
-	for (int i = 0; i < sz; i++) {
-		if (chunks[i]->pos.x == pos.x && chunks[i]->pos.y == pos.y && chunks[i]->pos.z == pos.z) {
-			return chunks[i];
-		}
-	}
-
-	return NULL;
+inline void* malloc_c(size_t size) {
+	void* result = malloc(size);
+	memset(result, 0, size);
+	return result;
 }
 
 static void recalcChunksNextTo(Chunk* chunk) {
@@ -86,40 +81,50 @@ static void recalcChunksNextTo(Chunk* chunk) {
 	}
 }
 
-static bool closeEnough(Vec3 pos, Vec3 other) {
+static bool closeEnough(Vec3i pos, Vec3i other) {
 	return pos.dist(other) <= CHUNK_RAD;
 }
 
-static void addNext(Chunk* chunk, Vec3 pos) {
+static int addNext(Chunk* chunk, Vec3i pos) {
+	int result = 0;
+
 	if (chunk->m_xn == NULL) {
 		Chunk* temp = new Chunk(pos.add({ -1, 0, 0 }));
 		recalcChunksNextTo(temp);
+		result = 1;
 	}
 
 	if (chunk->m_xp == NULL) {
 		Chunk* temp = new Chunk(pos.add({ 1, 0, 0 }));
 		recalcChunksNextTo(temp);
+		result = 1;
 	}
 
 	if (chunk->m_yn == NULL) {
 		Chunk* temp = new Chunk(pos.add({ 0, -1, 0 }));
 		recalcChunksNextTo(temp);
+		result = 1;
 	}
 
 	if (chunk->m_yp == NULL) {
 		Chunk* temp = new Chunk(pos.add({ 0,  1, 0 }));
 		recalcChunksNextTo(temp);
+		result = 1;
 	}
 
 	if (chunk->m_zn == NULL) {
 		Chunk* temp = new Chunk(pos.add({ 0, 0, -1 }));
 		recalcChunksNextTo(temp);
+		result = 1;
 	}
 
 	if (chunk->m_zp == NULL) {
 		Chunk* temp = new Chunk(pos.add({ 0, 0,  1 }));
 		recalcChunksNextTo(temp);
+		result = 1;
 	}
+
+	return result;
 }
 
 static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkThreadFreeInfo* freeInfo) {
@@ -157,16 +162,39 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 	VkQueue transferQueue;
 	vkGetDeviceQueue(vrc->device->device, vrc->device->queueIdx, 1, &transferQueue);
 
-	while (!glfwWindowShouldClose(window)) {
-		Vec3 playerPos = { floor(Camera::pos.x / 16.0f), floor(Camera::pos.y / 16.0f), floor(Camera::pos.z / 16.0f) };
+	bool nmc = false;
+	Vec3i prevPlayerPos = {-100, -100, -100};
 
-		Chunk* playerChunk = Chunk::getChunkAt(playerPos);
+	while (!glfwWindowShouldClose(window)) {
+		Vec3i playerPos = { (int)floor(Camera::pos.x / 16.0f), (int)floor(Camera::pos.y / 16.0f), (int)floor(Camera::pos.z / 16.0f) };
+
+		bool moved = false;
+
+		if (playerPos.x != prevPlayerPos.x || playerPos.y != prevPlayerPos.y || playerPos.z != prevPlayerPos.z) {
+			nmc = false;
+		}
+
+		prevPlayerPos.x = playerPos.x;
+		prevPlayerPos.y = playerPos.y;
+		prevPlayerPos.z = playerPos.z;
+
+		if (nmc) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			continue;
+		}
+
+		Chunk* playerChunk = getChunkAt(playerPos);
+
+		nmc = true;
 
 		if (playerChunk == NULL) {
 			Chunk* temp = new Chunk(playerPos);
 			recalcChunksNextTo(temp);
+			nmc = false;
 		} else {
-			addNext(playerChunk, playerPos);
+			if (addNext(playerChunk, playerPos)) {
+				nmc = false;
+			}
 		}
 
 		for (int i = 0; i < CHUNK_NUM; i++) {
@@ -183,7 +211,9 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 
 		for (int i = 0; i < CHUNK_NUM; i++) {
 			if (closeChunks[i] != NULL && !closeChunks[i]->m_air) {
-				addNext(closeChunks[i], closeChunks[i]->pos);
+				if (addNext(closeChunks[i], closeChunks[i]->pos)) {
+					nmc = false;
+				}
 			}
 		}
 
@@ -854,6 +884,12 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vul
 	freeInfo->modelInfo = NULL;
 	freeInfo->pmodelInfo = NULL;
 
+	dataNode = (CubeDataNode*)malloc_c(sizeof(CubeDataNode));
+
+	dataNode->len = 0;
+	dataNode->offset = 0;
+	dataNode->data = NULL;
+
 	chunkThread = new std::thread(chunkThreadRun, window, renderContext, freeInfo);
 }
 
@@ -910,32 +946,168 @@ void Chunk::render(VLKDevice* device, VLKSwapchain* swapChain) {
 	m_fence = m_fence - 2;
 }
 
-Chunk::Chunk(Vec3 a_pos) {
+typedef struct CubeNoise {
+	float nz1;
+	float nz2;
+
+	float nz;
+
+	float nzc;
+
+	float cnzc;
+	float inzc;
+} CubeNoise;
+
+inline float interpolateCubeValue(float val0, float val3, uint8_t rem) {
+	float m = (val3 - val0)/3.0f;
+
+	return val0 + m * rem;
+}
+
+Chunk::Chunk(Vec3i a_pos) {
 	pos = { a_pos.x, a_pos.y, a_pos.z };
 	m_cubePos = { a_pos.x * 16, a_pos.y * 16, a_pos.z * 16 };
 
 	cubes = new uint16_t[16 * 16 * 16];
 
-	for (uint8_t x = 0; x < 16; x++) {
+	CubeNoise* cubeNoises = new CubeNoise[16 * 16 * 16];
+
+	for (uint8_t x = 0; x < 16; x += 3) {
 		float xf = m_cubePos.x + x;
-		for (uint8_t z = 0; z < 16; z++) {
+		for (uint8_t z = 0; z < 16; z += 3) {
 			float zf = m_cubePos.z + z;
 			float nz1 = heightNoise->GetPerlin(xf / 1.2f, 0.8f, zf / 1.2f) * 64;
 			float nz2 = heightNoise->GetPerlin(xf * 2, 2.7f, zf * 2) * 16;
 
 			float nz = nz1 + nz2;
 
-			for (uint8_t y = 0; y < 16; y++) {
+			for (uint8_t y = 0; y < 16; y += 3) {
 				float yf = m_cubePos.y + y;
 
 				float yh = yf - nz;
 
-				int type = 0;
-
 				if (yh <= 0) {
 					float nzc = caveNoise->GetCellular(xf, yf, zf);
 
-					if (nzc < 0.45) {
+					cubeNoises[x * 256 + y * 16 + z].nzc = nzc;
+
+					if (nzc < 0.45 && yh <= -5) {
+						float cnzc = oreNoise->GetSimplex(xf / 0.5f, yf / 0.5f, zf / 0.5f);
+						float inzc = oreNoise->GetSimplex(xf / 0.25f, yf / 0.25f, zf / 0.25f);
+
+						cubeNoises[x * 256 + y * 16 + z].cnzc = cnzc;
+						cubeNoises[x * 256 + y * 16 + z].inzc = inzc;
+					}
+				}
+
+				cubeNoises[x * 256 + y * 16 + z].nz1 = nz1;
+				cubeNoises[x * 256 + y * 16 + z].nz2 = nz2;
+				cubeNoises[x * 256 + y * 16 + z].nz = nz;
+			}
+		}
+	}
+
+	for (uint8_t x = 0; x < 16; x += 1) {
+		for (uint8_t z = 0; z < 16; z += 3) {
+			for (uint8_t y = 0; y < 16; y += 3) {
+				uint8_t rem = x % 3;
+				if (rem != 0) {
+					uint8_t off = x - rem;
+
+					cubeNoises[x * 256 + y * 16 + z].nz1 = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].nz1, cubeNoises[(off + 3) * 256 + y * 16 + z].nz1, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz2 = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].nz2, cubeNoises[(off + 3) * 256 + y * 16 + z].nz2, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].nz, cubeNoises[(off+ 3) * 256 + y * 16 + z].nz, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nzc = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].nzc, cubeNoises[(off + 3) * 256 + y * 16 + z].nzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].cnzc = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].cnzc, cubeNoises[(off + 3) * 256 + y * 16 + z].cnzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].inzc = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].inzc, cubeNoises[(off + 3) * 256 + y * 16 + z].inzc, rem);
+				}
+			}
+		}
+	}
+
+	for (uint8_t x = 0; x < 16; x += 1) {
+		for (uint8_t z = 0; z < 16; z += 1) {
+			for (uint8_t y = 0; y < 16; y += 3) {
+				uint8_t rem = z % 3;
+				if (rem != 0) {
+					uint8_t off = z - rem;
+
+					cubeNoises[x * 256 + y * 16 + z].nz1 = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].nz1, cubeNoises[x * 256 + y * 16 + (off + 3)].nz1, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz2 = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].nz2, cubeNoises[x * 256 + y * 16 + (off + 3)].nz2, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].nz, cubeNoises[x * 256 + y * 16 + (off + 3)].nz, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nzc = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].nzc, cubeNoises[x * 256 + y * 16 + (off + 3)].nzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].cnzc = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].cnzc, cubeNoises[x * 256 + y * 16 + (off + 3)].cnzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].inzc = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].inzc, cubeNoises[x * 256 + y * 16 + (off + 3)].inzc, rem);
+				}
+			}
+		}
+	}
+
+	for (uint8_t x = 0; x < 16; x += 1) {
+		for (uint8_t z = 0; z < 16; z += 1) {
+			for (uint8_t y = 0; y < 16; y += 1) {
+				uint8_t rem = y % 3;
+				if (rem != 0) {
+					uint8_t off = y - rem;
+
+					cubeNoises[x * 256 + y * 16 + z].nz1 = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].nz1, cubeNoises[x * 256 + (off + 3) * 16 + z].nz1, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz2 = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].nz2, cubeNoises[x * 256 + (off + 3) * 16 + z].nz2, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].nz, cubeNoises[x * 256 + (off + 3) * 16 + z].nz, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nzc = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].nzc, cubeNoises[x * 256 + (off + 3) * 16 + z].nzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].cnzc = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].cnzc, cubeNoises[x * 256 + (off + 3) * 16 + z].cnzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].inzc = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].inzc, cubeNoises[x * 256 + (off + 3) * 16 + z].inzc, rem);
+				}
+			}
+		}
+	}
+
+	for (uint8_t x = 0; x < 16; x++) {
+		float xf = m_cubePos.x + x;
+		for (uint8_t z = 0; z < 16; z++) {
+			float zf = m_cubePos.z + z;
+
+			for (uint8_t y = 0; y < 16; y++) {
+				float yf = m_cubePos.y + y;
+
+				float yh = yf - cubeNoises[x * 256 + y * 16 + z].nz;
+
+				int type = 0;
+
+				if (yh <= 0) {
+					if (cubeNoises[x * 256 + y * 16 + z].nzc < 0.45) {
 						if (yh <= 0 && yh > -1) {
 							type = 1;
 						}
@@ -943,13 +1115,10 @@ Chunk::Chunk(Vec3 a_pos) {
 							type = 2;
 						}
 						else {
-							float cnzc = oreNoise->GetSimplex(xf / 0.5f, yf / 0.5f, zf / 0.5f);
-							float inzc = oreNoise->GetSimplex(xf / 0.25f, yf / 0.25f, zf / 0.25f);
-
-							if (cnzc > 0.8) {
+							if (cubeNoises[x * 256 + y * 16 + z].cnzc > 0.8) {
 								type = 4;
 							}
-							else if (inzc > 0.8) {
+							else if (cubeNoises[x * 256 + y * 16 + z].inzc > 0.8) {
 								type = 5;
 							}
 							else {
@@ -968,14 +1137,20 @@ Chunk::Chunk(Vec3 a_pos) {
 		}
 	}
 
+	delete[] cubeNoises;
+
 	m_air = false;
+
+	Vec3i cp = {(int)pos.x,(int)pos.y, (int)pos.z};
+
+	putChunkAt(this, cp);
 
 	chunks.push_back(this);
 }
 
 void Chunk::findChunks() {
 	m_xn = getChunkAt(pos.add({ -1, 0, 0 }));
-	m_xp = getChunkAt(pos.add({ 1, 0, 0 }));
+	m_xp = getChunkAt(pos.add({  1, 0, 0 }));
 	m_yn = getChunkAt(pos.add({ 0, -1, 0 }));
 	m_yp = getChunkAt(pos.add({ 0,  1, 0 }));
 	m_zn = getChunkAt(pos.add({ 0, 0, -1 }));
@@ -1040,4 +1215,184 @@ void Chunk::recalcqrid() {
 			break;
 		}
 	}
+}
+
+inline Chunk* getChunkAt(Vec3i pos) {
+	CubeDataNode* dataNode = Chunk::dataNode;
+
+	if (dataNode == NULL || (pos.x - dataNode->offset) > dataNode->len - 1 || (pos.x - dataNode->offset) < 0) {
+		return NULL;
+	}
+
+	dataNode = ((CubeDataNode**)dataNode->data)[pos.x - dataNode->offset];
+
+	if (dataNode == NULL || (pos.y - dataNode->offset) > dataNode->len - 1 || (pos.y - dataNode->offset) < 0) {
+		return NULL;
+	}
+
+	dataNode = ((CubeDataNode**)dataNode->data)[pos.y - dataNode->offset];
+
+	if (dataNode == NULL || (pos.z - dataNode->offset) > dataNode->len - 1 || (pos.z - dataNode->offset) < 0) {
+		return NULL;
+	}
+
+	return ((Chunk**)dataNode->data)[pos.z - dataNode->offset];
+}
+
+void putChunkAt(Chunk* chunk, Vec3i pos) {
+	CubeDataNode* dataNode = Chunk::dataNode;
+
+	if (dataNode->len + dataNode->offset - 1 < pos.x) {
+		int32_t preLen = dataNode->len;
+
+		dataNode->len = pos.x - dataNode->offset + 1;
+
+		CubeDataNode** preData = (CubeDataNode**)dataNode->data;
+
+		dataNode->data = malloc_c(sizeof(CubeDataNode*) * dataNode->len);
+
+		CubeDataNode** resultData = (CubeDataNode**)dataNode->data;
+
+		for (int i = 0; i < preLen;i++) {
+			resultData[i] = preData[i];
+		}
+
+		for (int i = preLen; i < dataNode->len;i++) {
+			resultData[i] = (CubeDataNode*)malloc_c(sizeof(CubeDataNode));
+
+			resultData[i]->data = NULL;
+			resultData[i]->len = 0;
+			resultData[i]->offset = 0;
+		}
+
+		putChunkAt(chunk, pos);
+	} else if (dataNode->offset > pos.x) {
+		int32_t preLen = dataNode->len;
+		int32_t preOff = dataNode->offset;
+
+		dataNode->offset = pos.x;
+		dataNode->len = preLen + preOff - dataNode->offset;
+
+		CubeDataNode** preData = (CubeDataNode**)dataNode->data;
+
+		dataNode->data = malloc_c(sizeof(CubeDataNode*) * dataNode->len);
+
+		CubeDataNode** resultData = (CubeDataNode**)dataNode->data;
+
+		int copyOff = preOff - dataNode->offset;
+
+		for (int i = 0; i < preLen; i++) {
+			resultData[i + copyOff] = preData[i];
+		}
+
+		for (int i = 0; i < copyOff; i++) {
+			resultData[i] = (CubeDataNode*)malloc_c(sizeof(CubeDataNode));
+
+			resultData[i]->data = NULL;
+			resultData[i]->len = 0;
+			resultData[i]->offset = 0;
+		}
+
+		putChunkAt(chunk, pos);
+	}
+
+	dataNode = ((CubeDataNode**)dataNode->data)[pos.x - dataNode->offset];
+
+	if (dataNode->len + dataNode->offset - 1 < pos.y) {
+		int32_t preLen = dataNode->len;
+
+		dataNode->len = pos.y - dataNode->offset + 1;
+
+		CubeDataNode** preData = (CubeDataNode**)dataNode->data;
+
+		dataNode->data = malloc_c(sizeof(CubeDataNode*) * dataNode->len);
+
+		CubeDataNode** resultData = (CubeDataNode**)dataNode->data;
+
+		for (int i = 0; i < preLen; i++) {
+			resultData[i] = preData[i];
+		}
+
+		for (int i = preLen; i < dataNode->len; i++) {
+			resultData[i] = (CubeDataNode*)malloc_c(sizeof(CubeDataNode));
+
+			resultData[i]->data = NULL;
+			resultData[i]->len = 0;
+			resultData[i]->offset = 0;
+		}
+
+		putChunkAt(chunk, pos);
+	}
+	else if (dataNode->offset > pos.y) {
+		int32_t preLen = dataNode->len;
+		int32_t preOff = dataNode->offset;
+
+		dataNode->offset = pos.y;
+		dataNode->len = preLen + preOff - dataNode->offset;
+
+		CubeDataNode** preData = (CubeDataNode**)dataNode->data;
+
+		dataNode->data = malloc_c(sizeof(CubeDataNode*) * dataNode->len);
+
+		CubeDataNode** resultData = (CubeDataNode**)dataNode->data;
+
+		int copyOff = preOff - dataNode->offset;
+
+		for (int i = 0; i < preLen; i++) {
+			resultData[i + copyOff] = preData[i];
+		}
+
+		for (int i = 0; i < copyOff; i++) {
+			resultData[i] = (CubeDataNode*)malloc_c(sizeof(CubeDataNode));
+
+			resultData[i]->data = NULL;
+			resultData[i]->len = 0;
+			resultData[i]->offset = 0;
+		}
+
+		putChunkAt(chunk, pos);
+	}
+
+	dataNode = ((CubeDataNode**)dataNode->data)[pos.y - dataNode->offset];
+	
+	if (dataNode->len + dataNode->offset - 1 < pos.z) {
+		int32_t preLen = dataNode->len;
+
+		dataNode->len = pos.z - dataNode->offset + 1;
+
+		Chunk** preData = (Chunk**)dataNode->data;
+
+		dataNode->data = malloc_c(sizeof(Chunk*) * dataNode->len);
+
+		Chunk** resultData = (Chunk**)dataNode->data;
+
+		for (int i = 0; i < preLen; i++) {
+			resultData[i] = preData[i];
+		}
+
+		putChunkAt(chunk, pos);
+	}
+	else if (dataNode->offset > pos.z) {
+		int32_t preLen = dataNode->len;
+		int32_t preOff = dataNode->offset;
+
+		dataNode->offset = pos.z;
+		dataNode->len = preLen + preOff - dataNode->offset;
+
+		Chunk** preData = (Chunk**)dataNode->data;
+
+		dataNode->data = malloc_c(sizeof(Chunk*) * dataNode->len);
+
+		Chunk** resultData = (Chunk**)dataNode->data;
+
+		int copyOff = preOff - dataNode->offset;
+
+		for (int i = 0; i < preLen; i++) {
+			resultData[i + copyOff] = preData[i];
+		}
+
+		putChunkAt(chunk, pos);
+	}
+
+	((Chunk**)dataNode->data)[pos.z - dataNode->offset] = chunk;
 }

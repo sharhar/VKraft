@@ -7,11 +7,30 @@
 #include <string>
 #include <math.h>
 
+typedef struct Vec3i {
+	int x, y, z;
+
+	Vec3i add(Vec3i input) {
+		return{ x + input.x, y + input.y , z + input.z };
+	}
+
+	inline float dist(Vec3i other) {
+		float xd = x - other.x;
+		float yd = y - other.y;
+		float zd = z - other.z;
+		return sqrt(xd*xd + yd*yd + zd*zd);
+	}
+} Vec3i;
+
 typedef struct Vec3 {
 	float x, y, z;
 
 	Vec3 add(Vec3 input) {
 		return{ x + input.x, y + input.y , z + input.z };
+	}
+
+	Vec3i addi(Vec3 input) {
+		return{ (int)(x + input.x), (int)(y + input.y) , (int)(z + input.z) };
 	}
 
 	inline float dist(Vec3 other) {
@@ -21,18 +40,6 @@ typedef struct Vec3 {
 		return sqrt(xd*xd + yd*yd + zd*zd);
 	}
 } Vec3;
-
-typedef struct Vec3i {
-	int x, y, z;
-
-	Vec3i add(Vec3i input) {
-		return{ x + input.x, y + input.y , z + input.z };
-	}
-
-	Vec3 add(Vec3 input) {
-		return{ x + input.x, y + input.y , z + input.z };
-	}
-} Vec3i;
 
 typedef struct Vec3i8 {
 	uint8_t x, y, z;

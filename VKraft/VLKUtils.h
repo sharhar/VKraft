@@ -45,7 +45,6 @@ typedef struct VLKSwapchain {
 	VkRenderPass renderPass;
 	VkFramebuffer* frameBuffers;
 	VkSemaphore presentCompleteSemaphore, renderingCompleteSemaphore;
-	VkFence renderingCompleteFence;
 
 	uint32_t width, height, nextImageIdx, imageCount;
 
