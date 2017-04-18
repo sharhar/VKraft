@@ -32,9 +32,5 @@
 *.vspx
 *.psess
 
-/Debug
-/Release
-/x64
-/VKraft/Debug
-/VKraft/Release
-/VKraft/x64
+/build
+/ext

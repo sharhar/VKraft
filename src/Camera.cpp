@@ -69,7 +69,7 @@ VLKComputeContext* getComputeContext(VLKContext* context) {
 
 	vkBindBufferMemory(computeContext->device->device, computeContext->posBuffer, computeContext->posMemory, 0);
 	
-	std::vector<char> shaderCode = readFile("raycast-comp.spv");
+	std::vector<char> shaderCode = readFile("res/raycast-comp.spv");
 
 	VkShaderModuleCreateInfo computeShaderCreationInfo = {};
 	computeShaderCreationInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

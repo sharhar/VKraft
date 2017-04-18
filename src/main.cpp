@@ -1040,7 +1040,7 @@ int main() {
 	CubeUniformBuffer uniformBuffer;
 	memcpy(uniformBuffer.proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
 
-	VLKShader* shader = vlkCreateShader(device, "cube-vert.spv", "cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
+	VLKShader* shader = vlkCreateShader(device, "res/cube-vert.spv", "res/cube-frag.spv", &uniformBuffer, sizeof(CubeUniformBuffer));
 	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width * 2, swapChain->height * 2);
 	VLKPipeline* pipeline = vlkCreatePipeline(device, frameBuffer, shader);
 
@@ -1067,7 +1067,7 @@ int main() {
 
 	Chunk::init(1337, window, &renderContext);
 
-	VLKTexture* texture = vlkCreateTexture(device, "pack.png", VK_FILTER_NEAREST);
+	VLKTexture* texture = vlkCreateTexture(device, "res/pack.png", VK_FILTER_NEAREST);
 	vlkBindTexture(device, shader, texture);
 
 	float backGroundVerts[] = {
@@ -1079,7 +1079,7 @@ int main() {
 		 1,  1, 1, 1 };
 
 	VLKModel* bgModel = vlkCreateModel(device, backGroundVerts, 6 * 4 * sizeof(float));
-	VLKShader* bgShader = createBGShader(device, "bg-vert.spv", "bg-frag.spv");
+	VLKShader* bgShader = createBGShader(device, "res/bg-vert.spv", "res/bg-frag.spv");
 	VLKPipeline* bgPipeline = createBGPipeline(device, swapChain, bgShader);
 
 	float cursorVerts[] = {
@@ -1114,9 +1114,9 @@ int main() {
 	};
 
 	VLKModel* cursorModel = vlkCreateModel(device, cursorVerts, 12 * 2 * sizeof(float));
-	VLKShader* cursorShader = createCursorShader(device, "cursor-vert.spv", "cursor-frag.spv", cursorUniform, sizeof(float) * 18);
+	VLKShader* cursorShader = createCursorShader(device, "res/cursor-vert.spv", "res/cursor-frag.spv", cursorUniform, sizeof(float) * 18);
 	VLKPipeline* cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
-	VLKTexture* cursorTexture = createCursorTexture(device, "Cursor.png");
+	VLKTexture* cursorTexture = createCursorTexture(device, "res/Cursor.png");
 
 	VkWriteDescriptorSet writeDescriptors[2];
 	writeDescriptors[0] = {};
@@ -1143,9 +1143,9 @@ int main() {
 
 	vkUpdateDescriptorSets(device->device, 2, writeDescriptors, 0, NULL);
 
-	VLKShader* fontShader = vlkCreateShader(device, "font-vert.spv", "font-frag.spv", cursorUniform, 16 * sizeof(float));
+	VLKShader* fontShader = vlkCreateShader(device, "res/font-vert.spv", "res/font-frag.spv", cursorUniform, 16 * sizeof(float));
 	VLKPipeline* fontPipeline = createFontPipeline(device, swapChain, fontShader);
-	VLKTexture* font = vlkCreateTexture(device, "font.png", VK_FILTER_LINEAR);
+	VLKTexture* font = vlkCreateTexture(device, "res/font.png", VK_FILTER_LINEAR);
 	vlkBindTexture(device, fontShader, font);
 
 	double ct = glfwGetTime();
