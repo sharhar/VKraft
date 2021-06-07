@@ -188,7 +188,7 @@ protected:
 
 	CellularDistanceFunction m_cellularDistanceFunction = Euclidean;
 	CellularReturnType m_cellularReturnType = CellValue;
-	FastNoise* m_cellularNoiseLookup = nullptr;
+	FastNoise* m_cellularNoiseLookup = 0;
 
 	FN_DECIMAL m_gradientPerturbAmp = 1 / FN_DECIMAL(0.45);
 

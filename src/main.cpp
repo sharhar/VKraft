@@ -308,8 +308,10 @@ VLKPipeline* createBGPipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSha
 	viewport.maxDepth = 1;
 
 	VkRect2D scissors = {};
-	scissors.offset = { 0, 0 };
-	scissors.extent = { swapChain->width, swapChain->height };
+	scissors.offset.x = 0;
+	scissors.offset.y = 0;
+	scissors.extent.width = swapChain->width;
+	scissors.extent.height = swapChain->height;
 
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -478,8 +480,10 @@ VLKPipeline* createCursorPipeline(VLKDevice* device, VLKSwapchain* swapChain, VL
 	viewport.maxDepth = 1;
 
 	VkRect2D scissors = {};
-	scissors.offset = { 0, 0 };
-	scissors.extent = { swapChain->width, swapChain->height };
+	scissors.offset.x = 0;
+	scissors.offset.y = 0;
+	scissors.extent.width = swapChain->width;
+	scissors.extent.height = swapChain->height;
 
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -616,7 +620,13 @@ VLKTexture* createCursorTexture(VLKDevice* device, char* path) {
 	textureCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	textureCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	textureCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	textureCreateInfo.extent = { texture->width, texture->height, 1 };
+	
+	VkExtent3D textureExtent;
+	textureExtent.width = texture->width;
+	textureExtent.height = texture->height;
+	textureExtent.depth = 1;
+	
+	textureCreateInfo.extent = textureExtent;
 	textureCreateInfo.mipLevels = 1;
 	textureCreateInfo.arrayLayers = 1;
 	textureCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -721,10 +731,10 @@ VLKTexture* createCursorTexture(VLKDevice* device, char* path) {
 	textureImageViewCreateInfo.image = texture->textureImage;
 	textureImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	textureImageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	textureImageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R,
-		VK_COMPONENT_SWIZZLE_G,
-		VK_COMPONENT_SWIZZLE_B,
-		VK_COMPONENT_SWIZZLE_A };
+	textureImageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+	textureImageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;
+	textureImageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_B;
+	textureImageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_A;
 	textureImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	textureImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	textureImageViewCreateInfo.subresourceRange.levelCount = 1;
@@ -835,8 +845,10 @@ VLKPipeline* createFontPipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKS
 	viewport.maxDepth = 1;
 
 	VkRect2D scissors = {};
-	scissors.offset = { 0, 0 };
-	scissors.extent = { swapChain->width, swapChain->height };
+	scissors.offset.x = 0;
+	scissors.offset.y = 0;
+	scissors.extent.width = swapChain->width;
+	scissors.extent.height = swapChain->height;
 
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -1009,7 +1021,7 @@ VLKModel* drawText(VLKDevice* device,
 
 	VLKModel* fontModel = vlkCreateModel(device, verts, 6 * 4 * sizeof(float) * tsz);
 
-	VkDeviceSize offsets = {};
+	VkDeviceSize offsets = 0;
 
 	vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fontPipeline->pipeline);
 	vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &fontModel->vertexInputBuffer, &offsets);
@@ -1044,8 +1056,8 @@ int main() {
 	VLKFramebuffer* frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width * 2, swapChain->height * 2);
 	VLKPipeline* pipeline = vlkCreatePipeline(device, frameBuffer, shader);
 
-	Vec3 pos = {0, 0, 1};
-	Vec3 rot = {0, 0, 0};
+	Vec3 pos = Vec3(0, 0, 1);
+	Vec3 rot = Vec3(0, 0, 0);
 	double prev_x = 0;
 	double prev_y = 0;
 
@@ -1119,8 +1131,8 @@ int main() {
 	VLKTexture* cursorTexture = createCursorTexture(device, "res/Cursor.png");
 
 	VkWriteDescriptorSet writeDescriptors[2];
-	writeDescriptors[0] = {};
 	writeDescriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeDescriptors[0].pNext = NULL;
 	writeDescriptors[0].dstSet = bgShader->descriptorSet;
 	writeDescriptors[0].dstBinding = 0;
 	writeDescriptors[0].dstArrayElement = 0;
@@ -1130,8 +1142,8 @@ int main() {
 	writeDescriptors[0].pBufferInfo = NULL;
 	writeDescriptors[0].pTexelBufferView = NULL;
 
-	writeDescriptors[1] = {};
 	writeDescriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeDescriptors[1].pNext = NULL;
 	writeDescriptors[1].dstSet = cursorShader->descriptorSet;
 	writeDescriptors[1].dstBinding = 1;
 	writeDescriptors[1].dstArrayElement = 0;
@@ -1235,7 +1247,10 @@ int main() {
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassBeginInfo.renderPass = swapChain->renderPass;
 		renderPassBeginInfo.framebuffer = swapChain->frameBuffers[swapChain->nextImageIdx];
-		renderPassBeginInfo.renderArea = { 0, 0, swapChain->width, swapChain->height };
+		renderPassBeginInfo.renderArea.offset.x = 0;
+		renderPassBeginInfo.renderArea.offset.y = 0;
+		renderPassBeginInfo.renderArea.extent.width = swapChain->width;
+		renderPassBeginInfo.renderArea.extent.height = swapChain->height;
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValue;
 		vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
@@ -1243,7 +1258,7 @@ int main() {
 
 		VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
 		VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
-		VkDeviceSize offsets = {};
+		VkDeviceSize offsets =0;
 
 		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
 		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);

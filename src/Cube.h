@@ -21,7 +21,7 @@ typedef struct CubeUniformBuffer {
 		0, 0, 1, 0,
 		0, 0, 0, 1 };
 
-	Vec3 selected = { 0.5f, 0.5f, 0.5f };
+	Vec3 selected = Vec3( 0.5f, 0.5f, 0.5f );
 
 	float density = 1.0f / 200.0f;
 	float gradient = 25;
@@ -61,7 +61,7 @@ typedef struct CubeDataNode {
 } CubeDataNode;
 
 class Chunk {
-private:
+public:
 	static FastNoise* heightNoise;
 	static FastNoise* caveNoise;
 	static FastNoise* oreNoise;
@@ -79,7 +79,7 @@ private:
 	Chunk* m_zp;
 
 	bool m_air;
-public:
+
 	static int m_fence;
 	static uint32_t rcubesSize;
 	static uint32_t rcubestSize;
@@ -104,9 +104,9 @@ public:
 	void recalcqrid();
 	void findChunks();
 
-	friend static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vulkanRenderContext, ChunkThreadFreeInfo* freeInfo);
-	friend static void recalcChunksNextTo(Chunk* chunk);
-	friend static int addNext(Chunk* chunk, Vec3i pos);
+	friend void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vulkanRenderContext, ChunkThreadFreeInfo* freeInfo);
+	friend void recalcChunksNextTo(Chunk* chunk);
+	friend int addNext(Chunk* chunk, Vec3i pos);
 };
 
 inline Chunk* getChunkAt(Vec3i pos);

@@ -35,7 +35,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugReportCallback(VkDebugReportFlagsEXT flags,
 #endif
 
 void VLKCheck(VkResult result, char *msg) {
-	assert(result == VK_SUCCESS, msg);
+	assert(result == VK_SUCCESS);//, msg);
 }
 
 VLKContext* vlkCreateContext() {
@@ -212,7 +212,7 @@ VLKDevice* vlkCreateRenderDevice(VLKContext* context, GLFWwindow* window, uint32
 	}
 	delete[] physicalDevices;
 
-	assert(device->physicalDevice, "No physical device detected that can render and present!");
+	assert(device->physicalDevice);//, "No physical device detected that can render and present!");
 
 	float* queuePriorities = new float[queueCount];
 	for (int i = 0; i < queueCount; i++) {
@@ -318,7 +318,7 @@ VLKDevice* vlkCreateComputeDevice(VLKContext* context, uint32_t queueCount) {
 	}
 	delete[] physicalDevices;
 
-	assert(device->physicalDevice, "No physical device detected that can compute!");
+	assert(device->physicalDevice);//, "No physical device detected that can compute!");
 
 	float* queuePriorities = new float[queueCount];
 	for (int i = 0; i < queueCount;i++) {
@@ -481,10 +481,15 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSy
 	presentImagesViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	presentImagesViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	presentImagesViewCreateInfo.format = colorFormat;
-	presentImagesViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R,
-		VK_COMPONENT_SWIZZLE_G,
-		VK_COMPONENT_SWIZZLE_B,
-		VK_COMPONENT_SWIZZLE_A };
+	
+	VkComponentMapping presentImagesViewComponents;
+	
+	presentImagesViewComponents.r = VK_COMPONENT_SWIZZLE_R;
+	presentImagesViewComponents.g = VK_COMPONENT_SWIZZLE_G;
+	presentImagesViewComponents.b = VK_COMPONENT_SWIZZLE_B;
+	presentImagesViewComponents.a = VK_COMPONENT_SWIZZLE_A;
+	
+	presentImagesViewCreateInfo.components = presentImagesViewComponents;
 	presentImagesViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	presentImagesViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	presentImagesViewCreateInfo.subresourceRange.levelCount = 1;
@@ -529,8 +534,9 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSy
 	vkEndCommandBuffer(device->setupCmdBuffer);
 
 	VkPipelineStageFlags waitStageMash[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	VkSubmitInfo submitInfo = {};
+	VkSubmitInfo submitInfo;
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.pNext = NULL;
 	submitInfo.waitSemaphoreCount = 0;
 	submitInfo.pWaitSemaphores = NULL;
 	submitInfo.pWaitDstStageMask = waitStageMash;
@@ -558,7 +564,13 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSy
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	imageCreateInfo.format = VK_FORMAT_D16_UNORM;
-	imageCreateInfo.extent = { swapChain->width, swapChain->height, 1 };
+	
+	VkExtent3D imageExtent;
+	imageExtent.width = swapChain->width;
+	imageExtent.height = swapChain->height;
+	imageExtent.depth = 1;
+	
+	imageCreateInfo.extent = imageExtent;
 	imageCreateInfo.mipLevels = 1;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -610,8 +622,11 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSy
 	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.image = swapChain->depthImage;
-	resourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
-	layoutTransitionBarrier.subresourceRange = resourceRange;
+	layoutTransitionBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	layoutTransitionBarrier.subresourceRange.baseMipLevel = 0;
+	layoutTransitionBarrier.subresourceRange.levelCount = 1;
+	layoutTransitionBarrier.subresourceRange.baseArrayLayer = 0;
+	layoutTransitionBarrier.subresourceRange.layerCount = 1;
 
 	vkCmdPipelineBarrier(device->setupCmdBuffer,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -624,7 +639,6 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSy
 	vkEndCommandBuffer(device->setupCmdBuffer);
 
 	VkPipelineStageFlags waitStageMask[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.waitSemaphoreCount = 0;
 	submitInfo.pWaitSemaphores = NULL;
@@ -647,8 +661,14 @@ VLKSwapchain* vlkCreateSwapchain(VLKDevice* device, GLFWwindow* window, bool vSy
 	imageViewCreateInfo.image = swapChain->depthImage;
 	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	imageViewCreateInfo.format = imageCreateInfo.format;
-	imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+	VkComponentMapping componentMapping;
+	
+	componentMapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	componentMapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	componentMapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	componentMapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	
+	imageViewCreateInfo.components = componentMapping;
 	imageViewCreateInfo.subresourceRange.aspectMask = aspectMask;
 	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	imageViewCreateInfo.subresourceRange.levelCount = 1;
@@ -826,10 +846,10 @@ void vlkRecreateSwapchain(VLKDevice* device, VLKSwapchain** pSwapChain, bool vSy
 	presentImagesViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	presentImagesViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	presentImagesViewCreateInfo.format = colorFormat;
-	presentImagesViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R,
-		VK_COMPONENT_SWIZZLE_G,
-		VK_COMPONENT_SWIZZLE_B,
-		VK_COMPONENT_SWIZZLE_A };
+	presentImagesViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+	presentImagesViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;
+	presentImagesViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_B;
+	presentImagesViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_A;
 	presentImagesViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	presentImagesViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	presentImagesViewCreateInfo.subresourceRange.levelCount = 1;
@@ -903,8 +923,9 @@ void vlkRecreateSwapchain(VLKDevice* device, VLKSwapchain** pSwapChain, bool vSy
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	imageCreateInfo.format = VK_FORMAT_D16_UNORM;
-	imageCreateInfo.extent = { swapChain->width, swapChain->height, 1 };
-	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.extent.width = swapChain->width;
+	imageCreateInfo.extent.height = swapChain->height;
+	imageCreateInfo.extent.depth = 1;	imageCreateInfo.mipLevels = 1;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -955,8 +976,11 @@ void vlkRecreateSwapchain(VLKDevice* device, VLKSwapchain** pSwapChain, bool vSy
 	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.image = swapChain->depthImage;
-	resourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
-	layoutTransitionBarrier.subresourceRange = resourceRange;
+	layoutTransitionBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	layoutTransitionBarrier.subresourceRange.baseArrayLayer = 0;
+	layoutTransitionBarrier.subresourceRange.baseMipLevel = 0;
+	layoutTransitionBarrier.subresourceRange.layerCount = 1;
+	layoutTransitionBarrier.subresourceRange.levelCount = 1;
 
 	vkCmdPipelineBarrier(device->setupCmdBuffer,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -969,8 +993,8 @@ void vlkRecreateSwapchain(VLKDevice* device, VLKSwapchain** pSwapChain, bool vSy
 	vkEndCommandBuffer(device->setupCmdBuffer);
 
 	VkPipelineStageFlags waitStageMask[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.pNext = NULL;
 	submitInfo.waitSemaphoreCount = 0;
 	submitInfo.pWaitSemaphores = NULL;
 	submitInfo.pWaitDstStageMask = waitStageMask;
@@ -992,8 +1016,10 @@ void vlkRecreateSwapchain(VLKDevice* device, VLKSwapchain** pSwapChain, bool vSy
 	imageViewCreateInfo.image = swapChain->depthImage;
 	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	imageViewCreateInfo.format = imageCreateInfo.format;
-	imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+	imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 	imageViewCreateInfo.subresourceRange.aspectMask = aspectMask;
 	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	imageViewCreateInfo.subresourceRange.levelCount = 1;
@@ -1372,8 +1398,10 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKSwapchain* swapChain, VLKSh
 	viewport.maxDepth = 1;
 
 	VkRect2D scissors = {};
-	scissors.offset = { 0, 0 };
-	scissors.extent = { swapChain->width, swapChain->height };
+	scissors.offset.x = 0;
+	scissors.offset.y = 0;
+	scissors.extent.width = swapChain->width;
+	scissors.extent.height = swapChain->height;
 
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -1540,8 +1568,10 @@ VLKPipeline* vlkCreatePipeline(VLKDevice* device, VLKFramebuffer* frameBuffer, V
 	viewport.maxDepth = 1;
 
 	VkRect2D scissors = {};
-	scissors.offset = { 0, 0 };
-	scissors.extent = { frameBuffer->width, frameBuffer->height };
+	scissors.offset.x = 0;
+	scissors.offset.y = 0;
+	scissors.extent.width = frameBuffer->width;
+	scissors.extent.height = frameBuffer->height;
 
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -1666,7 +1696,7 @@ void vlkClear(VLKDevice* device, VLKSwapchain** pSwapChain) {
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		vlkRecreateSwapchain(device, pSwapChain, false);
 	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-		assert(false, "failed to acquire swap chain image!");
+		assert(false);//, "failed to acquire swap chain image!");
 	}
 
 	VkCommandBufferBeginInfo beginInfo = {};
@@ -1709,7 +1739,11 @@ void vlkSwap(VLKDevice* device, VLKSwapchain** pSwapChain) {
 	prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	prePresentBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	prePresentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	prePresentBarrier.subresourceRange.baseMipLevel = 0;
+	prePresentBarrier.subresourceRange.baseArrayLayer = 0;
+	prePresentBarrier.subresourceRange.levelCount = 1;
+	prePresentBarrier.subresourceRange.layerCount = 1;
 	prePresentBarrier.image = swapChain->presentImages[swapChain->nextImageIdx];
 
 	vkCmdPipelineBarrier(device->drawCmdBuffer,
@@ -1750,7 +1784,7 @@ void vlkSwap(VLKDevice* device, VLKSwapchain** pSwapChain) {
 		vlkRecreateSwapchain(device, pSwapChain, false);
 	}
 	else if (result != VK_SUCCESS) {
-		assert(false, "failed to acquire swap chain image!");
+		assert(false);//, "failed to acquire swap chain image!");
 	}
 	
 	vkDestroySemaphore(device->device, swapChain->presentCompleteSemaphore, NULL);
@@ -1781,7 +1815,9 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path, VkFilter filter) {
 	textureCreateInfo.flags = 0;
 	textureCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	textureCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	textureCreateInfo.extent = { texture->width, texture->height, 1 };
+	textureCreateInfo.extent.width = texture->width;
+	textureCreateInfo.extent.height = texture->height;
+	textureCreateInfo.extent.depth = 1;
 	textureCreateInfo.mipLevels = 1;
 	textureCreateInfo.arrayLayers = 1;
 	textureCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1862,7 +1898,9 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path, VkFilter filter) {
 	textureCreateInfo.flags = 0;
 	textureCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	textureCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	textureCreateInfo.extent = { texture->width, texture->height, 1 };
+	textureCreateInfo.extent.width = texture->width;
+	textureCreateInfo.extent.height = texture->height;
+	textureCreateInfo.extent.depth = 1;
 	textureCreateInfo.mipLevels = 1;
 	textureCreateInfo.arrayLayers = 1;
 	textureCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1951,8 +1989,12 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path, VkFilter filter) {
 	VkImageCopy region = {};
 	region.srcSubresource = subResource;
 	region.dstSubresource = subResource;
-	region.srcOffset = { 0, 0, 0 };
-	region.dstOffset = { 0, 0, 0 };
+	region.srcOffset.x = 0;
+	region.srcOffset.y = 0;
+	region.srcOffset.z = 0;
+	region.dstOffset.x = 0;
+	region.dstOffset.y = 0;
+	region.dstOffset.z = 0;
 	region.extent.width = width;
 	region.extent.height = height;
 	region.extent.depth = 1;
@@ -2014,10 +2056,10 @@ VLKTexture* vlkCreateTexture(VLKDevice* device, char* path, VkFilter filter) {
 	textureImageViewCreateInfo.image = texture->textureImage;
 	textureImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	textureImageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	textureImageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R,
-		VK_COMPONENT_SWIZZLE_G,
-		VK_COMPONENT_SWIZZLE_B,
-		VK_COMPONENT_SWIZZLE_A };
+	textureImageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+	textureImageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;
+	textureImageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_B;
+	textureImageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_A;
 	textureImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	textureImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	textureImageViewCreateInfo.subresourceRange.levelCount = 1;
@@ -2092,7 +2134,9 @@ VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t image5Count, ui
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	imageCreateInfo.extent = { frameBuffer->width, frameBuffer->height, 1 };
+	imageCreateInfo.extent.width = frameBuffer->width;
+	imageCreateInfo.extent.height = frameBuffer->height;
+	imageCreateInfo.extent.depth = 1;
 	imageCreateInfo.mipLevels = 1;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -2186,10 +2230,10 @@ VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t image5Count, ui
 	presentImagesViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	presentImagesViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	presentImagesViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	presentImagesViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R,
-		VK_COMPONENT_SWIZZLE_G,
-		VK_COMPONENT_SWIZZLE_B,
-		VK_COMPONENT_SWIZZLE_A };
+	presentImagesViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+	presentImagesViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;
+	presentImagesViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_B;
+	presentImagesViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_A;
 	presentImagesViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	presentImagesViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	presentImagesViewCreateInfo.subresourceRange.levelCount = 1;
@@ -2203,7 +2247,9 @@ VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t image5Count, ui
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	imageCreateInfo.format = VK_FORMAT_D32_SFLOAT;
-	imageCreateInfo.extent = { frameBuffer->width, frameBuffer->height, 1 };
+	imageCreateInfo.extent.width = frameBuffer->width;
+	imageCreateInfo.extent.height = frameBuffer->height;
+	imageCreateInfo.extent.depth = 1;
 	imageCreateInfo.mipLevels = 1;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -2252,8 +2298,11 @@ VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t image5Count, ui
 	layoutTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	layoutTransitionBarrier.image = frameBuffer->depthImage;
-	resourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
-	layoutTransitionBarrier.subresourceRange = resourceRange;
+	layoutTransitionBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	layoutTransitionBarrier.subresourceRange.baseMipLevel = 0;
+	layoutTransitionBarrier.subresourceRange.baseArrayLayer = 0;
+	layoutTransitionBarrier.subresourceRange.levelCount = 1;
+	layoutTransitionBarrier.subresourceRange.layerCount = 1;
 
 	vkCmdPipelineBarrier(device->setupCmdBuffer,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -2289,8 +2338,10 @@ VLKFramebuffer* vlkCreateFramebuffer(VLKDevice* device, uint32_t image5Count, ui
 	imageViewCreateInfo.image = frameBuffer->depthImage;
 	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	imageViewCreateInfo.format = imageCreateInfo.format;
-	imageViewCreateInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+	imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 	imageViewCreateInfo.subresourceRange.aspectMask = aspectMask;
 	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	imageViewCreateInfo.subresourceRange.levelCount = 1;
@@ -2440,7 +2491,10 @@ void vlkStartFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.renderPass = frameBuffer->renderPass;
 	renderPassBeginInfo.framebuffer = frameBuffer->frameBuffer;
-	renderPassBeginInfo.renderArea = { 0, 0, frameBuffer->width, frameBuffer->height };
+	renderPassBeginInfo.renderArea.offset.x = 0;
+	renderPassBeginInfo.renderArea.offset.y = 0;
+	renderPassBeginInfo.renderArea.extent.width = frameBuffer->width;
+	renderPassBeginInfo.renderArea.extent.height = frameBuffer->height;
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValue;
 	vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
@@ -2458,7 +2512,11 @@ void vlkEndFramebuffer(VLKDevice* device, VLKFramebuffer* frameBuffer) {
 	prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	prePresentBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	prePresentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	prePresentBarrier.subresourceRange.baseMipLevel = 0;
+	prePresentBarrier.subresourceRange.baseArrayLayer = 0;
+	prePresentBarrier.subresourceRange.levelCount = 1;
+	prePresentBarrier.subresourceRange.layerCount = 1;
 	prePresentBarrier.image = frameBuffer->colorImage;
 
 	vkCmdPipelineBarrier(device->drawCmdBuffer,

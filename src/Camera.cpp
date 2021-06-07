@@ -3,9 +3,9 @@
 
 CubeUniformBuffer* Camera::uniforms = 0;
 GLFWwindow* Camera::window = 0;
-Vec3 Camera::pos = { 0, 5.1, 0 };
-Vec3 Camera::renderPos = { 0, 0, 0 };
-Vec3 Camera::rot = { 0, 0, 0 };
+Vec3 Camera::pos = Vec3( 0, 5.1, 0 );
+Vec3 Camera::renderPos = Vec3( 0, 0, 0 );
+Vec3 Camera::rot = Vec3( 0, 0, 0 );
 double Camera::prev_x = 0;
 double Camera::prev_y = 0;
 float Camera::yVel = 0;
@@ -15,6 +15,10 @@ int Camera::possSize = 0;
 int Camera::fence = 0;
 bool Camera::grounded = false;
 VLKComputeContext* Camera::computeContext = NULL;
+
+GLFWwindow* gg_win;
+CubeUniformBuffer* gg_uniforms;
+VLKComputeContext* gg_context;
 
 VLKComputeContext* getComputeContext(VLKContext* context) {
 	VLKComputeContext* computeContext = (VLKComputeContext*)malloc(sizeof(VLKComputeContext));
@@ -223,7 +227,11 @@ void destroyComputeContext(VLKComputeContext* context) {
 	vlkDestroyComputeDevice(context->context, context->device);
 }
 
-static void cameraThreadRun(GLFWwindow* win, CubeUniformBuffer* uniforms, VLKComputeContext* context) {
+static void cameraThreadRun() {
+	GLFWwindow* win = gg_win;
+	CubeUniformBuffer* uniforms = gg_uniforms;
+	VLKComputeContext* context = gg_context;
+	
 	std::vector<Cube*> closeCubes;
 	Vec3* pvecs = NULL;
 
@@ -255,7 +263,7 @@ static void cameraThreadRun(GLFWwindow* win, CubeUniformBuffer* uniforms, VLKCom
 		Vec3* vecs = new Vec3[cbsz];
 
 		for (int i = 0; i < cbsz; i++) {
-			vecs[i] = { closeCubes[i]->pos.x, closeCubes[i]->pos.y, closeCubes[i]->pos.z };
+			vecs[i] = Vec3(closeCubes[i]->pos.x, closeCubes[i]->pos.y, closeCubes[i]->pos.z );
 		}
 
 		if (cbsz > 0) {
@@ -524,8 +532,12 @@ void Camera::init(GLFWwindow* win, CubeUniformBuffer* puniforms, VLKContext* con
 	prev_y = ypos;
 
 	computeContext = getComputeContext(context);
+	
+	gg_win = window;
+	gg_uniforms = uniforms;
+	gg_context = computeContext;
 
-	cameraThread = new std::thread(cameraThreadRun, window, uniforms, computeContext);
+	cameraThread = new std::thread(cameraThreadRun);
 }
 
 bool hittingCube(Vec3 pos, Vec3 other) {

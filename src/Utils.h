@@ -9,9 +9,21 @@
 
 typedef struct Vec3i {
 	int x, y, z;
+	
+	Vec3i() {
+		x = 0;
+		y = 0;
+		z = 0;
+	}
+	
+	Vec3i(int a_x, int a_y, int a_z) {
+		x = a_x;
+		y = a_y;
+		z = a_z;
+	}
 
 	Vec3i add(Vec3i input) {
-		return{ x + input.x, y + input.y , z + input.z };
+		return Vec3i(x + input.x, y + input.y , z + input.z);
 	}
 
 	inline float dist(Vec3i other) {
@@ -24,13 +36,25 @@ typedef struct Vec3i {
 
 typedef struct Vec3 {
 	float x, y, z;
+	
+	Vec3() {
+		x = 0;
+		y = 0;
+		z = 0;
+	}
+	
+	Vec3(float a_x, float a_y, float a_z) {
+		x = a_x;
+		y = a_y;
+		z = a_z;
+	}
 
 	Vec3 add(Vec3 input) {
-		return{ x + input.x, y + input.y , z + input.z };
+		return Vec3(x + input.x, y + input.y , z + input.z );
 	}
 
 	Vec3i addi(Vec3 input) {
-		return{ (int)(x + input.x), (int)(y + input.y) , (int)(z + input.z) };
+		return Vec3i((int)(x + input.x), (int)(y + input.y) , (int)(z + input.z));
 	}
 
 	inline float dist(Vec3 other) {
@@ -49,7 +73,7 @@ typedef struct Vec3i8 {
 	}
 
 	Vec3 add(Vec3 input) {
-		return{ x + input.x, y + input.y , z + input.z };
+		return Vec3(x + input.x, y + input.y , z + input.z );
 	}
 } Vec3i8;
 

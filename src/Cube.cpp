@@ -5,6 +5,10 @@
 #define CHUNK_NUM 14144
 #define CHUNK_RAD 15
 
+GLFWwindow* gg_window = 0;
+VulkanRenderContext* gg_vrc = 0;
+ChunkThreadFreeInfo* gg_freeInfo = 0;
+
 inline uint8_t getVid(uint16_t num) {
 	return (uint8_t)(num & 0b0000000000111111);
 }
@@ -46,7 +50,7 @@ inline void* malloc_c(size_t size) {
 	return result;
 }
 
-static void recalcChunksNextTo(Chunk* chunk) {
+void recalcChunksNextTo(Chunk* chunk) {
 	chunk->findChunks();
 	chunk->recalcqrid();
 
@@ -85,41 +89,41 @@ static bool closeEnough(Vec3i pos, Vec3i other) {
 	return pos.dist(other) <= CHUNK_RAD;
 }
 
-static int addNext(Chunk* chunk, Vec3i pos) {
+int addNext(Chunk* chunk, Vec3i pos) {
 	int result = 0;
 
 	if (chunk->m_xn == NULL) {
-		Chunk* temp = new Chunk(pos.add({ -1, 0, 0 }));
+		Chunk* temp = new Chunk(pos.add(Vec3i( -1, 0, 0 )));
 		recalcChunksNextTo(temp);
 		result = 1;
 	}
 
 	if (chunk->m_xp == NULL) {
-		Chunk* temp = new Chunk(pos.add({ 1, 0, 0 }));
+		Chunk* temp = new Chunk(pos.add(Vec3i( 1, 0, 0 )));
 		recalcChunksNextTo(temp);
 		result = 1;
 	}
 
 	if (chunk->m_yn == NULL) {
-		Chunk* temp = new Chunk(pos.add({ 0, -1, 0 }));
+		Chunk* temp = new Chunk(pos.add(Vec3i( 0, -1, 0 )));
 		recalcChunksNextTo(temp);
 		result = 1;
 	}
 
 	if (chunk->m_yp == NULL) {
-		Chunk* temp = new Chunk(pos.add({ 0,  1, 0 }));
+		Chunk* temp = new Chunk(pos.add(Vec3i( 0,  1, 0 )));
 		recalcChunksNextTo(temp);
 		result = 1;
 	}
 
 	if (chunk->m_zn == NULL) {
-		Chunk* temp = new Chunk(pos.add({ 0, 0, -1 }));
+		Chunk* temp = new Chunk(pos.add(Vec3i( 0, 0, -1 )));
 		recalcChunksNextTo(temp);
 		result = 1;
 	}
 
 	if (chunk->m_zp == NULL) {
-		Chunk* temp = new Chunk(pos.add({ 0, 0,  1 }));
+		Chunk* temp = new Chunk(pos.add(Vec3i( 0, 0,  1 )));
 		recalcChunksNextTo(temp);
 		result = 1;
 	}
@@ -127,7 +131,11 @@ static int addNext(Chunk* chunk, Vec3i pos) {
 	return result;
 }
 
-static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkThreadFreeInfo* freeInfo) {
+void chunkThreadRun() {
+	GLFWwindow* window = gg_window;
+	VulkanRenderContext* vrc = gg_vrc;
+	ChunkThreadFreeInfo* freeInfo = gg_freeInfo;
+	
 	Chunk** closeChunks = new Chunk*[CHUNK_NUM];
 
 	for (int i = 0; i < CHUNK_NUM; i++) {
@@ -163,10 +171,10 @@ static void chunkThreadRun(GLFWwindow* window, VulkanRenderContext* vrc, ChunkTh
 	vkGetDeviceQueue(vrc->device->device, vrc->device->queueIdx, 1, &transferQueue);
 
 	bool nmc = false;
-	Vec3i prevPlayerPos = {-100, -100, -100};
+	Vec3i prevPlayerPos = Vec3i(-100, -100, -100);
 
 	while (!glfwWindowShouldClose(window)) {
-		Vec3i playerPos = { (int)floor(Camera::pos.x / 16.0f), (int)floor(Camera::pos.y / 16.0f), (int)floor(Camera::pos.z / 16.0f) };
+		Vec3i playerPos = Vec3i( (int)floor(Camera::pos.x / 16.0f), (int)floor(Camera::pos.y / 16.0f), (int)floor(Camera::pos.z / 16.0f) );
 
 		bool moved = false;
 
@@ -889,8 +897,12 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vul
 	dataNode->len = 0;
 	dataNode->offset = 0;
 	dataNode->data = NULL;
+	
+	gg_window = window;
+	gg_vrc = renderContext;
+	gg_freeInfo = freeInfo;
 
-	chunkThread = new std::thread(chunkThreadRun, window, renderContext, freeInfo);
+	chunkThread = new std::thread(chunkThreadRun);
 }
 
 void Chunk::destroy(VLKDevice* device) {
@@ -930,7 +942,7 @@ void Chunk::render(VLKDevice* device, VLKSwapchain* swapChain) {
 	if (model != NULL) {
 		VkViewport viewport = { 0, 0, swapChain->width * 2, swapChain->height * 2, 0, 1 };
 		VkRect2D scissor = { 0, 0, swapChain->width * 2, swapChain->height * 2 };
-		VkDeviceSize offsets = {};
+		VkDeviceSize offsets = 0;
 		
 		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
 		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
@@ -965,8 +977,8 @@ inline float interpolateCubeValue(float val0, float val3, uint8_t rem) {
 }
 
 Chunk::Chunk(Vec3i a_pos) {
-	pos = { a_pos.x, a_pos.y, a_pos.z };
-	m_cubePos = { a_pos.x * 16, a_pos.y * 16, a_pos.z * 16 };
+	pos = Vec3i(a_pos.x, a_pos.y, a_pos.z);
+	m_cubePos = Vec3i(a_pos.x * 16, a_pos.y * 16, a_pos.z * 16);
 
 	cubes = new uint16_t[16 * 16 * 16];
 
@@ -1141,7 +1153,7 @@ Chunk::Chunk(Vec3i a_pos) {
 
 	m_air = false;
 
-	Vec3i cp = {(int)pos.x,(int)pos.y, (int)pos.z};
+	Vec3i cp = Vec3i((int)pos.x,(int)pos.y, (int)pos.z);
 
 	putChunkAt(this, cp);
 
@@ -1149,12 +1161,12 @@ Chunk::Chunk(Vec3i a_pos) {
 }
 
 void Chunk::findChunks() {
-	m_xn = getChunkAt(pos.add({ -1, 0, 0 }));
-	m_xp = getChunkAt(pos.add({  1, 0, 0 }));
-	m_yn = getChunkAt(pos.add({ 0, -1, 0 }));
-	m_yp = getChunkAt(pos.add({ 0,  1, 0 }));
-	m_zn = getChunkAt(pos.add({ 0, 0, -1 }));
-	m_zp = getChunkAt(pos.add({ 0, 0,  1 }));
+	m_xn = getChunkAt(pos.add(Vec3i( -1, 0, 0 )));
+	m_xp = getChunkAt(pos.add(Vec3i(  1, 0, 0 )));
+	m_yn = getChunkAt(pos.add(Vec3i( 0, -1, 0 )));
+	m_yp = getChunkAt(pos.add(Vec3i( 0,  1, 0 )));
+	m_zn = getChunkAt(pos.add(Vec3i( 0, 0, -1 )));
+	m_zp = getChunkAt(pos.add(Vec3i( 0, 0,  1 )));
 }
 
 void Chunk::recalcqrid() {
