@@ -167,8 +167,8 @@ void chunkThreadRun() {
 	VLKCheck(vkAllocateCommandBuffers(vrc->device->device, &transferCommandBufferAllocateInfo, &transferCmdBuffer), 
 		"Failed to allocate command buffer");
 
-	VkQueue transferQueue;
-	vkGetDeviceQueue(vrc->device->device, vrc->device->queueIdx, 1, &transferQueue);
+	VkQueue transferQueue = vrc->device->queue;
+	//vkGetDeviceQueue(vrc->device->device, vrc->device->queueIdx, 1, &transferQueue);
 
 	bool nmc = false;
 	Vec3i prevPlayerPos = Vec3i(-100, -100, -100);
