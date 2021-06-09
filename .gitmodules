@@ -1,0 +1,3 @@
+[submodule "VKL"]
+	path = VKL
+	url = https://github.com/sharhar/VKL.git
