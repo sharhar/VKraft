@@ -63,4 +63,5 @@ option(GLFW_BUILD_TESTS "Build the GLFW test programs" OFF)
 option(GLFW_BUILD_DOCS "Build the GLFW documentation" OFF)
 
 add_subdirectory("${GLFW_SOURCE_DIR}")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/VKL")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/src")
