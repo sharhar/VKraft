@@ -18,4 +18,5 @@ else()
 	file(COPY "${CMAKE_SOURCE_DIR}/src/arial.ttf" DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 endif()
 
+target_link_libraries (VKraft LINK_PUBLIC VKL)
 target_link_libraries (VKraft glfw ${GLFW_LIBRARIES})

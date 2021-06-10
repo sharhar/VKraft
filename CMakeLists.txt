@@ -56,6 +56,7 @@ endif()
 include_directories(
 	"${GLFW_SOURCE_DIR}/include"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include"
+	"${CMAKE_CURRENT_SOURCE_DIR}/VKL/include"
 )
 
 option(GLFW_BUILD_EXAMPLES "Build the GLFW example programs" OFF)

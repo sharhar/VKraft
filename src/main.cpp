@@ -5,55 +5,9 @@
 #include <thread>
 #include "lodepng.h"
 
-int main() {
-	glfwInit();
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	GLFWwindow* window = glfwCreateWindow(1280, 720, "VKraft", NULL, NULL);
-
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	glfwSetWindowFocusCallback(window, window_focus_callback);
-	glfwSetMouseButtonCallback(window, mouse_button_callback);
-
-	//VLKContext* context = vlkCreateContext();
-	//VLKDevice* device = vlkCreateRenderDevice(context, window, 2);
-	//VLKSwapchain* swapChain = vlkCreateSwapchain(device, window, false);
-
-	VkBool32 debug = 0;
-
-#ifdef _DEBUG
-	debug = 1;
-#endif
-
-	uint32_t extensionCountGLFW = 0;
-	char** extensionsGLFW = (char**)glfwGetRequiredInstanceExtensions(&extensionCountGLFW);
-
-	VKLInstance* instance;
-	vklCreateInstance(&instance, NULL, extensionsGLFW[1], glfwGetInstanceProcAddress, debug);
-
-	VKLSurface* surface = (VKLSurface*) malloc(sizeof(VKLSurface));
-	//vklCreateGLFWSurface(instance, &surface, window);
-	glfwCreateWindowSurface(instance->instance, window, NULL, &surface->surface);
-
-	surface->width = 1280;
-	surface->height = 720;
-
-	VKLDevice* device;
-	VKLDeviceGraphicsContext** deviceContexts;
-	vklCreateDevice(instance, &device, &surface, 1, &deviceContexts, 0, NULL);
-
-	VKLDeviceGraphicsContext* devCon = deviceContexts[0];
-
-	VKLSwapChain* swapChain;
-	VKLFrameBuffer* backBuffer;
-	vklCreateSwapChain(devCon, &swapChain, VK_TRUE);
-	vklGetBackBuffer(swapChain, &backBuffer);
-	
-	CubeUniformBuffer uniformBufferData;
-	memcpy(uniformBufferData.proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
-
+void createCubeShader(VKLDevice* device, VKLShader** pShader) {
 	char* shaderPaths[2];
-	shaderPaths[0] = "res/cube-vert.spv"; 
+	shaderPaths[0] = "res/cube-vert.spv";
 	shaderPaths[1] = "res/cube-frag.spv";
 
 	VkShaderStageFlagBits stages[2];
@@ -87,9 +41,99 @@ int main() {
 	shaderCreateInfo.vertexInputAttributesCount = 2;
 	shaderCreateInfo.vertexInputAttributeOffsets = offsets;
 	shaderCreateInfo.vertexInputAttributeFormats = formats;
+	
+	vklCreateShader(device, pShader, &shaderCreateInfo);
+}
+
+void createBGShaderAndPipeline(VKLDevice* device, VKLShader** pShader, VKLPipeline** pPipeline, VKLSwapChain* swapChain) {
+	char* shaderPaths[2];
+	shaderPaths[0] = "res/bg-vert.spv";
+	shaderPaths[1] = "res/bg-frag.spv";
+
+	VkShaderStageFlagBits stages[2];
+	stages[0] = VK_SHADER_STAGE_VERTEX_BIT;
+	stages[1] = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	size_t offsets[2] = { 0, sizeof(float) * 2 };
+	VkFormat formats[2] = { VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32_SFLOAT };
+
+	VkDescriptorSetLayoutBinding bindings[1];
+	bindings[0].binding = 0;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[0].descriptorCount = 1;
+	bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	bindings[0].pImmutableSamplers = NULL;
+
+	VKLShaderCreateInfo shaderCreateInfo;
+	memset(&shaderCreateInfo, 0, sizeof(VKLShaderCreateInfo));
+	shaderCreateInfo.shaderPaths = shaderPaths;
+	shaderCreateInfo.shaderStages = stages;
+	shaderCreateInfo.shaderCount = 2;
+	shaderCreateInfo.bindings = bindings;
+	shaderCreateInfo.bindingsCount = 1;
+	shaderCreateInfo.vertexInputAttributeStride = sizeof(float) * 4;
+	shaderCreateInfo.vertexInputAttributesCount = 2;
+	shaderCreateInfo.vertexInputAttributeOffsets = offsets;
+	shaderCreateInfo.vertexInputAttributeFormats = formats;
+	
+	vklCreateShader(device, pShader, &shaderCreateInfo);
+	
+	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
+	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
+	pipelineCreateInfo.shader = *pShader;
+	pipelineCreateInfo.renderPass = swapChain->backBuffer->renderPass;
+	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	pipelineCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	pipelineCreateInfo.extent.width = swapChain->width;
+	pipelineCreateInfo.extent.height = swapChain->height;
+
+	vklCreateGraphicsPipeline(device, pPipeline, &pipelineCreateInfo);
+}
+
+int main() {
+	glfwInit();
+
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	GLFWwindow* window = glfwCreateWindow(1280, 720, "VKraft", NULL, NULL);
+
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetWindowFocusCallback(window, window_focus_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
+
+	VkBool32 debug = 0;
+
+#ifdef _DEBUG
+	debug = 1;
+#endif
+
+	uint32_t extensionCountGLFW = 0;
+	char** extensionsGLFW = (char**)glfwGetRequiredInstanceExtensions(&extensionCountGLFW);
+
+	VKLInstance* instance;
+	vklCreateInstance(&instance, NULL, extensionsGLFW[1], glfwGetInstanceProcAddress, debug);
+
+	VKLSurface* surface = (VKLSurface*) malloc(sizeof(VKLSurface));
+	glfwCreateWindowSurface(instance->instance, window, NULL, &surface->surface);
+
+	surface->width = 1280;
+	surface->height = 720;
+
+	VKLDevice* device;
+	VKLDeviceGraphicsContext** deviceContexts;
+	vklCreateDevice(instance, &device, &surface, 1, &deviceContexts, 0, NULL);
+
+	VKLDeviceGraphicsContext* devCon = deviceContexts[0];
+
+	VKLSwapChain* swapChain;
+	VKLFrameBuffer* backBuffer;
+	vklCreateSwapChain(devCon, &swapChain, VK_TRUE);
+	vklGetBackBuffer(swapChain, &backBuffer);
+	
+	CubeUniformBuffer uniformBufferData;
+	memcpy(uniformBufferData.proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
 
 	VKLShader* shader;
-	vklCreateShader(device, &shader, &shaderCreateInfo);
+	createCubeShader(device, &shader);
 
 	VKLUniformObject* uniform;
 	vklCreateUniformObject(device, &uniform, shader);
@@ -167,7 +211,6 @@ int main() {
 	vklSetUniformTexture(device, uniform, texture, 1);
 
 	//vklSetClearColor(backBuffer, 0.25f, 0.45f, 1.0f, 1.0f);
-
 	
 	float backGroundVerts[] = {
 		-1, -1, 0, 0,
@@ -176,12 +219,19 @@ int main() {
 		-1,  1, 0, 1,
 		 1, -1, 1, 0,
 		 1,  1, 1, 1 };
+	
+	VKLBuffer* bgModel;
+	vklCreateStagedBuffer(devCon, &bgModel, backGroundVerts, 6 * 4 * sizeof(float), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	
+	VKLShader* bgShader;
+	VKLPipeline* bgPipeline;
+	createBGShaderAndPipeline(device, &bgShader, &bgPipeline, swapChain);
 
-	/*
-	VLKModel* bgModel = vlkCreateModel(device, backGroundVerts, 6 * 4 * sizeof(float));
-	VLKShader* bgShader = createBGShader(device, "res/bg-vert.spv", "res/bg-frag.spv");
-	VLKPipeline* bgPipeline = createBGPipeline(device, swapChain, bgShader);
+	VKLUniformObject* bgUniform;
+	vklCreateUniformObject(device, &bgUniform, bgShader);
 
+	vklSetUniformFramebuffer(device, bgUniform, frameBuffer, 0);
+	
 	float cursorVerts[] = {
 		-25, -2.5f,
 		 25, -2.5f,
@@ -212,23 +262,18 @@ int main() {
 
 		640, 360
 	};
+	
+	VKLBuffer* cursorModel;
+	vklCreateStagedBuffer(devCon, &cursorModel, cursorVerts, 12 * 2 * sizeof(float), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	
+	
+	/*
 
-	VLKModel* cursorModel = vlkCreateModel(device, cursorVerts, 12 * 2 * sizeof(float));
 	VLKShader* cursorShader = createCursorShader(device, "res/cursor-vert.spv", "res/cursor-frag.spv", cursorUniform, sizeof(float) * 18);
 	VLKPipeline* cursorPipeline = createCursorPipeline(device, swapChain, cursorShader);
 	VLKTexture* cursorTexture = createCursorTexture(device, "res/Cursor.png");
 
 	VkWriteDescriptorSet writeDescriptors[2];
-	writeDescriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writeDescriptors[0].pNext = NULL;
-	writeDescriptors[0].dstSet = bgShader->descriptorSet;
-	writeDescriptors[0].dstBinding = 0;
-	writeDescriptors[0].dstArrayElement = 0;
-	writeDescriptors[0].descriptorCount = 1;
-	writeDescriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	writeDescriptors[0].pImageInfo = &frameBuffer->descriptorImageInfo;
-	writeDescriptors[0].pBufferInfo = NULL;
-	writeDescriptors[0].pTexelBufferView = NULL;
 
 	writeDescriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	writeDescriptors[1].pNext = NULL;
@@ -247,6 +292,8 @@ int main() {
 	VLKPipeline* fontPipeline = createFontPipeline(device, swapChain, fontShader);
 	VLKTexture* font = vlkCreateTexture(device, "res/font.png", VK_FILTER_LINEAR);
 	vlkBindTexture(device, fontShader, font);
+	 
+	 */
 
 	double ct = glfwGetTime();
 	double dt = ct;
@@ -261,8 +308,6 @@ int main() {
 	glfwGetWindowSize(window, &width, &height);
 	pwidth = width;
 	pheight = height;
-
-	*/
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -381,34 +426,27 @@ int main() {
 		vlkDestroyModel(device, fontModel);
 		*/
 	}
+	vklDestroyPipeline(device, pipeline);
+	vklDestroyPipeline(device, bgPipeline);
+	
+	vklDestroyTexture(device, texture);
+	
+	vklDestroyFrameBuffer(device, frameBuffer);
+	
+	vklDestroyBuffer(device, bgModel);
+	vklDestroyBuffer(device, uniformBuffer);
+	vklDestroyBuffer(device, cursorModel)
+	
+	vklDestroyUniformObject(device, bgUniform);
+	vklDestroyUniformObject(device, uniform);
 
-	/*
-	destroyFontPipeline(device, fontPipeline);
-	vlkDestroyShader(device, fontShader);
-	vlkDestroyTexture(device, font);
-
-	destroyCursorTexture(device, cursorTexture);
-	destroyCursorPipeline(device, cursorPipeline);
-	destroyCursorShader(device, cursorShader);
-	vlkDestroyModel(device, cursorModel);
-
-	destroyBGPipeline(device, bgPipeline);
-	destroyBGShader(device, bgShader);
-	vlkDestroyModel(device,bgModel);
-
-	Chunk::destroy(device);
-	Camera::destroy(device);
-
-	vlkDestroyFramebuffer(device, frameBuffer);
-	vlkDestroyTexture(device, texture);
-	vlkDestroyPipeline(device, pipeline);
-	vlkDestroyShader(device, shader);
-	vlkDestroySwapchain(device, swapChain);
-	vlkDestroyRenderDevice(context, device);
-	vlkDestroyContext(context);
-
-
-*/
+	vklDestroyShader(device, bgShader);
+	vklDestroyShader(device, shader);
+	
+	vklDestroySwapChain(swapChain);
+	vklDestroyDevice(device);
+	vklDestroySurface(instance, surface);
+	vklDestroyInstance(instance);
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
