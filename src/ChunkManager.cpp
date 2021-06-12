@@ -53,6 +53,8 @@ void ChunkManager::init(VKLDevice* device, int width, int height) {
 	bindings[1].descriptorCount = 1;
 	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	bindings[1].pImmutableSamplers = NULL;
+	
+	uint32_t vertexInputAttributeBindings[] = {0, 0};
 
 	VKLShaderCreateInfo shaderCreateInfo;
 	memset(&shaderCreateInfo, 0, sizeof(VKLShaderCreateInfo));
@@ -61,10 +63,16 @@ void ChunkManager::init(VKLDevice* device, int width, int height) {
 	shaderCreateInfo.shaderCount = 2;
 	shaderCreateInfo.bindings = bindings;
 	shaderCreateInfo.bindingsCount = 2;
-	shaderCreateInfo.vertexInputAttributeStride = sizeof(float) * 6;
 	shaderCreateInfo.vertexInputAttributesCount = 2;
 	shaderCreateInfo.vertexInputAttributeOffsets = offsets;
 	shaderCreateInfo.vertexInputAttributeFormats = formats;
+	shaderCreateInfo.vertexInputAttributeBindings = vertexInputAttributeBindings;
+	
+	VkVertexInputRate vertInputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	size_t stride = sizeof(float) * 6;
+	shaderCreateInfo.vertexBindingsCount = 1;
+	shaderCreateInfo.vertexBindingInputRates = &vertInputRate;
+	shaderCreateInfo.vertexBindingStrides = &stride;
 	
 	vklCreateShader(device, &m_shader, &shaderCreateInfo);
 	
@@ -91,7 +99,7 @@ void ChunkManager::init(VKLDevice* device, int width, int height) {
 	
 	if (error != 0) {
 		std::cout << "Error loading image: " << error << "\n";
-		return NULL;
+		return;
 	}
 	
 	VKLTextureCreateInfo textureCreateInfo;

@@ -943,7 +943,7 @@ void Chunk::render(VLKDevice* device, VLKSwapchain* swapChain) {
 
 	if (model != NULL) {
 		VkViewport viewport = { 0, 0, swapChain->width * 2, swapChain->height * 2, 0, 1 };
-		VkRect2D scissor = { 0, 0, swapChain->width * 2, swapChain->height * 2 };
+		VkRect2D scissor = { {0, 0}, {swapChain->width * 2, swapChain->height * 2} };
 		VkDeviceSize offsets = 0;
 		
 		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);

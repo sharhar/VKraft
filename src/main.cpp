@@ -1,8 +1,9 @@
 #include <VKL/VKL.h>
+#include <GLFW/glfw3.h>
 
-#include "VLKUtils.h"
-#include "Cube.h"
-#include "Camera.h"
+//#include "VLKUtils.h"
+//#include "Cube.h"
+//#include "Camera.h"
 
 #include "BG.h"
 #include "ChunkManager.h"
@@ -70,7 +71,6 @@ int main() {
 	FontEngine::init(device, swapChain);
 
 	//Camera::init(window, &uniformBuffer, context);
-	//Chunk::init(1337, window, &renderContext);
 	
 	double ct = glfwGetTime();
 	double dt = ct;
@@ -91,6 +91,9 @@ int main() {
 	
 	vklSetClearColor(ChunkManager::getFramebuffer(), 0.25f, 0.45f, 1.0f, 1.0f );
 	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
+	
+	FontEngine::setCoords(10, 10, 16);
+	FontEngine::setText("FPS:0");
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -119,7 +122,7 @@ int main() {
 
 		if (accDT > 1) {
 			fps = frames;
-			printf("frames: %d\n", frames);
+			FontEngine::setText("FPS:" + std::to_string(fps));
 			frames = 0;
 			accDT = 0;
 		}
@@ -140,8 +143,7 @@ int main() {
 		
 		BG::render(cmdBuffer);
 		Cursor::render(cmdBuffer);
-		
-		//VLKModel* fontModel = drawText(device, std::string("FPS:") + std::to_string(fps), 10, 10, 16, fontShader, fontPipeline);
+		FontEngine::render(cmdBuffer);
 		
 		vklEndRender(device, backBuffer, cmdBuffer);
 		
@@ -150,8 +152,6 @@ int main() {
 		vklExecuteCommandBuffer(devCon, cmdBuffer);
 
 		vklPresent(swapChain);
-		
-		//vlkDestroyModel(device, fontModel);
 	}
 	
 	BG::destroy();

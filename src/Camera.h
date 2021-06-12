@@ -2,6 +2,7 @@
 
 #include "VLKUtils.h"
 #include "Utils.h"
+#include "Cube.h"
 #include <thread>
 
 typedef struct VLKComputeContext {

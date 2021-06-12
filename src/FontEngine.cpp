@@ -10,6 +10,11 @@
 #include "lodepng.h"
 #include <iostream>
 
+#define MAX_CHAR_NUM 16
+
+int FontEngine::m_charNum = 0;
+VKLBuffer* FontEngine::m_vertBuffer = NULL;
+VKLBuffer* FontEngine::m_instanceBuffer = NULL;
 VKLBuffer* FontEngine::m_uniformBuffer = NULL;
 VKLDevice* FontEngine::m_device = NULL;
 VKLShader* FontEngine::m_shader = NULL;
@@ -20,7 +25,21 @@ VKLPipeline* FontEngine::m_pipeline = NULL;
 void FontEngine::init(VKLDevice *device, VKLSwapChain *swapChain) {
 	m_device = device;
 	
-	vklCreateBuffer(device, &m_uniformBuffer, VK_FALSE, sizeof(float) * 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	float verts[24] = {
+		0, 0, 0, 0,
+		0, 1, 0, 1,
+		1, 0, 1, 0,
+		
+		0, 1, 0, 1,
+		1, 0, 1, 0,
+		1, 1, 1, 1
+	};
+	
+	vklCreateStagedBuffer(device->deviceGraphicsContexts[0], &m_vertBuffer, verts, 6 * 4 * sizeof(float), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	
+	vklCreateBuffer(device, &m_uniformBuffer, VK_FALSE, sizeof(float) * 19, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	
+	vklCreateBuffer(device, &m_instanceBuffer, VK_FALSE, sizeof(float) * MAX_CHAR_NUM, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	
 	char* shaderPaths[2];
 	shaderPaths[0] = "res/font-vert.spv";
@@ -30,8 +49,8 @@ void FontEngine::init(VKLDevice *device, VKLSwapChain *swapChain) {
 	stages[0] = VK_SHADER_STAGE_VERTEX_BIT;
 	stages[1] = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	size_t offsets[2] = { 0, sizeof(float) * 2 };
-	VkFormat formats[2] = { VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32_SFLOAT };
+	size_t offsets[3] = { 0, sizeof(float) * 2, 0};
+	VkFormat formats[3] = { VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32_SINT };
 
 	VkDescriptorSetLayoutBinding bindings[2];
 	bindings[0].binding = 0;
@@ -45,6 +64,8 @@ void FontEngine::init(VKLDevice *device, VKLSwapChain *swapChain) {
 	bindings[1].descriptorCount = 1;
 	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	bindings[1].pImmutableSamplers = NULL;
+	
+	uint32_t vertexInputAttributeBindings[3] = {0, 0, 1};
 
 	VKLShaderCreateInfo shaderCreateInfo;
 	memset(&shaderCreateInfo, 0, sizeof(VKLShaderCreateInfo));
@@ -53,10 +74,16 @@ void FontEngine::init(VKLDevice *device, VKLSwapChain *swapChain) {
 	shaderCreateInfo.shaderCount = 2;
 	shaderCreateInfo.bindings = bindings;
 	shaderCreateInfo.bindingsCount = 2;
-	shaderCreateInfo.vertexInputAttributeStride = sizeof(float) * 4;
-	shaderCreateInfo.vertexInputAttributesCount = 2;
+	shaderCreateInfo.vertexInputAttributesCount = 3;
 	shaderCreateInfo.vertexInputAttributeOffsets = offsets;
 	shaderCreateInfo.vertexInputAttributeFormats = formats;
+	shaderCreateInfo.vertexInputAttributeBindings = vertexInputAttributeBindings;
+	
+	VkVertexInputRate vertInputRates[] = {VK_VERTEX_INPUT_RATE_VERTEX, VK_VERTEX_INPUT_RATE_INSTANCE};
+	size_t strides[] = {sizeof(float) * 4, sizeof(float)};
+	shaderCreateInfo.vertexBindingsCount = 2;
+	shaderCreateInfo.vertexBindingInputRates = vertInputRates;
+	shaderCreateInfo.vertexBindingStrides = strides;
 	
 	vklCreateShader(device, &m_shader, &shaderCreateInfo);
 	
@@ -116,7 +143,36 @@ void FontEngine::updateProjection(int width, int height) {
 		-(r + l) / (r - l), -(t + b) / (t - b), -(f + n) / (f - n), 1
 	};
 	
-	vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 16);
+	vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 16, 0);
+}
+
+void FontEngine::render(VkCommandBuffer cmdBuffer) {
+	VkDeviceSize offsets = 0;
+	m_device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipeline);
+	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertBuffer->buffer, &offsets);
+	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instanceBuffer->buffer, &offsets);
+	m_device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipelineLayout, 0, 1, &m_uniform->descriptorSet, 0, NULL);
+	
+	m_device->pvkCmdDraw(cmdBuffer, 6, m_charNum, 0, 0);
+}
+
+void FontEngine::setText(const std::string& str) {
+	int* ids = new int[str.length()];
+	
+	for(int i = 0; i < str.length(); i++) {
+		ids[i] = (int) str[i];
+	}
+	
+	vklWriteToMemory(m_device, m_instanceBuffer->memory, ids, sizeof(int) * str.length(), 0);
+	
+	delete[] ids;
+	
+	m_charNum = str.length();
+}
+
+void FontEngine::setCoords(float xPos, float yPos, float size) {
+	float buff[3] = {xPos, yPos, size};
+	vklWriteToMemory(m_device, m_uniformBuffer->memory, buff, sizeof(float) * 3, sizeof(float) * 16);
 }
 
 void FontEngine::destroy() {

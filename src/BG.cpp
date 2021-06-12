@@ -44,6 +44,8 @@ void BG::init(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* frameb
 	bindings[0].descriptorCount = 1;
 	bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	bindings[0].pImmutableSamplers = NULL;
+	
+	uint32_t vertexInputAttributeBindings[2] = {0, 0};
 
 	VKLShaderCreateInfo shaderCreateInfo;
 	memset(&shaderCreateInfo, 0, sizeof(VKLShaderCreateInfo));
@@ -52,10 +54,16 @@ void BG::init(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* frameb
 	shaderCreateInfo.shaderCount = 2;
 	shaderCreateInfo.bindings = bindings;
 	shaderCreateInfo.bindingsCount = 1;
-	shaderCreateInfo.vertexInputAttributeStride = sizeof(float) * 4;
 	shaderCreateInfo.vertexInputAttributesCount = 2;
 	shaderCreateInfo.vertexInputAttributeOffsets = offsets;
 	shaderCreateInfo.vertexInputAttributeFormats = formats;
+	shaderCreateInfo.vertexInputAttributeBindings = vertexInputAttributeBindings;
+	
+	VkVertexInputRate vertInputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	size_t stride = sizeof(float) * 4;
+	shaderCreateInfo.vertexBindingsCount = 1;
+	shaderCreateInfo.vertexBindingInputRates = &vertInputRate;
+	shaderCreateInfo.vertexBindingStrides = &stride;
 	
 	vklCreateShader(device, &m_shader, &shaderCreateInfo);
 	

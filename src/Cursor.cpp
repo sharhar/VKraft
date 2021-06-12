@@ -57,6 +57,8 @@ void Cursor::init(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* fr
 	bindings[1].descriptorCount = 1;
 	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	bindings[1].pImmutableSamplers = NULL;
+	
+	uint32_t vertexInputAttributeBinding = 0;
 
 	VKLShaderCreateInfo shaderCreateInfo;
 	memset(&shaderCreateInfo, 0, sizeof(VKLShaderCreateInfo));
@@ -65,10 +67,17 @@ void Cursor::init(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* fr
 	shaderCreateInfo.shaderCount = 2;
 	shaderCreateInfo.bindings = bindings;
 	shaderCreateInfo.bindingsCount = 2;
-	shaderCreateInfo.vertexInputAttributeStride = sizeof(float) * 2;
+	//shaderCreateInfo.vertexInputAttributeStride = sizeof(float) * 2;
 	shaderCreateInfo.vertexInputAttributesCount = 1;
 	shaderCreateInfo.vertexInputAttributeOffsets = offsets;
 	shaderCreateInfo.vertexInputAttributeFormats = formats;
+	shaderCreateInfo.vertexInputAttributeBindings = &vertexInputAttributeBinding;
+	
+	VkVertexInputRate vertInputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	size_t stride = sizeof(float) * 2;
+	shaderCreateInfo.vertexBindingsCount = 1;
+	shaderCreateInfo.vertexBindingInputRates = &vertInputRate;
+	shaderCreateInfo.vertexBindingStrides = &stride;
 	
 	vklCreateShader(device, &m_shader, &shaderCreateInfo);
 	
@@ -110,7 +119,7 @@ void Cursor::updateProjection(int width, int height) {
 		width/2, height/2
 	};
 	
-	vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 18);
+	vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 18, 0);
 }
 
 void Cursor::render(VkCommandBuffer cmdBuffer) {
