@@ -5,6 +5,8 @@
 #include <thread>
 #include "lodepng.h"
 
+#include "Cursor.h"
+
 void createCubeShader(VKLDevice* device, VKLShader** pShader) {
 	char* shaderPaths[2];
 	shaderPaths[0] = "res/cube-vert.spv";
@@ -83,7 +85,7 @@ void createBGShaderAndPipeline(VKLDevice* device, VKLShader** pShader, VKLPipeli
 	pipelineCreateInfo.shader = *pShader;
 	pipelineCreateInfo.renderPass = swapChain->backBuffer->renderPass;
 	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	pipelineCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
 	pipelineCreateInfo.extent.width = swapChain->width;
 	pipelineCreateInfo.extent.height = swapChain->height;
 
@@ -151,7 +153,7 @@ int main() {
 	pipelineCreateInfo.shader = shader;
 	pipelineCreateInfo.renderPass = frameBuffer->renderPass;
 	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	pipelineCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
 	pipelineCreateInfo.extent.width = swapChain->width;
 	pipelineCreateInfo.extent.height = swapChain->height;
 
@@ -209,8 +211,6 @@ int main() {
 	vklCreateStagedTexture(devCon, &texture, &textureCreateInfo, imageData.data());
 
 	vklSetUniformTexture(device, uniform, texture, 1);
-
-	//vklSetClearColor(backBuffer, 0.25f, 0.45f, 1.0f, 1.0f);
 	
 	float backGroundVerts[] = {
 		-1, -1, 0, 0,
@@ -232,40 +232,7 @@ int main() {
 
 	vklSetUniformFramebuffer(device, bgUniform, frameBuffer, 0);
 	
-	float cursorVerts[] = {
-		-25, -2.5f,
-		 25, -2.5f,
-		-25,  2.5f,
-		-25,  2.5f,
-		 25, -2.5f,
-		 25,  2.5f,
-
-		-2.5f, -25,
-		 2.5f, -25,
-		-2.5f,  25,
-		-2.5f,  25,
-		 2.5f, -25,
-		 2.5f,  25 };
-
-	float r = swapChain->width;
-	float l = 0;
-	float t = swapChain->height;
-	float b = 0;
-	float f = 1;
-	float n = -1;
-
-	float cursorUniform[] = {
-		2 / (r - l), 0, 0, 0,
-		0, 2 / (t - b), 0, 0,
-		0, 0, -2 / (f - n), 0,
-		-(r + l) / (r - l), -(t + b) / (t - b), -(f + n) / (f - n), 1,
-
-		640, 360
-	};
-	
-	VKLBuffer* cursorModel;
-	vklCreateStagedBuffer(devCon, &cursorModel, cursorVerts, 12 * 2 * sizeof(float), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	
+	Cursor cursor = Cursor(device, swapChain, frameBuffer);
 	
 	/*
 
@@ -308,6 +275,12 @@ int main() {
 	glfwGetWindowSize(window, &width, &height);
 	pwidth = width;
 	pheight = height;
+	
+	VkCommandBuffer cmdBuffer;
+	vklAllocateCommandBuffer(devCon, &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+	
+	vklSetClearColor(frameBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
+	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -316,46 +289,18 @@ int main() {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 
-		/*
+		
 		glfwGetWindowSize(window, &width, &height);
 
 		if (pwidth != width || pheight != height) {
-			vlkRecreateSwapchain(device, &swapChain, false);
-
-			float r2 = swapChain->width;
-			float l2 = 0;
-			float t2 = swapChain->height;
-			float b2 = 0;
-			float f2 = 1;
-			float n2 = -1;
-
-			float aspect = ((float)swapChain->width) / ((float)swapChain->height);
-
-			float cursorUniform2[] = {
-				2 / (r2 - l2), 0, 0, 0,
-				0, 2 / (t2 - b2), 0, 0,
-				0, 0, -2 / (f2 - n2), 0,
-				-(r2 + l2) / (r2 - l2), -(t2 + b2) / (t2 - b2), -(f2 + n2) / (f2 - n2), 1,
-
-				swapChain->width/2, swapChain->height/2
-			};
+			//vlkRecreateSwapchain(device, &swapChain, false);
 			
-			vlkUniforms(device, fontShader, cursorUniform2, sizeof(float) * 16);
-			vlkUniforms(device, cursorShader, cursorUniform2, sizeof(float) * 18);
-
-			memcpy(uniformBuffer.proj, getPerspective(aspect, 90), sizeof(float) * 16);
-
-			vlkDestroyFramebuffer(device, frameBuffer);
-			frameBuffer = vlkCreateFramebuffer(device, swapChain->imageCount, swapChain->width * 2, swapChain->height * 2);
-
-			writeDescriptors[0].pImageInfo = &frameBuffer->descriptorImageInfo;
-			writeDescriptors[1].pImageInfo = &frameBuffer->descriptorImageInfo;
-			
-			vkUpdateDescriptorSets(device->device, 2, writeDescriptors, 0, NULL);
+			cursor.updateProjection(width, height);
 		}
 		
 		pwidth = width;
 		pheight = height;
+		 
 
 		dt = glfwGetTime() - ct;
 		ct = glfwGetTime();
@@ -365,67 +310,55 @@ int main() {
 
 		if (accDT > 1) {
 			fps = frames;
+			printf("frames: %d\n", frames);
 			frames = 0;
 			accDT = 0;
 		}
 		
-		Camera::update(dt);
+		//Camera::update(dt);
 		
-		vlkClear(device, &swapChain);
-
-		vlkStartFramebuffer(device, frameBuffer);
-
+		vklBeginCommandBuffer(device, cmdBuffer);
+		
+		vklBeginRender(device, frameBuffer, cmdBuffer);
+		
 		//Chunk::render(device, swapChain);
-	
-		vlkEndFramebuffer(device, frameBuffer);
 		
-		VkClearValue clearValue[] = {
-			{ 0.25f, 0.45f, 1.0f, 1.0f },
-			{ 1.0, 0.0 } };
-
-		VkRenderPassBeginInfo renderPassBeginInfo = {};
-		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBeginInfo.renderPass = swapChain->renderPass;
-		renderPassBeginInfo.framebuffer = swapChain->frameBuffers[swapChain->nextImageIdx];
-		renderPassBeginInfo.renderArea.offset.x = 0;
-		renderPassBeginInfo.renderArea.offset.y = 0;
-		renderPassBeginInfo.renderArea.extent.width = swapChain->width;
-		renderPassBeginInfo.renderArea.extent.height = swapChain->height;
-		renderPassBeginInfo.clearValueCount = 2;
-		renderPassBeginInfo.pClearValues = clearValue;
-		vkCmdBeginRenderPass(device->drawCmdBuffer, &renderPassBeginInfo,
-			VK_SUBPASS_CONTENTS_INLINE);
-
+		vklEndRender(device, frameBuffer, cmdBuffer);
+		
+		vklBeginRender(device, backBuffer, cmdBuffer);
+		
 		VkViewport viewport = { 0, 0, swapChain->width, swapChain->height, 0, 1 };
 		VkRect2D scissor = { 0, 0, swapChain->width, swapChain->height };
-		VkDeviceSize offsets =0;
-
-		vkCmdSetViewport(device->drawCmdBuffer, 0, 1, &viewport);
-		vkCmdSetScissor(device->drawCmdBuffer, 0, 1, &scissor);
-
-		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, bgPipeline->pipeline);
-		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &bgModel->vertexInputBuffer, &offsets);
-		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			bgPipeline->pipelineLayout, 0, 1, &bgShader->descriptorSet, 0, NULL);
-
-		vkCmdDraw(device->drawCmdBuffer, 6, 1, 0, 0);
-
-		vkCmdBindPipeline(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, cursorPipeline->pipeline);
-		vkCmdBindVertexBuffers(device->drawCmdBuffer, 0, 1, &cursorModel->vertexInputBuffer, &offsets);
-		vkCmdBindDescriptorSets(device->drawCmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			cursorPipeline->pipelineLayout, 0, 1, &cursorShader->descriptorSet, 0, NULL);
-
-		vkCmdDraw(device->drawCmdBuffer, 12, 1, 0, 0);
 		
-		VLKModel* fontModel = drawText(device, std::string("FPS:") + std::to_string(fps), 10, 10, 16, fontShader, fontPipeline);
+		device->pvkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+		device->pvkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+		
+		VkDeviceSize vertexOffsets = 0;
+		device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, bgPipeline->pipeline);
+		device->pvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &bgModel->buffer, &vertexOffsets);
 
-		vkCmdEndRenderPass(device->drawCmdBuffer);
+		device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			bgPipeline->pipelineLayout, 0, 1, &bgUniform->descriptorSet, 0, NULL);
 
-		vlkSwap(device, &swapChain);
+		device->pvkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+		
+		cursor.render(cmdBuffer);
+		
+		//VLKModel* fontModel = drawText(device, std::string("FPS:") + std::to_string(fps), 10, 10, 16, fontShader, fontPipeline);
+		
+		vklEndRender(device, backBuffer, cmdBuffer);
+		
+		vklEndCommandBuffer(device, cmdBuffer);
+		
+		vklExecuteCommandBuffer(devCon, cmdBuffer);
 
-		vlkDestroyModel(device, fontModel);
-		*/
+		vklPresent(swapChain);
+		
+		//vlkDestroyModel(device, fontModel);
 	}
+	
+	cursor.destroy();
+	
 	vklDestroyPipeline(device, pipeline);
 	vklDestroyPipeline(device, bgPipeline);
 	
@@ -435,7 +368,6 @@ int main() {
 	
 	vklDestroyBuffer(device, bgModel);
 	vklDestroyBuffer(device, uniformBuffer);
-	vklDestroyBuffer(device, cursorModel)
 	
 	vklDestroyUniformObject(device, bgUniform);
 	vklDestroyUniformObject(device, uniform);
@@ -450,8 +382,6 @@ int main() {
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
-	
-	//system("PAUSE");
 
 	return 0;
 }
