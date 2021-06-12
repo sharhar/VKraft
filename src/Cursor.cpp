@@ -7,7 +7,14 @@
 
 #include "Cursor.h"
 
-Cursor::Cursor(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* framebuffer) {
+VKLDevice* Cursor::m_device = NULL;
+VKLBuffer* Cursor::m_vertBuffer = NULL;
+VKLBuffer* Cursor::m_uniformBuffer = NULL;
+VKLShader* Cursor::m_shader = NULL;
+VKLUniformObject* Cursor::m_uniform = NULL;
+VKLPipeline* Cursor::m_pipeline = NULL;
+
+void Cursor::init(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* framebuffer) {
 	m_device = device;
 	
 	float cursorVerts[] = {
@@ -118,6 +125,9 @@ void Cursor::render(VkCommandBuffer cmdBuffer) {
 }
 
 void Cursor::destroy() {
+	vklDestroyPipeline(m_device, m_pipeline);
+	vklDestroyUniformObject(m_device, m_uniform);
+	vklDestroyShader(m_device, m_shader);
 	vklDestroyBuffer(m_device, m_vertBuffer);
-	
+	vklDestroyBuffer(m_device, m_uniformBuffer);
 }

@@ -1,4 +1,6 @@
-#include "master.h"
+#include "VLKUtils.h"
+#include "Cube.h"
+#include "Camera.h"
 #include <iostream>
 #include <assert.h>
 
