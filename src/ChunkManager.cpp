@@ -131,6 +131,10 @@ VKLFrameBuffer* ChunkManager::getFramebuffer() {
 	return m_framebuffer;
 }
 
+ChunkUniform* ChunkManager::getUniform() {
+	return m_chunkUniformBufferData;
+}
+
 void ChunkManager::destroy() {
 	m_thread->join();
 	

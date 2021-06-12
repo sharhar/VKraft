@@ -1,6 +1,6 @@
 #include "VLKUtils.h"
 #include "Cube.h"
-#include "Camera.h"
+#include "Camera_old.h"
 #include <iostream>
 #include <assert.h>
 
@@ -176,7 +176,7 @@ void chunkThreadRun() {
 	Vec3i prevPlayerPos = Vec3i(-100, -100, -100);
 
 	while (!glfwWindowShouldClose(window)) {
-		Vec3i playerPos = Vec3i( (int)floor(Camera::pos.x / 16.0f), (int)floor(Camera::pos.y / 16.0f), (int)floor(Camera::pos.z / 16.0f) );
+		Vec3i playerPos = Vec3i( (int)floor(Camera_old::pos.x / 16.0f), (int)floor(Camera_old::pos.y / 16.0f), (int)floor(Camera_old::pos.z / 16.0f) );
 
 		bool moved = false;
 

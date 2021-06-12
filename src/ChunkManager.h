@@ -35,6 +35,7 @@ public:
 	static void init(VKLDevice* device, int width, int height);
 	static void render(VkCommandBuffer cmdBuffer);
 	static VKLFrameBuffer* getFramebuffer();
+	static ChunkUniform* getUniform();
 	static void destroy();
 private:
 	static void internalThreadFunction();

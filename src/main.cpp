@@ -6,6 +6,7 @@
 //#include "Camera.h"
 
 #include "BG.h"
+#include "Camera.h"
 #include "ChunkManager.h"
 #include "Cursor.h"
 #include "FontEngine.h"
@@ -55,22 +56,24 @@ int main() {
 
 	VKLDevice* device;
 	VKLDeviceGraphicsContext** deviceContexts;
-	vklCreateDevice(instance, &device, &surface, 1, &deviceContexts, 0, NULL);
-
-	VKLDeviceGraphicsContext* devCon = deviceContexts[0];
+	VKLDeviceComputeContext** deviceComps;
+	vklCreateDevice(instance, &device, &surface, 1, &deviceContexts, 1, &deviceComps);
 
 	VKLSwapChain* swapChain;
 	VKLFrameBuffer* backBuffer;
-	vklCreateSwapChain(devCon, &swapChain, VK_TRUE);
+	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_TRUE);
 	vklGetBackBuffer(swapChain, &backBuffer);
 	
 	ChunkManager::init(device, swapChain->width * 2, swapChain->height * 2);
+	Camera::init(window);
 	
 	BG::init(device, swapChain, ChunkManager::getFramebuffer());
 	Cursor::init(device, swapChain, ChunkManager::getFramebuffer());
 	FontEngine::init(device, swapChain);
 
 	//Camera::init(window, &uniformBuffer, context);
+	
+	
 	
 	double ct = glfwGetTime();
 	double dt = ct;
@@ -87,7 +90,7 @@ int main() {
 	pheight = height;
 	
 	VkCommandBuffer cmdBuffer;
-	vklAllocateCommandBuffer(devCon, &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+	vklAllocateCommandBuffer(device->deviceGraphicsContexts[0], &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 	
 	vklSetClearColor(ChunkManager::getFramebuffer(), 0.25f, 0.45f, 1.0f, 1.0f );
 	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
@@ -127,7 +130,7 @@ int main() {
 			accDT = 0;
 		}
 		
-		//Camera::update(dt);
+		Camera::update(dt);
 		
 		vklBeginCommandBuffer(device, cmdBuffer);
 		
@@ -149,7 +152,7 @@ int main() {
 		
 		vklEndCommandBuffer(device, cmdBuffer);
 		
-		vklExecuteCommandBuffer(devCon, cmdBuffer);
+		vklExecuteCommandBuffer(device->deviceGraphicsContexts[0], cmdBuffer);
 
 		vklPresent(swapChain);
 	}
@@ -158,6 +161,7 @@ int main() {
 	Cursor::destroy();
 	FontEngine::destroy();
 	ChunkManager::destroy();
+	Camera::destroy();
 	
 	vklDestroySwapChain(swapChain);
 	vklDestroyDevice(device);
