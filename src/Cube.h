@@ -35,8 +35,8 @@ typedef struct ChunkModelInfo {
 
 typedef struct VulkanRenderContext {
 	VLKDevice* device;
-	VLKSwapchain* swapChain;
-	VLKFramebuffer* framebuffer;
+	//VLKSwapchain* swapChain;
+	//VLKFramebuffer* framebuffer;
 	VLKShader* shader;
 	VLKPipeline* pipeline;
 	CubeUniformBuffer* uniformBuffer;

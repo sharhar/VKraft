@@ -4,14 +4,10 @@
 #include "Cube.h"
 #include "Camera.h"
 
-#include <chrono>
-#include <thread>
-
-
 #include "BG.h"
+#include "ChunkManager.h"
 #include "Cursor.h"
-
-#include "lodepng.h"
+#include "FontEngine.h"
 
 void window_focus_callback(GLFWwindow* window, int focused) {
 	if (focused) {
@@ -67,20 +63,15 @@ int main() {
 	vklCreateSwapChain(devCon, &swapChain, VK_TRUE);
 	vklGetBackBuffer(swapChain, &backBuffer);
 	
-	VKLFrameBuffer* frameBuffer;
-	vklCreateFrameBuffer(devCon, &frameBuffer, swapChain->width * 2, swapChain->height * 2, VK_FORMAT_R8G8B8A8_UNORM, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	ChunkManager::init(device, swapChain->width * 2, swapChain->height * 2);
 	
-	
-	BG::init(device, swapChain, frameBuffer);
-	Cursor::init(device, swapChain, frameBuffer);
-	
-	/*
-	VLKShader* fontShader = vlkCreateShader(device, "res/font-vert.spv", "res/font-frag.spv", cursorUniform, 16 * sizeof(float));
-	VLKPipeline* fontPipeline = createFontPipeline(device, swapChain, fontShader);
-	VLKTexture* font = vlkCreateTexture(device, "res/font.png", VK_FILTER_LINEAR);
-	vlkBindTexture(device, fontShader, font);
-	 */
+	BG::init(device, swapChain, ChunkManager::getFramebuffer());
+	Cursor::init(device, swapChain, ChunkManager::getFramebuffer());
+	FontEngine::init(device, swapChain);
 
+	//Camera::init(window, &uniformBuffer, context);
+	//Chunk::init(1337, window, &renderContext);
+	
 	double ct = glfwGetTime();
 	double dt = ct;
 
@@ -98,7 +89,7 @@ int main() {
 	VkCommandBuffer cmdBuffer;
 	vklAllocateCommandBuffer(devCon, &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 	
-	vklSetClearColor(frameBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
+	vklSetClearColor(ChunkManager::getFramebuffer(), 0.25f, 0.45f, 1.0f, 1.0f );
 	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
 
 	while (!glfwWindowShouldClose(window)) {
@@ -114,6 +105,7 @@ int main() {
 			//vlkRecreateSwapchain(device, &swapChain, false);
 			
 			Cursor::updateProjection(width, height);
+			FontEngine::updateProjection(width, height);
 		}
 		
 		pwidth = width;
@@ -136,11 +128,7 @@ int main() {
 		
 		vklBeginCommandBuffer(device, cmdBuffer);
 		
-		vklBeginRender(device, frameBuffer, cmdBuffer);
-		
-		//Chunk::render(device, swapChain);
-		
-		vklEndRender(device, frameBuffer, cmdBuffer);
+		ChunkManager::render(cmdBuffer);
 		
 		vklBeginRender(device, backBuffer, cmdBuffer);
 		
@@ -168,8 +156,8 @@ int main() {
 	
 	BG::destroy();
 	Cursor::destroy();
-	
-	vklDestroyFrameBuffer(device, frameBuffer);
+	FontEngine::destroy();
+	ChunkManager::destroy();
 	
 	vklDestroySwapChain(swapChain);
 	vklDestroyDevice(device);
@@ -181,109 +169,3 @@ int main() {
 
 	return 0;
 }
-
-void createCubeShader(VKLDevice* device, VKLShader** pShader) {
-	char* shaderPaths[2];
-	shaderPaths[0] = "res/cube-vert.spv";
-	shaderPaths[1] = "res/cube-frag.spv";
-
-	VkShaderStageFlagBits stages[2];
-	stages[0] = VK_SHADER_STAGE_VERTEX_BIT;
-	stages[1] = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	size_t offsets[2] = { 0, sizeof(float) * 4 };
-	VkFormat formats[2] = { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R32G32_SFLOAT };
-
-	VkDescriptorSetLayoutBinding bindings[2];
-	bindings[0].binding = 0;
-	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	bindings[0].descriptorCount = 1;
-	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	bindings[0].pImmutableSamplers = NULL;
-
-	bindings[1].binding = 1;
-	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	bindings[1].descriptorCount = 1;
-	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	bindings[1].pImmutableSamplers = NULL;
-
-	VKLShaderCreateInfo shaderCreateInfo;
-	memset(&shaderCreateInfo, 0, sizeof(VKLShaderCreateInfo));
-	shaderCreateInfo.shaderPaths = shaderPaths;
-	shaderCreateInfo.shaderStages = stages;
-	shaderCreateInfo.shaderCount = 2;
-	shaderCreateInfo.bindings = bindings;
-	shaderCreateInfo.bindingsCount = 2;
-	shaderCreateInfo.vertexInputAttributeStride = sizeof(float) * 6;
-	shaderCreateInfo.vertexInputAttributesCount = 2;
-	shaderCreateInfo.vertexInputAttributeOffsets = offsets;
-	shaderCreateInfo.vertexInputAttributeFormats = formats;
-	
-	vklCreateShader(device, pShader, &shaderCreateInfo);
-}
-
-/*
-CubeUniformBuffer uniformBufferData;
-memcpy(uniformBufferData.proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
-
-VKLShader* shader;
-createCubeShader(device, &shader);
-
-VKLUniformObject* uniform;
-vklCreateUniformObject(device, &uniform, shader);
-
-VKLBuffer* uniformBuffer;
-vklCreateBuffer(device, &uniformBuffer, VK_FALSE, sizeof(CubeUniformBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-
-vklSetUniformBuffer(device, uniform, uniformBuffer, 0);
-
-VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
-memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
-pipelineCreateInfo.shader = shader;
-pipelineCreateInfo.renderPass = frameBuffer->renderPass;
-pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
-pipelineCreateInfo.extent.width = swapChain->width;
-pipelineCreateInfo.extent.height = swapChain->height;
-
-VKLPipeline* pipeline;
-vklCreateGraphicsPipeline(device, &pipeline, &pipelineCreateInfo);
-
-VKLTextureCreateInfo textureCreateInfo;
-textureCreateInfo.width = 4;
-textureCreateInfo.height = 4;
-textureCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-textureCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
-textureCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-textureCreateInfo.filter = VK_FILTER_NEAREST;
-textureCreateInfo.colorSize = sizeof(char);
-textureCreateInfo.colorCount = 4;
-
-uint32_t tex_width, tex_height;
-
-std::vector<unsigned char> imageData;
-
-unsigned int error = lodepng::decode(imageData, tex_width, tex_height, "res/pack.png");
-
-if (error != 0) {
-	std::cout << "Error loading image: " << error << "\n";
-	return NULL;
-}
-
-VKLTexture* texture;
-vklCreateStagedTexture(devCon, &texture, &textureCreateInfo, imageData.data());
-
-vklSetUniformTexture(device, uniform, texture, 1);
-
-VulkanRenderContext renderContext = {};
-renderContext.device = device;
-renderContext.swapChain = swapChain;
-renderContext.uniformBuffer = &uniformBuffer;
-renderContext.shader = shader;
-renderContext.pipeline = pipeline;
-renderContext.framebuffer = frameBuffer;
-
-Camera::init(window, &uniformBuffer, context);
-
-Chunk::init(1337, window, &renderContext);
-*/
