@@ -1,5 +1,5 @@
 //
-//  Cursor.hpp
+//  Cursor.h
 //  VKraft
 //
 //  Created by Shahar Sandhaus on 6/11/21.
@@ -26,4 +26,4 @@ private:
 	static VKLPipeline* m_pipeline;
 };
 
-#endif /* Cursor_hpp */
+#endif /* Cursor_h */

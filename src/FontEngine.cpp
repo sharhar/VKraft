@@ -22,7 +22,7 @@ VKLUniformObject* FontEngine::m_uniform = NULL;
 VKLTexture* FontEngine::m_texture = NULL;
 VKLPipeline* FontEngine::m_pipeline = NULL;
 
-void FontEngine::init(VKLDevice *device, VKLSwapChain *swapChain) {
+void FontEngine::init(VKLDevice *device, VKLFrameBuffer *framebuffer) {
 	m_device = device;
 	
 	float verts[24] = {
@@ -90,11 +90,11 @@ void FontEngine::init(VKLDevice *device, VKLSwapChain *swapChain) {
 	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
 	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
 	pipelineCreateInfo.shader = m_shader;
-	pipelineCreateInfo.renderPass = swapChain->backBuffer->renderPass;
+	pipelineCreateInfo.renderPass = framebuffer->renderPass;
 	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	pipelineCreateInfo.cullMode = VK_CULL_MODE_NONE;
-	pipelineCreateInfo.extent.width = swapChain->width;
-	pipelineCreateInfo.extent.height = swapChain->height;
+	pipelineCreateInfo.extent.width = framebuffer->width;
+	pipelineCreateInfo.extent.height = framebuffer->height;
 
 	vklCreateGraphicsPipeline(device, &m_pipeline, &pipelineCreateInfo);
 	
@@ -125,7 +125,7 @@ void FontEngine::init(VKLDevice *device, VKLSwapChain *swapChain) {
 	vklSetUniformBuffer(m_device, m_uniform, m_uniformBuffer, 0);
 	vklSetUniformTexture(m_device, m_uniform, m_texture, 1);
 	
-	updateProjection(swapChain->width, swapChain->height);
+	updateProjection(framebuffer->width, framebuffer->height);
 }
 
 void FontEngine::updateProjection(int width, int height) {

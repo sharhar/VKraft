@@ -1,17 +1,19 @@
 //
-//  ChunkManager.hpp
+//  ChunkManager.h
 //  VKraft
 //
 //  Created by Shahar Sandhaus on 6/11/21.
 //
 
-#ifndef ChunkManager_h
-#define ChunkManager_h
+#ifndef ChunkRenderer_h
+#define ChunkRenderer_h
 
 #include <VKL/VKL.h>
 #include "Utils.h"
+#include "Chunk.h"
 
 #include <thread>
+#include <vector>
 
 typedef struct ChunkUniform {
 	float view[16] = { 1, 0, 0, 0,
@@ -30,26 +32,26 @@ typedef struct ChunkUniform {
 	float gradient = 25;
 } ChunkUniform;
 
-class ChunkManager {
+class ChunkRenderer {
 public:
-	static void init(VKLDevice* device, int width, int height);
+	static void init(VKLDevice* device, VKLFrameBuffer* framebuffer);
 	static void render(VkCommandBuffer cmdBuffer);
-	static VKLFrameBuffer* getFramebuffer();
 	static ChunkUniform* getUniform();
 	static void destroy();
-private:
-	static void internalThreadFunction();
 	
-	static std::thread* m_thread;
+	static void addChunk(Vec3i pos);
+private:
+	static std::vector<Chunk> m_chunks;
 	static ChunkUniform* m_chunkUniformBufferData;
 	
 	static VKLDevice* m_device;
 	static VKLFrameBuffer* m_framebuffer;
 	static VKLBuffer* m_uniformBuffer;
+	static VKLBuffer* m_vertBuffer;
 	static VKLShader* m_shader;
 	static VKLUniformObject* m_uniform;
 	static VKLPipeline* m_pipeline;
 	static VKLTexture* m_texture;
 };
 
-#endif /* ChunkManager_hpp */
+#endif /* ChunkRenderer_h */

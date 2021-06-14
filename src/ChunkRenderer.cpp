@@ -1,32 +1,90 @@
 //
-//  ChunkManager.cpp
+//  ChunkRenderer.cpp
 //  VKraft
 //
 //  Created by Shahar Sandhaus on 6/11/21.
 //
 
-#include "ChunkManager.h"
+#include "ChunkRenderer.h"
 
 #include <vector>
 #include "lodepng.h"
 
-std::thread* ChunkManager::m_thread = NULL;
-ChunkUniform* ChunkManager::m_chunkUniformBufferData = NULL;
-VKLDevice* ChunkManager::m_device = NULL;
-VKLFrameBuffer* ChunkManager::m_framebuffer = NULL;
-VKLBuffer* ChunkManager::m_uniformBuffer = NULL;
-VKLShader* ChunkManager::m_shader = NULL;
-VKLUniformObject* ChunkManager::m_uniform = NULL;
-VKLPipeline* ChunkManager::m_pipeline = NULL;
-VKLTexture* ChunkManager::m_texture = NULL;
+std::vector<Chunk> ChunkRenderer::m_chunks = std::vector<Chunk>();
+ChunkUniform* ChunkRenderer::m_chunkUniformBufferData = NULL;
+VKLDevice* ChunkRenderer::m_device = NULL;
+VKLFrameBuffer* ChunkRenderer::m_framebuffer = NULL;
+VKLBuffer* ChunkRenderer::m_uniformBuffer = NULL;
+VKLBuffer* ChunkRenderer::m_vertBuffer = NULL;
+VKLShader* ChunkRenderer::m_shader = NULL;
+VKLUniformObject* ChunkRenderer::m_uniform = NULL;
+VKLPipeline* ChunkRenderer::m_pipeline = NULL;
+VKLTexture* ChunkRenderer::m_texture = NULL;
 
-void ChunkManager::init(VKLDevice* device, int width, int height) {
+void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	m_device = device;
+	m_framebuffer = framebuffer;
 	
 	m_chunkUniformBufferData = (ChunkUniform*) malloc(sizeof(ChunkUniform));
 	memcpy(m_chunkUniformBufferData->proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
 	
-	vklCreateFrameBuffer(device->deviceGraphicsContexts[0], &m_framebuffer, width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	float cubeVerts[] = {
+		// back face
+		-0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
+		 0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+		
+		 0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
+		 0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
+		
+		// front face
+	     0.5f, -0.5f,  0.5f, 1.0f, 0.0f,
+	    -0.5f,  0.5f,  0.5f, 0.0f, 1.0f,
+	    -0.5f, -0.5f,  0.5f, 0.0f, 0.0f,
+	   
+		 0.5f,  0.5f,  0.5f, 1.0f, 1.0f,
+	    -0.5f,  0.5f,  0.5f, 0.0f, 1.0f,
+		 0.5f, -0.5f,  0.5f, 1.0f, 0.0f,
+		
+		// left face
+		-0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+		-0.5f, -0.5f,  0.5f, 1.0f, 0.0f,
+		-0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
+		 
+		-0.5f, -0.5f,  0.5f, 1.0f, 0.0f,
+		-0.5f,  0.5f,  0.5f, 1.0f, 1.0f,
+		-0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
+		 
+		// right face
+		 0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+		 0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
+		 0.5f, -0.5f,  0.5f, 0.0f, 0.0f,
+
+		 0.5f,  0.5f,  0.5f, 0.0f, 1.0f,
+		 0.5f, -0.5f,  0.5f, 0.0f, 0.0f,
+		 0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
+
+		 // top face
+		  0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+		 -0.5f, -0.5f,  0.5f, 0.0f, 1.0f,
+		 -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+		
+		  0.5f, -0.5f,  0.5f, 1.0f, 1.0f,
+		 -0.5f, -0.5f,  0.5f, 0.0f, 1.0f,
+		  0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+		
+		// back face
+		  0.5f,  0.5f,  0.5f, 1.0f, 0.0f,
+		 -0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
+		 -0.5f,  0.5f,  0.5f, 0.0f, 0.0f,
+		
+		  0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
+		 -0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
+		  0.5f,  0.5f,  0.5f, 1.0f, 0.0f,
+	};
+	
+	vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_vertBuffer, cubeVerts, sizeof(float) * 5 * 6 * 6, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	
 	vklCreateBuffer(device, &m_uniformBuffer, VK_FALSE, sizeof(ChunkUniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	
@@ -38,8 +96,8 @@ void ChunkManager::init(VKLDevice* device, int width, int height) {
 	stages[0] = VK_SHADER_STAGE_VERTEX_BIT;
 	stages[1] = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	size_t offsets[2] = { 0, sizeof(float) * 4 };
-	VkFormat formats[2] = { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R32G32_SFLOAT };
+	size_t offsets[2] = { 0, sizeof(float) * 3 };
+	VkFormat formats[2] = { VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32_SFLOAT };
 
 	VkDescriptorSetLayoutBinding bindings[2];
 	bindings[0].binding = 0;
@@ -69,7 +127,7 @@ void ChunkManager::init(VKLDevice* device, int width, int height) {
 	shaderCreateInfo.vertexInputAttributeBindings = vertexInputAttributeBindings;
 	
 	VkVertexInputRate vertInputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	size_t stride = sizeof(float) * 6;
+	size_t stride = sizeof(float) * 5;
 	shaderCreateInfo.vertexBindingsCount = 1;
 	shaderCreateInfo.vertexBindingInputRates = &vertInputRate;
 	shaderCreateInfo.vertexBindingStrides = &stride;
@@ -115,38 +173,42 @@ void ChunkManager::init(VKLDevice* device, int width, int height) {
 	vklCreateStagedTexture(device->deviceGraphicsContexts[0], &m_texture, &textureCreateInfo, imageData.data());
 	
 	vklSetUniformTexture(device, m_uniform, m_texture, 1);
-	
-	m_thread = new std::thread(ChunkManager::internalThreadFunction);
 }
 
-void ChunkManager::render(VkCommandBuffer cmdBuffer) {
-	vklBeginRender(m_device, m_framebuffer, cmdBuffer);
+void ChunkRenderer::render(VkCommandBuffer cmdBuffer) {
+	vklWriteToMemory(m_device, m_uniformBuffer->memory, m_chunkUniformBufferData, sizeof(ChunkUniform), 0);
 	
+	VkViewport viewport = { 0, 0, m_framebuffer->width, m_framebuffer->height, 0, 1 };
+	VkRect2D scissor = { {0, 0}, {m_framebuffer->width, m_framebuffer->height} };
+	VkDeviceSize offsets = 0;
 	
+	m_device->pvkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+	m_device->pvkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+	m_device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipeline);
+	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertBuffer->buffer, &offsets);
+	m_device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipelineLayout, 0, 1, &m_uniform->descriptorSet, 0, NULL);
 	
-	vklEndRender(m_device, m_framebuffer, cmdBuffer);
+	for (Chunk chunk: m_chunks) {
+		chunk.bindInstanceBuffer(cmdBuffer);
+		m_device->pvkCmdDraw(cmdBuffer, 36, 16*16*16, 0, 0);
+	}
 }
 
-VKLFrameBuffer* ChunkManager::getFramebuffer() {
-	return m_framebuffer;
-}
-
-ChunkUniform* ChunkManager::getUniform() {
+ChunkUniform* ChunkRenderer::getUniform() {
 	return m_chunkUniformBufferData;
 }
 
-void ChunkManager::destroy() {
-	m_thread->join();
-	
+void ChunkRenderer::destroy() {
 	vklDestroyTexture(m_device, m_texture);
 	vklDestroyPipeline(m_device, m_pipeline);
 	vklDestroyUniformObject(m_device, m_uniform);
 	vklDestroyShader(m_device, m_shader);
 	vklDestroyBuffer(m_device, m_uniformBuffer);
+	vklDestroyBuffer(m_device, m_vertBuffer);
 	vklDestroyFrameBuffer(m_device, m_framebuffer);
 	free(m_chunkUniformBufferData);
 }
 
-void ChunkManager::internalThreadFunction() {
-	printf("Chunk thread!\n");
+void ChunkRenderer::addChunk(Vec3i pos) {
+	m_chunks.push_back(Chunk(m_device, pos));
 }

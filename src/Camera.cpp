@@ -6,9 +6,9 @@
 //
 
 #include "Camera.h"
-#include "ChunkManager.h"
+#include "ChunkRenderer.h"
 
-Vec3 Camera::pos = Vec3(0, 5.1, 0);
+Vec3 Camera::pos = Vec3(0, 0, 1);
 Vec3 Camera::renderPos = Vec3(0, 0, 0);
 Vec3 Camera::rot = Vec3(0, 0, 0);
 double Camera::prev_x = 0;
@@ -20,7 +20,7 @@ void Camera::init(GLFWwindow *window) {
 	m_window = window;
 	
 	renderPos.x = pos.x;
-	renderPos.y = -pos.y;
+	renderPos.y = pos.y;
 	renderPos.z = pos.z;
 	
 	double xpos, ypos;
@@ -65,6 +65,13 @@ void Camera::update(float dt) {
 			zVel += speed * sin(rot.y*DEG_TO_RAD) * dt;
 			xVel += speed * cos(rot.y*DEG_TO_RAD) * dt;
 		}
+		
+		if (glfwGetKey(m_window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+			pos.y -= speed * dt;
+		}
+		if (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+			pos.y += speed * dt;
+		}
 
 		/*
 		//T = 3/5, H = 1.2
@@ -83,7 +90,7 @@ void Camera::update(float dt) {
 
 		fence = fence + 2;
 
-		pos.x += xVel;
+		
 
 		if (hittingCubes(pos)) {
 			pos.x -= xVel;
@@ -104,7 +111,11 @@ void Camera::update(float dt) {
 		}
 
 		fence = fence - 2;
+		 
 */
+		pos.x += xVel;
+		pos.z += zVel;
+		
 		float xdiff = (prev_x - xpos);
 
 		if (xdiff != 0) {
@@ -130,10 +141,10 @@ void Camera::update(float dt) {
 	prev_y = ypos;
 
 	renderPos.x = pos.x;
-	renderPos.y = -pos.y;
+	renderPos.y = pos.y;
 	renderPos.z = pos.z;
 
-	getWorldview(ChunkManager::getUniform()->view, renderPos, rot);
+	getWorldview(ChunkRenderer::getUniform()->view, renderPos, rot);
 }
 
 void Camera::destroy() {

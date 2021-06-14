@@ -1,5 +1,5 @@
 //
-//  BG.hpp
+//  BG.h
 //  VKraft
 //
 //  Created by Shahar Sandhaus on 6/11/21.
@@ -24,4 +24,4 @@ private:
 	static VKLPipeline* m_pipeline;
 };
 
-#endif /* BG_hpp */
+#endif /* BG_h */

@@ -1,13 +1,9 @@
 #include <VKL/VKL.h>
 #include <GLFW/glfw3.h>
 
-//#include "VLKUtils.h"
-//#include "Cube.h"
-//#include "Camera.h"
-
 #include "BG.h"
 #include "Camera.h"
-#include "ChunkManager.h"
+#include "ChunkRenderer.h"
 #include "Cursor.h"
 #include "FontEngine.h"
 
@@ -61,19 +57,22 @@ int main() {
 
 	VKLSwapChain* swapChain;
 	VKLFrameBuffer* backBuffer;
-	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_TRUE);
+	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_FALSE);
 	vklGetBackBuffer(swapChain, &backBuffer);
 	
-	ChunkManager::init(device, swapChain->width * 2, swapChain->height * 2);
+	float msaaAmount = 1.4f;
+	
+	VKLFrameBuffer* msaaBuffer;
+	vklCreateFrameBuffer(device->deviceGraphicsContexts[0], &msaaBuffer, swapChain->width * msaaAmount, swapChain->height * msaaAmount, VK_FORMAT_R8G8B8A8_UNORM, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	
+	ChunkRenderer::init(device, msaaBuffer);
 	Camera::init(window);
 	
-	BG::init(device, swapChain, ChunkManager::getFramebuffer());
-	Cursor::init(device, swapChain, ChunkManager::getFramebuffer());
-	FontEngine::init(device, swapChain);
-
-	//Camera::init(window, &uniformBuffer, context);
+	ChunkRenderer::addChunk(Vec3i(0, 0, 0));
 	
-	
+	BG::init(device, swapChain, msaaBuffer);
+	Cursor::init(device, swapChain, msaaBuffer);
+	FontEngine::init(device, swapChain->backBuffer);
 	
 	double ct = glfwGetTime();
 	double dt = ct;
@@ -92,10 +91,10 @@ int main() {
 	VkCommandBuffer cmdBuffer;
 	vklAllocateCommandBuffer(device->deviceGraphicsContexts[0], &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 	
-	vklSetClearColor(ChunkManager::getFramebuffer(), 0.25f, 0.45f, 1.0f, 1.0f );
+	vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
 	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
 	
-	FontEngine::setCoords(10, 10, 16);
+	FontEngine::setCoords(20, 20, 32);
 	FontEngine::setText("FPS:0");
 
 	while (!glfwWindowShouldClose(window)) {
@@ -108,7 +107,7 @@ int main() {
 		glfwGetWindowSize(window, &width, &height);
 
 		if (pwidth != width || pheight != height) {
-			//vlkRecreateSwapchain(device, &swapChain, false);
+			//vlkRecreateSwapchain(device, &swapChain, false); // TODO: Recreate swapchain and msaaBuffer along with all pipelines
 			
 			Cursor::updateProjection(width, height);
 			FontEngine::updateProjection(width, height);
@@ -134,7 +133,11 @@ int main() {
 		
 		vklBeginCommandBuffer(device, cmdBuffer);
 		
-		ChunkManager::render(cmdBuffer);
+		vklBeginRender(device, msaaBuffer, cmdBuffer);
+		
+		ChunkRenderer::render(cmdBuffer);
+		
+		vklEndRender(device, msaaBuffer, cmdBuffer);
 		
 		vklBeginRender(device, backBuffer, cmdBuffer);
 		
@@ -160,7 +163,7 @@ int main() {
 	BG::destroy();
 	Cursor::destroy();
 	FontEngine::destroy();
-	ChunkManager::destroy();
+	ChunkRenderer::destroy();
 	Camera::destroy();
 	
 	vklDestroySwapChain(swapChain);

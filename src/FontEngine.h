@@ -13,7 +13,7 @@
 
 class FontEngine {
 public:
-	static void init(VKLDevice* device, VKLSwapChain* swapChain);
+	static void init(VKLDevice* device, VKLFrameBuffer* framebuffer);
 	static void updateProjection(int width, int height);
 	static void render(VkCommandBuffer cmdBuffer);
 	static void setText(const std::string& str);
