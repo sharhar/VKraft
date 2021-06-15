@@ -18,11 +18,9 @@ public:
 	void destroy();
 private:
 	VKLDevice* m_device;
-	VKLBuffer* m_vertBuffer;
+	VKLBuffer* m_instBuffer;
 	Vec3i m_pos;
-	uint16_t m_cubes[16*16*16];
-	
-	void genChunkMesh();
+	int m_cubes[16*16*16];
 };
 
 #endif /* Chunk_h */

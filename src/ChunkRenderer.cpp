@@ -21,6 +21,40 @@ VKLUniformObject* ChunkRenderer::m_uniform = NULL;
 VKLPipeline* ChunkRenderer::m_pipeline = NULL;
 VKLTexture* ChunkRenderer::m_texture = NULL;
 
+static int calcVertInt(float posx, float posy, float posz, float u, float v, int face) {
+	int result = 0;
+	
+	if (posx > 0) {
+		result = result | 1;
+		
+	}
+	
+	if (posy > 0) {
+		result = result | 2;
+		
+	}
+	
+	if (posz > 0) {
+		result = result | 4;
+		
+	}
+	
+	if (u > 0.5) {
+		result = result | 8;
+		
+	}
+	
+	if (v > 0.5) {
+		result = result | 16;
+		
+	}
+	
+	result = result | ((face & 0b111111) << 5);
+	
+	return result;
+	
+}
+
 void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	m_device = device;
 	m_framebuffer = framebuffer;
@@ -28,63 +62,63 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	m_chunkUniformBufferData = (ChunkUniform*) malloc(sizeof(ChunkUniform));
 	memcpy(m_chunkUniformBufferData->proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
 	
-	float cubeVerts[] = {
+	int cubeVertis[] = {
 		// back face
-		-0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
-		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
-		 0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+		calcVertInt(-0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 1),
+		calcVertInt(-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1),
+		calcVertInt( 0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1),
 		
-		 0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
-		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
-		 0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
+		calcVertInt( 0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1),
+		calcVertInt(-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1),
+		calcVertInt( 0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 1),
 		
 		// front face
-	     0.5f, -0.5f,  0.5f, 1.0f, 0.0f,
-	    -0.5f,  0.5f,  0.5f, 0.0f, 1.0f,
-	    -0.5f, -0.5f,  0.5f, 0.0f, 0.0f,
+	    calcVertInt( 0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 2),
+	    calcVertInt(-0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 2),
+	    calcVertInt(-0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 2),
 	   
-		 0.5f,  0.5f,  0.5f, 1.0f, 1.0f,
-	    -0.5f,  0.5f,  0.5f, 0.0f, 1.0f,
-		 0.5f, -0.5f,  0.5f, 1.0f, 0.0f,
+		calcVertInt( 0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 2),
+	    calcVertInt(-0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 2),
+		calcVertInt( 0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 2),
 		
 		// left face
-		-0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
-		-0.5f, -0.5f,  0.5f, 1.0f, 0.0f,
-		-0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
+		calcVertInt(-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 4),
+		calcVertInt(-0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 4),
+		calcVertInt(-0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 4),
 		 
-		-0.5f, -0.5f,  0.5f, 1.0f, 0.0f,
-		-0.5f,  0.5f,  0.5f, 1.0f, 1.0f,
-		-0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
+		calcVertInt(-0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 4),
+		calcVertInt(-0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 4),
+		calcVertInt(-0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 4),
 		 
 		// right face
-		 0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
-		 0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
-		 0.5f, -0.5f,  0.5f, 0.0f, 0.0f,
+		calcVertInt( 0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 8),
+		calcVertInt( 0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 8),
+		calcVertInt( 0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 8),
 
-		 0.5f,  0.5f,  0.5f, 0.0f, 1.0f,
-		 0.5f, -0.5f,  0.5f, 0.0f, 0.0f,
-		 0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
+		calcVertInt( 0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 8),
+		calcVertInt( 0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 8),
+		calcVertInt( 0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 8),
 
 		 // top face
-		  0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
-		 -0.5f, -0.5f,  0.5f, 0.0f, 1.0f,
-		 -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+		calcVertInt(  0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 16),
+		calcVertInt( -0.5f, -0.5f,  0.5f, 0.0f, 1.0f, 16),
+		calcVertInt( -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 16),
 		
-		  0.5f, -0.5f,  0.5f, 1.0f, 1.0f,
-		 -0.5f, -0.5f,  0.5f, 0.0f, 1.0f,
-		  0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+		calcVertInt(  0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 16),
+		calcVertInt( -0.5f, -0.5f,  0.5f, 0.0f, 1.0f, 16),
+		calcVertInt(  0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 16),
 		
 		// back face
-		  0.5f,  0.5f,  0.5f, 1.0f, 0.0f,
-		 -0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
-		 -0.5f,  0.5f,  0.5f, 0.0f, 0.0f,
+		calcVertInt(  0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 32),
+		calcVertInt( -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 32),
+		calcVertInt( -0.5f,  0.5f,  0.5f, 0.0f, 0.0f, 32),
 		
-		  0.5f,  0.5f, -0.5f, 1.0f, 1.0f,
-		 -0.5f,  0.5f, -0.5f, 0.0f, 1.0f,
-		  0.5f,  0.5f,  0.5f, 1.0f, 0.0f,
+		calcVertInt( 0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 32),
+		calcVertInt(-0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 32),
+		calcVertInt( 0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 32),
 	};
 	
-	vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_vertBuffer, cubeVerts, sizeof(float) * 5 * 6 * 6, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_vertBuffer, cubeVertis, sizeof(int) * 6 * 6, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	
 	vklCreateBuffer(device, &m_uniformBuffer, VK_FALSE, sizeof(ChunkUniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	
@@ -96,8 +130,8 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	stages[0] = VK_SHADER_STAGE_VERTEX_BIT;
 	stages[1] = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	size_t offsets[2] = { 0, sizeof(float) * 3 };
-	VkFormat formats[2] = { VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32_SFLOAT };
+	size_t offsets[] = { 0, 0 };
+	VkFormat formats[] = { VK_FORMAT_R32_SINT, VK_FORMAT_R32_SINT };
 
 	VkDescriptorSetLayoutBinding bindings[2];
 	bindings[0].binding = 0;
@@ -112,7 +146,7 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	bindings[1].pImmutableSamplers = NULL;
 	
-	uint32_t vertexInputAttributeBindings[] = {0, 0};
+	uint32_t vertexInputAttributeBindings[] = {0, 1};
 
 	VKLShaderCreateInfo shaderCreateInfo;
 	memset(&shaderCreateInfo, 0, sizeof(VKLShaderCreateInfo));
@@ -126,11 +160,11 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	shaderCreateInfo.vertexInputAttributeFormats = formats;
 	shaderCreateInfo.vertexInputAttributeBindings = vertexInputAttributeBindings;
 	
-	VkVertexInputRate vertInputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	size_t stride = sizeof(float) * 5;
-	shaderCreateInfo.vertexBindingsCount = 1;
-	shaderCreateInfo.vertexBindingInputRates = &vertInputRate;
-	shaderCreateInfo.vertexBindingStrides = &stride;
+	VkVertexInputRate vertInputRate[] = {VK_VERTEX_INPUT_RATE_VERTEX, VK_VERTEX_INPUT_RATE_INSTANCE};
+	size_t stride[] = {sizeof(int), sizeof(int)};
+	shaderCreateInfo.vertexBindingsCount = 2;
+	shaderCreateInfo.vertexBindingInputRates = vertInputRate;
+	shaderCreateInfo.vertexBindingStrides = stride;
 	
 	vklCreateShader(device, &m_shader, &shaderCreateInfo);
 	

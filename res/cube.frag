@@ -13,6 +13,10 @@ void main() {
 	vec4 cbColor = vec4(0.0, 0.0, 0.0, 1.0);
 
 	cbColor = texture(tex, IN.uv);
+	
+	if (cbColor.a < 0.5) {
+		discard;
+	}
 
 	uFragColor = cbColor;
 }

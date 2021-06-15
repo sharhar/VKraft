@@ -5,24 +5,18 @@
 //  Created by Shahar Sandhaus on 6/11/21.
 //
 
-#include "FontEngine.h"
+#include "TextObject.h"
 
 #include "lodepng.h"
 #include <iostream>
 
-#define MAX_CHAR_NUM 16
+VKLBuffer* TextObject::m_vertBuffer = NULL;
+VKLDevice* TextObject::m_device = NULL;
+VKLShader* TextObject::m_shader = NULL;
+VKLTexture* TextObject::m_texture = NULL;
+VKLPipeline* TextObject::m_pipeline = NULL;
 
-int FontEngine::m_charNum = 0;
-VKLBuffer* FontEngine::m_vertBuffer = NULL;
-VKLBuffer* FontEngine::m_instanceBuffer = NULL;
-VKLBuffer* FontEngine::m_uniformBuffer = NULL;
-VKLDevice* FontEngine::m_device = NULL;
-VKLShader* FontEngine::m_shader = NULL;
-VKLUniformObject* FontEngine::m_uniform = NULL;
-VKLTexture* FontEngine::m_texture = NULL;
-VKLPipeline* FontEngine::m_pipeline = NULL;
-
-void FontEngine::init(VKLDevice *device, VKLFrameBuffer *framebuffer) {
+void TextObject::init(VKLDevice *device, VKLFrameBuffer *framebuffer) {
 	m_device = device;
 	
 	float verts[24] = {
@@ -36,10 +30,6 @@ void FontEngine::init(VKLDevice *device, VKLFrameBuffer *framebuffer) {
 	};
 	
 	vklCreateStagedBuffer(device->deviceGraphicsContexts[0], &m_vertBuffer, verts, 6 * 4 * sizeof(float), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	
-	vklCreateBuffer(device, &m_uniformBuffer, VK_FALSE, sizeof(float) * 19, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	
-	vklCreateBuffer(device, &m_instanceBuffer, VK_FALSE, sizeof(float) * MAX_CHAR_NUM, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	
 	char* shaderPaths[2];
 	shaderPaths[0] = "res/font-vert.spv";
@@ -98,7 +88,7 @@ void FontEngine::init(VKLDevice *device, VKLFrameBuffer *framebuffer) {
 
 	vklCreateGraphicsPipeline(device, &m_pipeline, &pipelineCreateInfo);
 	
-	vklCreateUniformObject(device, &m_uniform, m_shader);
+	
 	
 	uint32_t tex_width, tex_height;
 	
@@ -121,14 +111,9 @@ void FontEngine::init(VKLDevice *device, VKLFrameBuffer *framebuffer) {
 	textureCreateInfo.colorCount = 4;
 	
 	vklCreateStagedTexture(m_device->deviceGraphicsContexts[0], &m_texture, &textureCreateInfo, imageData.data());
-	
-	vklSetUniformBuffer(m_device, m_uniform, m_uniformBuffer, 0);
-	vklSetUniformTexture(m_device, m_uniform, m_texture, 1);
-	
-	updateProjection(framebuffer->width, framebuffer->height);
 }
 
-void FontEngine::updateProjection(int width, int height) {
+void TextObject::updateProjection(int width, int height) {
 	float r = width;
 	float l = 0;
 	float t = height;
@@ -146,7 +131,33 @@ void FontEngine::updateProjection(int width, int height) {
 	vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 16, 0);
 }
 
-void FontEngine::render(VkCommandBuffer cmdBuffer) {
+void TextObject::destroy() {
+	vklDestroyBuffer(m_device, m_vertBuffer);
+	vklDestroyPipeline(m_device, m_pipeline);
+	vklDestroyTexture(m_device, m_texture);
+	vklDestroyShader(m_device, m_shader);
+}
+
+TextObject::TextObject(int maxCharNum) {
+	vklCreateBuffer(m_device, &m_uniformBuffer, VK_FALSE, sizeof(float) * 19, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vklCreateBuffer(m_device, &m_instanceBuffer, VK_FALSE, sizeof(int) * maxCharNum, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	
+	vklCreateUniformObject(m_device, &m_uniform, m_shader);
+	
+	vklSetUniformBuffer(m_device, m_uniform, m_uniformBuffer, 0);
+	vklSetUniformTexture(m_device, m_uniform, m_texture, 1);
+	
+	updateProjection(1280, 720);
+}
+
+TextObject::~TextObject() {
+	vklDestroyBuffer(m_device, m_instanceBuffer);
+	vklDestroyBuffer(m_device, m_uniformBuffer);
+	vklDestroyUniformObject(m_device, m_uniform);
+}
+
+
+void TextObject::render(VkCommandBuffer cmdBuffer) {
 	VkDeviceSize offsets = 0;
 	m_device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipeline);
 	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertBuffer->buffer, &offsets);
@@ -156,7 +167,7 @@ void FontEngine::render(VkCommandBuffer cmdBuffer) {
 	m_device->pvkCmdDraw(cmdBuffer, 6, m_charNum, 0, 0);
 }
 
-void FontEngine::setText(const std::string& str) {
+void TextObject::setText(const std::string& str) {
 	int* ids = new int[str.length()];
 	
 	for(int i = 0; i < str.length(); i++) {
@@ -170,14 +181,8 @@ void FontEngine::setText(const std::string& str) {
 	m_charNum = str.length();
 }
 
-void FontEngine::setCoords(float xPos, float yPos, float size) {
+void TextObject::setCoords(float xPos, float yPos, float size) {
 	float buff[3] = {xPos, yPos, size};
 	vklWriteToMemory(m_device, m_uniformBuffer->memory, buff, sizeof(float) * 3, sizeof(float) * 16);
 }
 
-void FontEngine::destroy() {
-	vklDestroyPipeline(m_device, m_pipeline);
-	vklDestroyUniformObject(m_device, m_uniform);
-	vklDestroyTexture(m_device, m_texture);
-	vklDestroyShader(m_device, m_shader);
-}

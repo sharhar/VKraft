@@ -39,7 +39,7 @@ void Camera::update(float dt) {
 	if (focused) {
 		float speed = 3.5f;
 
-		if (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+		if (glfwGetKey(m_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
 			speed *= 2;
 		}
 

@@ -5,7 +5,52 @@
 #include "Camera.h"
 #include "ChunkRenderer.h"
 #include "Cursor.h"
-#include "FontEngine.h"
+#include "TextObject.h"
+
+class Timer {
+private:
+	double m_startTime;
+	double m_time;
+	int m_count;
+	std::string m_name;
+public:
+	Timer(const std::string& name) {
+		m_startTime = -1;
+		m_name = name;
+		
+		reset();
+	}
+	
+	void reset() {
+		m_count = 0;
+		m_time = 0;
+	}
+	
+	void start() {
+		m_startTime = glfwGetTime();
+	}
+	
+	void stop() {
+		m_time = m_time + glfwGetTime() - m_startTime;
+		m_count++;
+	}
+	
+	double getLapTime() {
+		return m_time/m_count;
+	}
+	
+	const std::string& getName() {
+		return m_name;
+	}
+	
+	void printLapTime() {
+		printf("%s: %g ms\n", m_name.c_str(), getLapTime() * 1000);
+	}
+	
+	void printLapTimeAndFPS() {
+		printf("%s: %g ms (%g FPS)\n", m_name.c_str(), getLapTime() * 1000, 1.0 / getLapTime());
+	}
+};
 
 void window_focus_callback(GLFWwindow* window, int focused) {
 	if (focused) {
@@ -26,7 +71,7 @@ int main() {
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	GLFWwindow* window = glfwCreateWindow(1280, 720, "VKraft", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(1600, 900, "VKraft", NULL, NULL);
 
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwSetWindowFocusCallback(window, window_focus_callback);
@@ -57,7 +102,7 @@ int main() {
 
 	VKLSwapChain* swapChain;
 	VKLFrameBuffer* backBuffer;
-	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_FALSE);
+	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_TRUE);
 	vklGetBackBuffer(swapChain, &backBuffer);
 	
 	float msaaAmount = 1.4f;
@@ -72,7 +117,10 @@ int main() {
 	
 	BG::init(device, swapChain, msaaBuffer);
 	Cursor::init(device, swapChain, msaaBuffer);
-	FontEngine::init(device, swapChain->backBuffer);
+	TextObject::init(device, swapChain->backBuffer);
+	
+	TextObject* fpsText = new TextObject(16);
+	TextObject* rpsText = new TextObject(16);
 	
 	double ct = glfwGetTime();
 	double dt = ct;
@@ -94,10 +142,20 @@ int main() {
 	vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
 	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
 	
-	FontEngine::setCoords(20, 20, 32);
-	FontEngine::setText("FPS:0");
+	fpsText->setCoords(10, 10, 20);
+	fpsText->setText("FPS:0");
+	
+	rpsText->setCoords(10, 34, 20);
+	rpsText->setText("RPS:0");
+	
+	Timer frameTime("FrameTime");
+	Timer renderTime("RenderTime");
 
 	while (!glfwWindowShouldClose(window)) {
+		frameTime.start();
+		
+		renderTime.start();
+		
 		glfwPollEvents();
 
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -110,7 +168,7 @@ int main() {
 			//vlkRecreateSwapchain(device, &swapChain, false); // TODO: Recreate swapchain and msaaBuffer along with all pipelines
 			
 			Cursor::updateProjection(width, height);
-			FontEngine::updateProjection(width, height);
+			fpsText->updateProjection(width, height);
 		}
 		
 		pwidth = width;
@@ -124,7 +182,13 @@ int main() {
 
 		if (accDT > 1) {
 			fps = frames;
-			FontEngine::setText("FPS:" + std::to_string(fps));
+			
+			fpsText->setText("FPS:" + std::to_string((int) (1.0 / frameTime.getLapTime())));
+			rpsText->setText("RPS:" + std::to_string((int)(1.0 / renderTime.getLapTime())));
+			
+			frameTime.reset();
+			renderTime.reset();
+			
 			frames = 0;
 			accDT = 0;
 		}
@@ -149,20 +213,28 @@ int main() {
 		
 		BG::render(cmdBuffer);
 		Cursor::render(cmdBuffer);
-		FontEngine::render(cmdBuffer);
+		fpsText->render(cmdBuffer);
+		rpsText->render(cmdBuffer);
 		
 		vklEndRender(device, backBuffer, cmdBuffer);
 		
 		vklEndCommandBuffer(device, cmdBuffer);
 		
 		vklExecuteCommandBuffer(device->deviceGraphicsContexts[0], cmdBuffer);
+		
+		renderTime.stop();
 
 		vklPresent(swapChain);
+		
+		frameTime.stop();
 	}
+	
+	delete fpsText;
+	delete rpsText;
 	
 	BG::destroy();
 	Cursor::destroy();
-	FontEngine::destroy();
+	TextObject::destroy();
 	ChunkRenderer::destroy();
 	Camera::destroy();
 	
