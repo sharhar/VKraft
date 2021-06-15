@@ -35,6 +35,7 @@ typedef struct ChunkUniform {
 class ChunkRenderer {
 public:
 	static void init(VKLDevice* device, VKLFrameBuffer* framebuffer);
+	static void rebuildPipeline();
 	static void render(VkCommandBuffer cmdBuffer);
 	static ChunkUniform* getUniform();
 	static void destroy();

@@ -38,8 +38,10 @@ Chunk::Chunk(VKLDevice* device, Vec3i pos) {
 	
 	calcRenderCubes();
 	
-	vklCreateBuffer(m_device, &m_instBuffer, VK_FALSE, sizeof(int) * 16 * 16 * 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	vklWriteToMemory(m_device, m_instBuffer->memory, m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), 0);
+	vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_instBuffer,  m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	
+	//vklCreateBuffer(m_device, &m_instBuffer, VK_FALSE, sizeof(int) * 16 * 16 * 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	//vklWriteToMemory(m_device, m_instBuffer->memory, m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), 0);
 }
 
 void Chunk::render(VkCommandBuffer cmdBuffer) {
@@ -102,6 +104,4 @@ void Chunk::calcRenderCubes() {
 			}
 		}
 	}
-	
-	printf("Cube count: %d\n", m_renderCubes.size());
 }

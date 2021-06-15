@@ -122,6 +122,23 @@ void Cursor::updateProjection(int width, int height) {
 	vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 18, 0);
 }
 
+void Cursor::rebuildPipeline(VKLSwapChain* swapChain, VKLFrameBuffer* framebuffer) {
+	vklDestroyPipeline(m_device, m_pipeline);
+	
+	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
+	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
+	pipelineCreateInfo.shader = m_shader;
+	pipelineCreateInfo.renderPass = swapChain->backBuffer->renderPass;
+	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+	pipelineCreateInfo.extent.width = swapChain->width;
+	pipelineCreateInfo.extent.height = swapChain->height;
+
+	vklCreateGraphicsPipeline(m_device, &m_pipeline, &pipelineCreateInfo);
+	
+	vklSetUniformFramebuffer(m_device, m_uniform, framebuffer, 1);
+}
+
 void Cursor::render(VkCommandBuffer cmdBuffer) {
 	VkDeviceSize vertexOffsets = 0;
 	m_device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipeline);

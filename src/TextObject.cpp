@@ -15,9 +15,11 @@ VKLDevice* TextObject::m_device = NULL;
 VKLShader* TextObject::m_shader = NULL;
 VKLTexture* TextObject::m_texture = NULL;
 VKLPipeline* TextObject::m_pipeline = NULL;
+VKLFrameBuffer* TextObject::m_renderBuffer = NULL;
 
 void TextObject::init(VKLDevice *device, VKLFrameBuffer *framebuffer) {
 	m_device = device;
+	m_renderBuffer = framebuffer;
 	
 	float verts[24] = {
 		0, 0, 0, 0,
@@ -113,10 +115,25 @@ void TextObject::init(VKLDevice *device, VKLFrameBuffer *framebuffer) {
 	vklCreateStagedTexture(m_device->deviceGraphicsContexts[0], &m_texture, &textureCreateInfo, imageData.data());
 }
 
-void TextObject::updateProjection(int width, int height) {
-	float r = width;
+void TextObject::rebuildPipeline() {
+	vklDestroyPipeline(m_device, m_pipeline);
+	
+	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
+	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
+	pipelineCreateInfo.shader = m_shader;
+	pipelineCreateInfo.renderPass = m_renderBuffer->renderPass;
+	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	pipelineCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	pipelineCreateInfo.extent.width = m_renderBuffer->width;
+	pipelineCreateInfo.extent.height = m_renderBuffer->height;
+
+	vklCreateGraphicsPipeline(m_device, &m_pipeline, &pipelineCreateInfo);
+}
+
+void TextObject::updateProjection() {
+	float r = m_renderBuffer->width;
 	float l = 0;
-	float t = height;
+	float t = m_renderBuffer->height;
 	float b = 0;
 	float f = 1;
 	float n = -1;
@@ -147,7 +164,7 @@ TextObject::TextObject(int maxCharNum) {
 	vklSetUniformBuffer(m_device, m_uniform, m_uniformBuffer, 0);
 	vklSetUniformTexture(m_device, m_uniform, m_texture, 1);
 	
-	updateProjection(1280, 720);
+	updateProjection();
 }
 
 TextObject::~TextObject() {

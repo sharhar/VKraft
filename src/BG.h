@@ -13,6 +13,7 @@
 class BG {
 public:
 	static void init(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* framebuffer);
+	static void rebuildPipeline(VKLSwapChain* swapChain, VKLFrameBuffer* framebuffer);
 	static void render(VkCommandBuffer cmdBuff);
 	static void destroy();
 	

@@ -209,6 +209,21 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	vklSetUniformTexture(device, m_uniform, m_texture, 1);
 }
 
+void ChunkRenderer::rebuildPipeline() {
+	vklDestroyPipeline(m_device, m_pipeline);
+	
+	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
+	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
+	pipelineCreateInfo.shader = m_shader;
+	pipelineCreateInfo.renderPass = m_framebuffer->renderPass;
+	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+	pipelineCreateInfo.extent.width = m_framebuffer->width;
+	pipelineCreateInfo.extent.height = m_framebuffer->height;
+	
+	vklCreateGraphicsPipeline(m_device, &m_pipeline, &pipelineCreateInfo);
+}
+
 void ChunkRenderer::render(VkCommandBuffer cmdBuffer) {
 	vklWriteToMemory(m_device, m_uniformBuffer->memory, m_chunkUniformBufferData, sizeof(ChunkUniform), 0);
 	

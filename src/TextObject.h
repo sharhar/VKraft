@@ -14,7 +14,8 @@
 class TextObject {
 public:
 	static void init(VKLDevice* device, VKLFrameBuffer* framebuffer);
-	void updateProjection(int width, int height);
+	static void rebuildPipeline();
+	void updateProjection();
 	static void destroy();
 	
 	TextObject(int maxCharNum);
@@ -30,6 +31,7 @@ private:
 	VKLUniformObject* m_uniform;
 	static VKLTexture* m_texture;
 	static VKLPipeline* m_pipeline;
+	static VKLFrameBuffer* m_renderBuffer;
 	
 	VKLBuffer* m_instanceBuffer;
 	VKLBuffer* m_uniformBuffer;

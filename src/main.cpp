@@ -117,7 +117,7 @@ int main() {
 	
 	BG::init(device, swapChain, msaaBuffer);
 	Cursor::init(device, swapChain, msaaBuffer);
-	TextObject::init(device, swapChain->backBuffer);
+	TextObject::init(device, msaaBuffer);
 	
 	TextObject* fpsText = new TextObject(16);
 	TextObject* rpsText = new TextObject(16);
@@ -142,10 +142,10 @@ int main() {
 	vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
 	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
 	
-	fpsText->setCoords(10, 10, 20);
+	fpsText->setCoords(20, 20, 42);
 	fpsText->setText("FPS:0");
 	
-	rpsText->setCoords(10, 34, 20);
+	rpsText->setCoords(20, 68, 42);
 	rpsText->setText("RPS:0");
 	
 	Timer frameTime("FrameTime");
@@ -165,10 +165,20 @@ int main() {
 		glfwGetWindowSize(window, &width, &height);
 
 		if (pwidth != width || pheight != height) {
-			//vlkRecreateSwapchain(device, &swapChain, false); // TODO: Recreate swapchain and msaaBuffer along with all pipelines
+			vklRecreateSwapChain(device->deviceGraphicsContexts[0], swapChain);
+			backBuffer = swapChain->backBuffer;
+			
+			vklRecreateFrameBuffer(device->deviceGraphicsContexts[0], msaaBuffer, swapChain->width * msaaAmount, swapChain->height * msaaAmount);
+			
+			BG::rebuildPipeline(swapChain, msaaBuffer);
+			Cursor::rebuildPipeline(swapChain, msaaBuffer);
+			TextObject::rebuildPipeline();
+			
+			ChunkRenderer::rebuildPipeline();
 			
 			Cursor::updateProjection(width, height);
-			fpsText->updateProjection(width, height);
+			fpsText->updateProjection();
+			rpsText->updateProjection();
 		}
 		
 		pwidth = width;
@@ -200,6 +210,8 @@ int main() {
 		vklBeginRender(device, msaaBuffer, cmdBuffer);
 		
 		ChunkRenderer::render(cmdBuffer);
+		fpsText->render(cmdBuffer);
+		rpsText->render(cmdBuffer);
 		
 		vklEndRender(device, msaaBuffer, cmdBuffer);
 		
@@ -213,8 +225,6 @@ int main() {
 		
 		BG::render(cmdBuffer);
 		Cursor::render(cmdBuffer);
-		fpsText->render(cmdBuffer);
-		rpsText->render(cmdBuffer);
 		
 		vklEndRender(device, backBuffer, cmdBuffer);
 		
