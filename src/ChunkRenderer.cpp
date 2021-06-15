@@ -223,8 +223,7 @@ void ChunkRenderer::render(VkCommandBuffer cmdBuffer) {
 	m_device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipelineLayout, 0, 1, &m_uniform->descriptorSet, 0, NULL);
 	
 	for (Chunk chunk: m_chunks) {
-		chunk.bindInstanceBuffer(cmdBuffer);
-		m_device->pvkCmdDraw(cmdBuffer, 36, 16*16*16, 0, 0);
+		chunk.render(cmdBuffer);
 	}
 }
 

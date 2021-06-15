@@ -7,7 +7,7 @@
 
 #include "Chunk.h"
 
-#define PROP_FACE_MASK 0b111111
+#define PROP_FACE_MASK 63
 #define PROP_FACE_EXP 0
 
 #define PROP_POS_MASK 0xfff
@@ -33,19 +33,75 @@ Chunk::Chunk(VKLDevice* device, Vec3i pos) {
 		int y = (i >> 4) % 16;
 		
 		m_cubes[i] = setProp(0, i, PROP_POS_MASK, PROP_POS_EXP);
-		m_cubes[i] = setProp(m_cubes[i], 1, PORP_ID_MASK, PORP_ID_EXP);
-		m_cubes[i] = setProp(m_cubes[i], i % 64, PROP_FACE_MASK, PROP_FACE_EXP);
+		m_cubes[i] = setProp(m_cubes[i], x < y, PORP_ID_MASK, PORP_ID_EXP);
 	}
 	
+	calcRenderCubes();
+	
 	vklCreateBuffer(m_device, &m_instBuffer, VK_FALSE, sizeof(int) * 16 * 16 * 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	vklWriteToMemory(m_device, m_instBuffer->memory, m_cubes, sizeof(int) * 16 * 16 * 16, 0);
+	vklWriteToMemory(m_device, m_instBuffer->memory, m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), 0);
 }
 
-void Chunk::bindInstanceBuffer(VkCommandBuffer cmdBuffer) {
+void Chunk::render(VkCommandBuffer cmdBuffer) {
 	VkDeviceSize offsets = 0;
 	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instBuffer->buffer, &offsets);
+	m_device->pvkCmdDraw(cmdBuffer, 36, m_renderCubes.size(), 0, 0);
 }
 
 void Chunk::destroy() {
 	vklDestroyBuffer(m_device, m_instBuffer);
+}
+
+int Chunk::getCubeAt(int x, int y, int z) {
+	if(x < 0 || x > 15 || y < 0 || y > 15 || z < 0 || z > 15) {
+		return 0; // TODO: figure out true boundary conditions based on adjacent chunks
+	}
+	
+	return m_cubes[z * 256 + y * 16 + x];
+}
+
+void Chunk::calcRenderCubes() {
+	m_renderCubes.clear();
+	
+	for(int x = 0; x < 16; x++) {
+		for(int y = 0; y < 16; y++) {
+			for(int z = 0; z < 16; z++) {
+				int cube = m_cubes[z * 256 + y * 16 + x];
+				
+				if(getProp(cube, PORP_ID_MASK, PORP_ID_EXP)) {
+					int vid = 0;
+					
+					if (!getProp(getCubeAt(x-1, y, z), PORP_ID_MASK, PORP_ID_EXP)) {
+						vid = vid | 1;
+					}
+					
+					if (!getProp(getCubeAt(x+1, y, z), PORP_ID_MASK, PORP_ID_EXP)) {
+						vid = vid | 2;
+					}
+					
+					if (!getProp(getCubeAt(x, y, z-1), PORP_ID_MASK, PORP_ID_EXP)) {
+						vid = vid | 4;
+					}
+					
+					if (!getProp(getCubeAt(x, y, z+1), PORP_ID_MASK, PORP_ID_EXP)) {
+						vid = vid | 8;
+					}
+					
+					if (!getProp(getCubeAt(x, y-1, z), PORP_ID_MASK, PORP_ID_EXP)) {
+						vid = vid | 16;
+					}
+					
+					if (!getProp(getCubeAt(x, y+1, z), PORP_ID_MASK, PORP_ID_EXP)) {
+						vid = vid | 32;
+					}
+					
+					if(vid) {
+						m_renderCubes.push_back(setProp(m_cubes[z * 256 + y * 16 + x], vid, PROP_FACE_MASK, PROP_FACE_EXP));
+					}
+				}
+			}
+		}
+	}
+	
+	printf("Cube count: %d\n", m_renderCubes.size());
 }
