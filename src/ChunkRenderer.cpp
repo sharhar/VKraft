@@ -14,46 +14,11 @@ std::vector<Chunk> ChunkRenderer::m_chunks = std::vector<Chunk>();
 ChunkUniform* ChunkRenderer::m_chunkUniformBufferData = NULL;
 VKLDevice* ChunkRenderer::m_device = NULL;
 VKLFrameBuffer* ChunkRenderer::m_framebuffer = NULL;
-VKLBuffer* ChunkRenderer::m_uniformBuffer = NULL;
 VKLBuffer* ChunkRenderer::m_vertBuffer = NULL;
 VKLShader* ChunkRenderer::m_shader = NULL;
 VKLUniformObject* ChunkRenderer::m_uniform = NULL;
 VKLPipeline* ChunkRenderer::m_pipeline = NULL;
 VKLTexture* ChunkRenderer::m_texture = NULL;
-
-static int calcVertInt(float posx, float posy, float posz, float u, float v, int face) {
-	int result = 0;
-	
-	if (posx > 0) {
-		result = result | 1;
-		
-	}
-	
-	if (posy > 0) {
-		result = result | 2;
-		
-	}
-	
-	if (posz > 0) {
-		result = result | 4;
-		
-	}
-	
-	if (u > 0.5) {
-		result = result | 8;
-		
-	}
-	
-	if (v > 0.5) {
-		result = result | 16;
-		
-	}
-	
-	result = result | ((face & 0b111111) << 5);
-	
-	return result;
-	
-}
 
 void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	m_device = device;
@@ -62,65 +27,12 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	m_chunkUniformBufferData = (ChunkUniform*) malloc(sizeof(ChunkUniform));
 	memcpy(m_chunkUniformBufferData->proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
 	
-	int cubeVertis[] = {
-		// back face
-		calcVertInt(-0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 1),
-		calcVertInt(-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1),
-		calcVertInt( 0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1),
-		
-		calcVertInt( 0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1),
-		calcVertInt(-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 1),
-		calcVertInt( 0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 1),
-		
-		// front face
-	    calcVertInt( 0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 2),
-	    calcVertInt(-0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 2),
-	    calcVertInt(-0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 2),
-	   
-		calcVertInt( 0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 2),
-	    calcVertInt(-0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 2),
-		calcVertInt( 0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 2),
-		
-		// left face
-		calcVertInt(-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 4),
-		calcVertInt(-0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 4),
-		calcVertInt(-0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 4),
-		 
-		calcVertInt(-0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 4),
-		calcVertInt(-0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 4),
-		calcVertInt(-0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 4),
-		 
-		// right face
-		calcVertInt( 0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 8),
-		calcVertInt( 0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 8),
-		calcVertInt( 0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 8),
-
-		calcVertInt( 0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 8),
-		calcVertInt( 0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 8),
-		calcVertInt( 0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 8),
-
-		 // top face
-		calcVertInt(  0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 16),
-		calcVertInt( -0.5f, -0.5f,  0.5f, 0.0f, 1.0f, 16),
-		calcVertInt( -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 16),
-		
-		calcVertInt(  0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 16),
-		calcVertInt( -0.5f, -0.5f,  0.5f, 0.0f, 1.0f, 16),
-		calcVertInt(  0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 16),
-		
-		// back face
-		calcVertInt(  0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 32),
-		calcVertInt( -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 32),
-		calcVertInt( -0.5f,  0.5f,  0.5f, 0.0f, 0.0f, 32),
-		
-		calcVertInt( 0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 32),
-		calcVertInt(-0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 32),
-		calcVertInt( 0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 32),
+	int vertIDs[] = {
+		0, 2, 1,
+		2, 3, 1
 	};
 	
-	vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_vertBuffer, cubeVertis, sizeof(int) * 6 * 6, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	
-	vklCreateBuffer(device, &m_uniformBuffer, VK_FALSE, sizeof(ChunkUniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_vertBuffer, vertIDs, sizeof(int) * 6, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	
 	char* shaderPaths[2];
 	shaderPaths[0] = "res/cube-vert.spv";
@@ -133,18 +45,12 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	size_t offsets[] = { 0, 0 };
 	VkFormat formats[] = { VK_FORMAT_R32_SINT, VK_FORMAT_R32_SINT };
 
-	VkDescriptorSetLayoutBinding bindings[2];
+	VkDescriptorSetLayoutBinding bindings[1];
 	bindings[0].binding = 0;
-	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[0].descriptorCount = 1;
-	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	bindings[0].pImmutableSamplers = NULL;
-
-	bindings[1].binding = 1;
-	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	bindings[1].descriptorCount = 1;
-	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	bindings[1].pImmutableSamplers = NULL;
 	
 	uint32_t vertexInputAttributeBindings[] = {0, 1};
 
@@ -154,7 +60,7 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	shaderCreateInfo.shaderStages = stages;
 	shaderCreateInfo.shaderCount = 2;
 	shaderCreateInfo.bindings = bindings;
-	shaderCreateInfo.bindingsCount = 2;
+	shaderCreateInfo.bindingsCount = 1;
 	shaderCreateInfo.vertexInputAttributesCount = 2;
 	shaderCreateInfo.vertexInputAttributeOffsets = offsets;
 	shaderCreateInfo.vertexInputAttributeFormats = formats;
@@ -170,7 +76,10 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	
 	vklCreateUniformObject(device, &m_uniform, m_shader);
 	
-	vklSetUniformBuffer(device, m_uniform, m_uniformBuffer, 0);
+	VkPushConstantRange push_constant;
+	push_constant.offset = 0;
+	push_constant.size = sizeof(float) * (16 * 2 + 3);
+	push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	
 	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
 	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
@@ -180,6 +89,8 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
 	pipelineCreateInfo.extent.width = m_framebuffer->width;
 	pipelineCreateInfo.extent.height = m_framebuffer->height;
+	pipelineCreateInfo.pushConstantRanges = &push_constant;
+	pipelineCreateInfo.pushConstantRangeCount = 1;
 	
 	vklCreateGraphicsPipeline(device, &m_pipeline, &pipelineCreateInfo);
 	
@@ -206,7 +117,7 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	
 	vklCreateStagedTexture(device->deviceGraphicsContexts[0], &m_texture, &textureCreateInfo, imageData.data());
 	
-	vklSetUniformTexture(device, m_uniform, m_texture, 1);
+	vklSetUniformTexture(device, m_uniform, m_texture, 0);
 }
 
 void ChunkRenderer::rebuildPipeline() {
@@ -225,7 +136,7 @@ void ChunkRenderer::rebuildPipeline() {
 }
 
 void ChunkRenderer::render(VkCommandBuffer cmdBuffer) {
-	vklWriteToMemory(m_device, m_uniformBuffer->memory, m_chunkUniformBufferData, sizeof(ChunkUniform), 0);
+	m_device->pvkCmdPushConstants(cmdBuffer, m_pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 16 * 2, m_chunkUniformBufferData);
 	
 	VkViewport viewport = { 0, 0, m_framebuffer->width, m_framebuffer->height, 0, 1 };
 	VkRect2D scissor = { {0, 0}, {m_framebuffer->width, m_framebuffer->height} };
@@ -238,6 +149,7 @@ void ChunkRenderer::render(VkCommandBuffer cmdBuffer) {
 	m_device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipelineLayout, 0, 1, &m_uniform->descriptorSet, 0, NULL);
 	
 	for (Chunk chunk: m_chunks) {
+		m_device->pvkCmdPushConstants(cmdBuffer, m_pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(float) * 16 * 2, sizeof(float) * 3, &chunk.renderPos);
 		chunk.render(cmdBuffer);
 	}
 }
@@ -251,7 +163,6 @@ void ChunkRenderer::destroy() {
 	vklDestroyPipeline(m_device, m_pipeline);
 	vklDestroyUniformObject(m_device, m_uniform);
 	vklDestroyShader(m_device, m_shader);
-	vklDestroyBuffer(m_device, m_uniformBuffer);
 	vklDestroyBuffer(m_device, m_vertBuffer);
 	vklDestroyFrameBuffer(m_device, m_framebuffer);
 	free(m_chunkUniformBufferData);

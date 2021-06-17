@@ -113,7 +113,41 @@ int main() {
 	ChunkRenderer::init(device, msaaBuffer);
 	Camera::init(window);
 	
-	ChunkRenderer::addChunk(Vec3i(0, 0, 0));
+	ChunkRenderer::addChunk(Vec3i(0, -1, 0));
+	ChunkRenderer::addChunk(Vec3i(0, -1, 1));
+	ChunkRenderer::addChunk(Vec3i(0, -1, -1));
+	
+	ChunkRenderer::addChunk(Vec3i(1, -1, 0));
+	ChunkRenderer::addChunk(Vec3i(1, -1, 1));
+	ChunkRenderer::addChunk(Vec3i(1, -1, -1));
+	
+	ChunkRenderer::addChunk(Vec3i(-1, -1, 0));
+	ChunkRenderer::addChunk(Vec3i(-1, -1, 1));
+	ChunkRenderer::addChunk(Vec3i(-1, -1, -1));
+	
+	ChunkRenderer::addChunk(Vec3i(0, -2, 0));
+	ChunkRenderer::addChunk(Vec3i(0, -2, 1));
+	ChunkRenderer::addChunk(Vec3i(0, -2, -1));
+	
+	ChunkRenderer::addChunk(Vec3i(1, -2, 0));
+	ChunkRenderer::addChunk(Vec3i(1, -2, 1));
+	ChunkRenderer::addChunk(Vec3i(1, -2, -1));
+	
+	ChunkRenderer::addChunk(Vec3i(-1, -2, 0));
+	ChunkRenderer::addChunk(Vec3i(-1, -2, 1));
+	ChunkRenderer::addChunk(Vec3i(-1, -2, -1));
+	
+	ChunkRenderer::addChunk(Vec3i(0, -3, 0));
+	ChunkRenderer::addChunk(Vec3i(0, -3, 1));
+	ChunkRenderer::addChunk(Vec3i(0, -3, -1));
+	
+	ChunkRenderer::addChunk(Vec3i(1, -3, 0));
+	ChunkRenderer::addChunk(Vec3i(1, -3, 1));
+	ChunkRenderer::addChunk(Vec3i(1, -3, -1));
+	
+	ChunkRenderer::addChunk(Vec3i(-1, -3, 0));
+	ChunkRenderer::addChunk(Vec3i(-1, -3, 1));
+	ChunkRenderer::addChunk(Vec3i(-1, -3, -1));
 	
 	BG::init(device, swapChain, msaaBuffer);
 	Cursor::init(device, swapChain, msaaBuffer);
@@ -121,6 +155,7 @@ int main() {
 	
 	TextObject* fpsText = new TextObject(16);
 	TextObject* rpsText = new TextObject(16);
+	TextObject* posText = new TextObject(64);
 	
 	double ct = glfwGetTime();
 	double dt = ct;
@@ -147,6 +182,9 @@ int main() {
 	
 	rpsText->setCoords(20, 68, 42);
 	rpsText->setText("RPS:0");
+	
+	posText->setCoords(20, 116, 32);
+	posText->setText("POS: 100, 100, 100");
 	
 	Timer frameTime("FrameTime");
 	Timer renderTime("RenderTime");
@@ -179,6 +217,7 @@ int main() {
 			Cursor::updateProjection(width, height);
 			fpsText->updateProjection();
 			rpsText->updateProjection();
+			posText->updateProjection();
 		}
 		
 		pwidth = width;
@@ -205,6 +244,8 @@ int main() {
 		
 		Camera::update(dt);
 		
+		posText->setText("POS: " + std::to_string(Camera::pos.x) + ", " + std::to_string(Camera::pos.y) + ", " + std::to_string(Camera::pos.z));
+		
 		vklBeginCommandBuffer(device, cmdBuffer);
 		
 		vklBeginRender(device, msaaBuffer, cmdBuffer);
@@ -212,6 +253,7 @@ int main() {
 		ChunkRenderer::render(cmdBuffer);
 		fpsText->render(cmdBuffer);
 		rpsText->render(cmdBuffer);
+		posText->render(cmdBuffer);
 		
 		vklEndRender(device, msaaBuffer, cmdBuffer);
 		

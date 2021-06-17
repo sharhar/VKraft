@@ -8,9 +8,9 @@
 #include "Camera.h"
 #include "ChunkRenderer.h"
 
-Vec3 Camera::pos = Vec3(0, 0, 1);
+Vec3 Camera::pos = Vec3(0, 8, -3);
 Vec3 Camera::renderPos = Vec3(0, 0, 0);
-Vec3 Camera::rot = Vec3(0, 0, 0);
+Vec3 Camera::rot = Vec3(0, 90, 0);
 double Camera::prev_x = 0;
 double Camera::prev_y = 0;
 float Camera::yVel = 0;
@@ -67,10 +67,10 @@ void Camera::update(float dt) {
 		}
 		
 		if (glfwGetKey(m_window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-			pos.y -= speed * dt;
+			pos.y += speed * dt;
 		}
 		if (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-			pos.y += speed * dt;
+			pos.y -= speed * dt;
 		}
 
 		/*
@@ -141,7 +141,7 @@ void Camera::update(float dt) {
 	prev_y = ypos;
 
 	renderPos.x = pos.x;
-	renderPos.y = pos.y;
+	renderPos.y = -pos.y;
 	renderPos.z = pos.z;
 
 	getWorldview(ChunkRenderer::getUniform()->view, renderPos, rot);

@@ -17,6 +17,8 @@ public:
 	Chunk(VKLDevice* device, Vec3i pos);
 	void render(VkCommandBuffer cmdBuffer);
 	void destroy();
+	
+	Vec3 renderPos;
 private:
 	VKLDevice* m_device;
 	VKLBuffer* m_instBuffer;

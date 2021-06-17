@@ -47,7 +47,6 @@ private:
 	
 	static VKLDevice* m_device;
 	static VKLFrameBuffer* m_framebuffer;
-	static VKLBuffer* m_uniformBuffer;
 	static VKLBuffer* m_vertBuffer;
 	static VKLShader* m_shader;
 	static VKLUniformObject* m_uniform;

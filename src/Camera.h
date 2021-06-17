@@ -20,10 +20,10 @@ public:
 	static void init(GLFWwindow* window);
 	static void update(float dt);
 	static void destroy();
+	static Vec3 pos;
 private:
 	static double prev_x, prev_y;
 	static float yVel;
-	static Vec3 pos;
 	static Vec3 renderPos;
 	static Vec3 rot;
 	static GLFWwindow* m_window;
