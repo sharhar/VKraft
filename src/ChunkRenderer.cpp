@@ -159,6 +159,12 @@ ChunkUniform* ChunkRenderer::getUniform() {
 }
 
 void ChunkRenderer::destroy() {
+	for (Chunk c : m_chunks) {
+		c.destroy();
+	}
+
+	m_chunks.clear();
+
 	vklDestroyTexture(m_device, m_texture);
 	vklDestroyPipeline(m_device, m_pipeline);
 	vklDestroyUniformObject(m_device, m_uniform);

@@ -104,11 +104,11 @@ int main() {
 	VKLFrameBuffer* backBuffer;
 	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_FALSE);
 	vklGetBackBuffer(swapChain, &backBuffer);
-	
+
 	float msaaAmount = 1.4f;
 	
 	VKLFrameBuffer* msaaBuffer;
-	vklCreateFrameBuffer(device->deviceGraphicsContexts[0], &msaaBuffer, swapChain->width * msaaAmount, swapChain->height * msaaAmount, VK_FORMAT_R8G8B8A8_UNORM, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vklCreateFrameBuffer(device->deviceGraphicsContexts[0], &msaaBuffer, swapChain->width * msaaAmount, swapChain->height * msaaAmount, VK_FORMAT_R8G8B8A8_UNORM, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 	
 	ChunkRenderer::init(device, msaaBuffer);
 	Camera::init(window);
@@ -120,50 +120,10 @@ int main() {
 			}
 		}
 	}
-	/*
-	ChunkRenderer::addChunk(Vec3i(0, -1, 0));
-	ChunkRenderer::addChunk(Vec3i(0, -1, 1));
-	ChunkRenderer::addChunk(Vec3i(0, -1, -1));
-	
-	ChunkRenderer::addChunk(Vec3i(1, -1, 0));
-	ChunkRenderer::addChunk(Vec3i(1, -1, 1));
-	ChunkRenderer::addChunk(Vec3i(1, -1, -1));
-	
-	ChunkRenderer::addChunk(Vec3i(-1, -1, 0));
-	ChunkRenderer::addChunk(Vec3i(-1, -1, 1));
-	ChunkRenderer::addChunk(Vec3i(-1, -1, -1));
-	
-	ChunkRenderer::addChunk(Vec3i(0, -2, 0));
-	ChunkRenderer::addChunk(Vec3i(0, -2, 1));
-	ChunkRenderer::addChunk(Vec3i(0, -2, -1));
-	
-	ChunkRenderer::addChunk(Vec3i(1, -2, 0));
-	ChunkRenderer::addChunk(Vec3i(1, -2, 1));
-	ChunkRenderer::addChunk(Vec3i(1, -2, -1));
-	
-	ChunkRenderer::addChunk(Vec3i(-1, -2, 0));
-	ChunkRenderer::addChunk(Vec3i(-1, -2, 1));
-	ChunkRenderer::addChunk(Vec3i(-1, -2, -1));
-	
-	ChunkRenderer::addChunk(Vec3i(0, -3, 0));
-	ChunkRenderer::addChunk(Vec3i(0, -3, 1));
-	ChunkRenderer::addChunk(Vec3i(0, -3, -1));
-	
-	ChunkRenderer::addChunk(Vec3i(1, -3, 0));
-	ChunkRenderer::addChunk(Vec3i(1, -3, 1));
-	ChunkRenderer::addChunk(Vec3i(1, -3, -1));
-	
-	ChunkRenderer::addChunk(Vec3i(-1, -3, 0));
-	ChunkRenderer::addChunk(Vec3i(-1, -3, 1));
-	ChunkRenderer::addChunk(Vec3i(-1, -3, -1));
-	*/
+
 	BG::init(device, swapChain, msaaBuffer);
 	Cursor::init(device, swapChain, msaaBuffer);
 	TextObject::init(device, msaaBuffer);
-	
-	TextObject* fpsText = new TextObject(16);
-	TextObject* rpsText = new TextObject(16);
-	TextObject* posText = new TextObject(64);
 	
 	double ct = glfwGetTime();
 	double dt = ct;
@@ -185,6 +145,10 @@ int main() {
 	vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
 	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
 	
+	TextObject* fpsText = new TextObject(16);
+	TextObject* rpsText = new TextObject(16);
+	TextObject* posText = new TextObject(64);
+
 	fpsText->setCoords(20, 20, 42);
 	fpsText->setText("FPS:0");
 	
@@ -250,14 +214,15 @@ int main() {
 			accDT = 0;
 		}
 		
+		
 		Camera::update(dt);
 		
 		posText->setText("POS: " + std::to_string(Camera::pos.x) + ", " + std::to_string(Camera::pos.y) + ", " + std::to_string(Camera::pos.z));
 		
 		vklBeginCommandBuffer(device, cmdBuffer);
-		
+
 		vklBeginRender(device, msaaBuffer, cmdBuffer);
-		
+
 		ChunkRenderer::render(cmdBuffer);
 		fpsText->render(cmdBuffer);
 		rpsText->render(cmdBuffer);
@@ -275,7 +240,7 @@ int main() {
 		
 		BG::render(cmdBuffer);
 		Cursor::render(cmdBuffer);
-		
+
 		vklEndRender(device, backBuffer, cmdBuffer);
 		
 		vklEndCommandBuffer(device, cmdBuffer);
@@ -291,6 +256,7 @@ int main() {
 	
 	delete fpsText;
 	delete rpsText;
+	delete posText;
 	
 	BG::destroy();
 	Cursor::destroy();

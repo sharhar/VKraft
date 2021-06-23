@@ -904,7 +904,7 @@ void Chunk::init(unsigned int seed, GLFWwindow* window, VulkanRenderContext* vul
 	gg_vrc = renderContext;
 	gg_freeInfo = freeInfo;
 
-	chunkThread = new std::thread(chunkThreadRun);
+	//chunkThread = new std::thread(chunkThreadRun);
 }
 
 void Chunk::destroy(VLKDevice* device) {
