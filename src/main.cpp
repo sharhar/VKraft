@@ -102,7 +102,7 @@ int main() {
 
 	VKLSwapChain* swapChain;
 	VKLFrameBuffer* backBuffer;
-	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_TRUE);
+	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_FALSE);
 	vklGetBackBuffer(swapChain, &backBuffer);
 	
 	float msaaAmount = 1.4f;
@@ -112,7 +112,15 @@ int main() {
 	
 	ChunkRenderer::init(device, msaaBuffer);
 	Camera::init(window);
-	
+
+	for(int y = -1; y > -4; y--) {
+		for(int x = -2; x < 3; x++) {
+			for(int z = -2; z < 3; z++) {
+				ChunkRenderer::addChunk(Vec3i(x, y, z));
+			}
+		}
+	}
+	/*
 	ChunkRenderer::addChunk(Vec3i(0, -1, 0));
 	ChunkRenderer::addChunk(Vec3i(0, -1, 1));
 	ChunkRenderer::addChunk(Vec3i(0, -1, -1));
@@ -148,7 +156,7 @@ int main() {
 	ChunkRenderer::addChunk(Vec3i(-1, -3, 0));
 	ChunkRenderer::addChunk(Vec3i(-1, -3, 1));
 	ChunkRenderer::addChunk(Vec3i(-1, -3, -1));
-	
+	*/
 	BG::init(device, swapChain, msaaBuffer);
 	Cursor::init(device, swapChain, msaaBuffer);
 	TextObject::init(device, msaaBuffer);

@@ -69,7 +69,7 @@ VLKComputeContext* getComputeContext(VLKContext* context) {
 	VLKCheck(vkMapMemory(computeContext->device->device, computeContext->posMemory, 0, memorySize, 0, &mapped),
 		"Could not map memory");
 
-	memset(mapped, 0, 6 * sizeof(float));
+	//(mapped, 0, 6 * sizeof(float));
 
 	vkUnmapMemory(computeContext->device->device, computeContext->posMemory);
 
@@ -385,7 +385,7 @@ static void cameraThreadRun() {
 			VLKCheck(vkMapMemory(context->device->device, context->outMemory, 0, memorySize, 0, &mapped),
 				"Could not map memory");
 
-			memset(mapped, 0, 3068 * sizeof(float));
+			//memset(mapped, 0, 3068 * sizeof(float));
 
 			vkUnmapMemory(context->device->device, context->outMemory);
 

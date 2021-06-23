@@ -50,7 +50,7 @@ Chunk::Chunk(VKLDevice* device, Vec3i pos) {
 		}
 		
 		m_cubes[i] = setProp(0, i, PROP_POS_MASK, PROP_POS_EXP);
-		m_cubes[i] = setProp(m_cubes[i], id, PORP_ID_MASK, PORP_ID_EXP);
+		m_cubes[i] = setProp(m_cubes[i], 4, PORP_ID_MASK, PORP_ID_EXP);
 	}
 	
 	calcRenderCubes();
@@ -59,10 +59,6 @@ Chunk::Chunk(VKLDevice* device, Vec3i pos) {
 		vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_instBuffer,  m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	}
 	
-	
-	
-	//vklCreateBuffer(m_device, &m_instBuffer, VK_FALSE, sizeof(int) * 16 * 16 * 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	//vklWriteToMemory(m_device, m_instBuffer->memory, m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), 0);
 }
 
 void Chunk::render(VkCommandBuffer cmdBuffer) {

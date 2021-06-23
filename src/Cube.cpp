@@ -48,7 +48,7 @@ CubeDataNode* Chunk::dataNode = NULL;
 
 inline void* malloc_c(size_t size) {
 	void* result = malloc(size);
-	memset(result, 0, size);
+	//memset(result, 0, size);
 	return result;
 }
 
