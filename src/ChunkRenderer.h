@@ -39,10 +39,7 @@ public:
 	static void render(VkCommandBuffer cmdBuffer);
 	static ChunkUniform* getUniform();
 	static void destroy();
-	
-	static void addChunk(Vec3i pos);
-private:
-	static std::vector<Chunk> m_chunks;
+private:\
 	static ChunkUniform* m_chunkUniformBufferData;
 	
 	static VKLDevice* m_device;

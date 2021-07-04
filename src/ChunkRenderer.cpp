@@ -6,11 +6,11 @@
 //
 
 #include "ChunkRenderer.h"
+#include "ChunkManager.h"
 
 #include <vector>
 #include "lodepng.h"
 
-std::vector<Chunk> ChunkRenderer::m_chunks = std::vector<Chunk>();
 ChunkUniform* ChunkRenderer::m_chunkUniformBufferData = NULL;
 VKLDevice* ChunkRenderer::m_device = NULL;
 VKLFrameBuffer* ChunkRenderer::m_framebuffer = NULL;
@@ -23,6 +23,8 @@ VKLTexture* ChunkRenderer::m_texture = NULL;
 void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	m_device = device;
 	m_framebuffer = framebuffer;
+	
+	Chunk::init(m_device);
 	
 	m_chunkUniformBufferData = (ChunkUniform*) malloc(sizeof(ChunkUniform));
 	memcpy(m_chunkUniformBufferData->proj, getPerspective(16.0f / 9.0f, 90), sizeof(float) * 16);
@@ -148,7 +150,7 @@ void ChunkRenderer::render(VkCommandBuffer cmdBuffer) {
 	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertBuffer->buffer, &offsets);
 	m_device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipelineLayout, 0, 1, &m_uniform->descriptorSet, 0, NULL);
 	
-	for (Chunk chunk: m_chunks) {
+	for (Chunk chunk: ChunkManager::getChunks()) {
 		m_device->pvkCmdPushConstants(cmdBuffer, m_pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(float) * 16 * 2, sizeof(float) * 3, &chunk.renderPos);
 		chunk.render(cmdBuffer);
 	}
@@ -166,8 +168,4 @@ void ChunkRenderer::destroy() {
 	vklDestroyBuffer(m_device, m_vertBuffer);
 	vklDestroyFrameBuffer(m_device, m_framebuffer);
 	free(m_chunkUniformBufferData);
-}
-
-void ChunkRenderer::addChunk(Vec3i pos) {
-	m_chunks.push_back(Chunk(m_device, pos));
 }

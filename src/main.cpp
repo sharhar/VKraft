@@ -4,6 +4,7 @@
 #include "BG.h"
 #include "Camera.h"
 #include "ChunkRenderer.h"
+#include "ChunkManager.h"
 #include "Cursor.h"
 #include "TextObject.h"
 
@@ -113,41 +114,46 @@ int main() {
 	ChunkRenderer::init(device, msaaBuffer);
 	Camera::init(window);
 	
-	ChunkRenderer::addChunk(Vec3i(0, -1, 0));
-	ChunkRenderer::addChunk(Vec3i(0, -1, 1));
-	ChunkRenderer::addChunk(Vec3i(0, -1, -1));
+	ChunkManager::addChunk(Vec3i(0, -3, 0));
+	ChunkManager::addChunk(Vec3i(0, -3, 1));
+	ChunkManager::addChunk(Vec3i(0, -3, -1));
 	
-	ChunkRenderer::addChunk(Vec3i(1, -1, 0));
-	ChunkRenderer::addChunk(Vec3i(1, -1, 1));
-	ChunkRenderer::addChunk(Vec3i(1, -1, -1));
+	ChunkManager::addChunk(Vec3i(1, -3, 0));
+	ChunkManager::addChunk(Vec3i(1, -3, 1));
+	ChunkManager::addChunk(Vec3i(1, -3, -1));
 	
-	ChunkRenderer::addChunk(Vec3i(-1, -1, 0));
-	ChunkRenderer::addChunk(Vec3i(-1, -1, 1));
-	ChunkRenderer::addChunk(Vec3i(-1, -1, -1));
+	ChunkManager::addChunk(Vec3i(-1, -3, 0));
+	ChunkManager::addChunk(Vec3i(-1, -3, 1));
+	ChunkManager::addChunk(Vec3i(-1, -3, -1));
 	
-	ChunkRenderer::addChunk(Vec3i(0, -2, 0));
-	ChunkRenderer::addChunk(Vec3i(0, -2, 1));
-	ChunkRenderer::addChunk(Vec3i(0, -2, -1));
+	ChunkManager::addChunk(Vec3i(0, -2, 0));
+	ChunkManager::addChunk(Vec3i(0, -2, 1));
+	ChunkManager::addChunk(Vec3i(0, -2, -1));
 	
-	ChunkRenderer::addChunk(Vec3i(1, -2, 0));
-	ChunkRenderer::addChunk(Vec3i(1, -2, 1));
-	ChunkRenderer::addChunk(Vec3i(1, -2, -1));
+	ChunkManager::addChunk(Vec3i(1, -2, 0));
+	ChunkManager::addChunk(Vec3i(1, -2, 1));
+	ChunkManager::addChunk(Vec3i(1, -2, -1));
 	
-	ChunkRenderer::addChunk(Vec3i(-1, -2, 0));
-	ChunkRenderer::addChunk(Vec3i(-1, -2, 1));
-	ChunkRenderer::addChunk(Vec3i(-1, -2, -1));
+	ChunkManager::addChunk(Vec3i(-1, -2, 0));
+	ChunkManager::addChunk(Vec3i(-1, -2, 1));
+	ChunkManager::addChunk(Vec3i(-1, -2, -1));
 	
-	ChunkRenderer::addChunk(Vec3i(0, -3, 0));
-	ChunkRenderer::addChunk(Vec3i(0, -3, 1));
-	ChunkRenderer::addChunk(Vec3i(0, -3, -1));
+	ChunkManager::addChunk(Vec3i(0, -1, 0));
+	ChunkManager::addChunk(Vec3i(0, -1, 1));
+	ChunkManager::addChunk(Vec3i(0, -1, -1));
 	
-	ChunkRenderer::addChunk(Vec3i(1, -3, 0));
-	ChunkRenderer::addChunk(Vec3i(1, -3, 1));
-	ChunkRenderer::addChunk(Vec3i(1, -3, -1));
+	int index = ChunkManager::getChunkAt(Vec3i(0, -1, 0));
 	
-	ChunkRenderer::addChunk(Vec3i(-1, -3, 0));
-	ChunkRenderer::addChunk(Vec3i(-1, -3, 1));
-	ChunkRenderer::addChunk(Vec3i(-1, -3, -1));
+	ChunkManager::getChunkFromIndex(index).renderPos = Vec3(0, 0, 0);
+	
+	ChunkManager::addChunk(Vec3i(1, -1, 0));
+	ChunkManager::addChunk(Vec3i(1, -1, 1));
+	ChunkManager::addChunk(Vec3i(1, -1, -1));
+	
+	ChunkManager::addChunk(Vec3i(-1, -1, 0));
+	ChunkManager::addChunk(Vec3i(-1, -1, 1));
+	ChunkManager::addChunk(Vec3i(-1, -1, -1));
+	
 	
 	BG::init(device, swapChain, msaaBuffer);
 	Cursor::init(device, swapChain, msaaBuffer);
