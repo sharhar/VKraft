@@ -15,6 +15,7 @@ const std::vector<Chunk>& ChunkManager::getChunks() {
 
 void ChunkManager::addChunk(Vec3i pos) {
 	m_chunks.push_back(Chunk(pos));
+	m_chunks.back().updateNearChunks();
 }
 
 int ChunkManager::getChunkAt(Vec3i pos) {
@@ -27,6 +28,10 @@ int ChunkManager::getChunkAt(Vec3i pos) {
 	return -1;
 }
 
-Chunk& ChunkManager::getChunkFromIndex(int index) {
-	return m_chunks[index];
+Chunk* ChunkManager::getChunkFromIndex(int index) {
+	if(index == -1) {
+		return NULL;
+	}
+	
+	return &(m_chunks.data()[index]);
 }

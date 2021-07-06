@@ -18,7 +18,7 @@ public:
 	static const std::vector<Chunk>& getChunks();
 	static void addChunk(Vec3i pos);
 	static int getChunkAt(Vec3i pos);
-	static Chunk& getChunkFromIndex(int index);
+	static Chunk* getChunkFromIndex(int index);
 private:
 	static std::vector<Chunk> m_chunks;
 };

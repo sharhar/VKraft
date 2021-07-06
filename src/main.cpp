@@ -114,45 +114,13 @@ int main() {
 	ChunkRenderer::init(device, msaaBuffer);
 	Camera::init(window);
 	
-	ChunkManager::addChunk(Vec3i(0, -3, 0));
-	ChunkManager::addChunk(Vec3i(0, -3, 1));
-	ChunkManager::addChunk(Vec3i(0, -3, -1));
-	
-	ChunkManager::addChunk(Vec3i(1, -3, 0));
-	ChunkManager::addChunk(Vec3i(1, -3, 1));
-	ChunkManager::addChunk(Vec3i(1, -3, -1));
-	
-	ChunkManager::addChunk(Vec3i(-1, -3, 0));
-	ChunkManager::addChunk(Vec3i(-1, -3, 1));
-	ChunkManager::addChunk(Vec3i(-1, -3, -1));
-	
-	ChunkManager::addChunk(Vec3i(0, -2, 0));
-	ChunkManager::addChunk(Vec3i(0, -2, 1));
-	ChunkManager::addChunk(Vec3i(0, -2, -1));
-	
-	ChunkManager::addChunk(Vec3i(1, -2, 0));
-	ChunkManager::addChunk(Vec3i(1, -2, 1));
-	ChunkManager::addChunk(Vec3i(1, -2, -1));
-	
-	ChunkManager::addChunk(Vec3i(-1, -2, 0));
-	ChunkManager::addChunk(Vec3i(-1, -2, 1));
-	ChunkManager::addChunk(Vec3i(-1, -2, -1));
-	
-	ChunkManager::addChunk(Vec3i(0, -1, 0));
-	ChunkManager::addChunk(Vec3i(0, -1, 1));
-	ChunkManager::addChunk(Vec3i(0, -1, -1));
-	
-	int index = ChunkManager::getChunkAt(Vec3i(0, -1, 0));
-	
-	ChunkManager::getChunkFromIndex(index).renderPos = Vec3(0, 0, 0);
-	
-	ChunkManager::addChunk(Vec3i(1, -1, 0));
-	ChunkManager::addChunk(Vec3i(1, -1, 1));
-	ChunkManager::addChunk(Vec3i(1, -1, -1));
-	
-	ChunkManager::addChunk(Vec3i(-1, -1, 0));
-	ChunkManager::addChunk(Vec3i(-1, -1, 1));
-	ChunkManager::addChunk(Vec3i(-1, -1, -1));
+	for(int x = -2; x < 3; x++) {
+		for(int z = -2; z < 3; z++) {
+			for(int y = -4; y < 2; y++) {
+				ChunkManager::addChunk(Vec3i(x, y, z));
+			}
+		}
+	}
 
 	BG::init(device, swapChain, msaaBuffer);
 	Cursor::init(device, swapChain, msaaBuffer);

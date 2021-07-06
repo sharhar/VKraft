@@ -32,6 +32,10 @@ typedef struct Vec3i {
 		float zd = z - other.z;
 		return sqrt(xd*xd + yd*yd + zd*zd);
 	}
+	
+	std::string to_string() {
+		return "(" + std::to_string(x) + ", "+ std::to_string(y) + ", "+ std::to_string(z) + ")";
+	}
 } Vec3i;
 
 typedef struct Vec3 {
