@@ -7,6 +7,7 @@
 
 #include "Chunk.h"
 #include "ChunkManager.h"
+#include "FastNoise.h"
 
 #define PROP_FACE_MASK 7
 #define PROP_FACE_EXP 0
@@ -51,33 +52,205 @@ void Chunk::init(VKLDevice* device) {
 	m_device = device;
 }
 
+typedef struct CubeNoise {
+	float nz1;
+	float nz2;
+
+	float nz;
+
+	float nzc;
+
+	float cnzc;
+	float inzc;
+} CubeNoise;
+
+inline float interpolateCubeValue(float val0, float val3, uint8_t rem) {
+	float m = (val3 - val0)/3.0f;
+
+	return val0 + m * rem;
+}
+
 Chunk::Chunk(Vec3i pos) {
 	m_pos = pos;
+	Vec3i worldPos = Vec3i(pos.x * 16, pos.y * 16, pos.z * 16);
 	m_foundAllBorders = 0;
 	
 	renderPos = Vec3(pos.x * 16.0f, - pos.y * 16.0f, pos.z * 16.0f);
 	
-	for(int i = 0; i < 16 * 16 * 16; i++) {
-		int z = 16 * pos.z + (i % 16);
-		int y = 16 * pos.y + ((i >> 4) % 16);
-		int x = 16 * pos.x + (i >> 8);
-		
-		int func = x*x + z*z;
-		
-		int height = y + func;
-		
-		int id = 0;
-		
-		if(height == -1) {
-			id = 4;
-		} else if(height < -1 && height >= -3) {
-			id = 4;
-		} else if (height < -3) {
-			id = 4;
+	unsigned int seed = 1337;
+	
+	FastNoise* heightNoise = new FastNoise(seed);
+	FastNoise* caveNoise = new FastNoise(seed);
+	caveNoise->SetFrequency(0.02);
+	caveNoise->SetCellularDistanceFunction(FastNoise::Euclidean);
+	caveNoise->SetCellularReturnType(FastNoise::Distance2Add);
+	FastNoise* oreNoise = new FastNoise(seed);
+	
+	CubeNoise* cubeNoises = new CubeNoise[16 * 16 * 16];
+
+	for (uint8_t x = 0; x < 16; x += 3) {
+		float xf = worldPos.x + x;
+		for (uint8_t z = 0; z < 16; z += 3) {
+			float zf = worldPos.z + z;
+			float nz1 = heightNoise->GetPerlin(xf / 1.2f, 0.8f, zf / 1.2f) * 64;
+			float nz2 = heightNoise->GetPerlin(xf * 2, 2.7f, zf * 2) * 16;
+
+			float nz = nz1 + nz2;
+
+			for (uint8_t y = 0; y < 16; y += 3) {
+				float yf = worldPos.y + y;
+
+				float yh = yf - nz;
+
+				if (yh <= 0) {
+					float nzc = caveNoise->GetCellular(xf, yf, zf);
+
+					cubeNoises[x * 256 + y * 16 + z].nzc = nzc;
+
+					if (nzc < 0.45 && yh <= -5) {
+						float cnzc = oreNoise->GetSimplex(xf / 0.5f, yf / 0.5f, zf / 0.5f);
+						float inzc = oreNoise->GetSimplex(xf / 0.25f, yf / 0.25f, zf / 0.25f);
+
+						cubeNoises[x * 256 + y * 16 + z].cnzc = cnzc;
+						cubeNoises[x * 256 + y * 16 + z].inzc = inzc;
+					}
+				}
+
+				cubeNoises[x * 256 + y * 16 + z].nz1 = nz1;
+				cubeNoises[x * 256 + y * 16 + z].nz2 = nz2;
+				cubeNoises[x * 256 + y * 16 + z].nz = nz;
+			}
 		}
-		
-		m_cubes[i] = setProp(0, i, PROP_POS_MASK, PROP_POS_EXP);
-		m_cubes[i] = setProp(m_cubes[i], id, PORP_ID_MASK, PORP_ID_EXP);
+	}
+	
+	for (uint8_t x = 0; x < 16; x += 1) {
+		for (uint8_t z = 0; z < 16; z += 3) {
+			for (uint8_t y = 0; y < 16; y += 3) {
+				uint8_t rem = x % 3;
+				if (rem != 0) {
+					uint8_t off = x - rem;
+
+					cubeNoises[x * 256 + y * 16 + z].nz1 = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].nz1, cubeNoises[(off + 3) * 256 + y * 16 + z].nz1, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz2 = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].nz2, cubeNoises[(off + 3) * 256 + y * 16 + z].nz2, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].nz, cubeNoises[(off+ 3) * 256 + y * 16 + z].nz, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nzc = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].nzc, cubeNoises[(off + 3) * 256 + y * 16 + z].nzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].cnzc = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].cnzc, cubeNoises[(off + 3) * 256 + y * 16 + z].cnzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].inzc = interpolateCubeValue(
+						cubeNoises[(off) * 256 + y * 16 + z].inzc, cubeNoises[(off + 3) * 256 + y * 16 + z].inzc, rem);
+				}
+			}
+		}
+	}
+
+	for (uint8_t x = 0; x < 16; x += 1) {
+		for (uint8_t z = 0; z < 16; z += 1) {
+			for (uint8_t y = 0; y < 16; y += 3) {
+				uint8_t rem = z % 3;
+				if (rem != 0) {
+					uint8_t off = z - rem;
+
+					cubeNoises[x * 256 + y * 16 + z].nz1 = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].nz1, cubeNoises[x * 256 + y * 16 + (off + 3)].nz1, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz2 = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].nz2, cubeNoises[x * 256 + y * 16 + (off + 3)].nz2, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].nz, cubeNoises[x * 256 + y * 16 + (off + 3)].nz, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nzc = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].nzc, cubeNoises[x * 256 + y * 16 + (off + 3)].nzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].cnzc = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].cnzc, cubeNoises[x * 256 + y * 16 + (off + 3)].cnzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].inzc = interpolateCubeValue(
+						cubeNoises[x * 256 + y * 16 + (off)].inzc, cubeNoises[x * 256 + y * 16 + (off + 3)].inzc, rem);
+				}
+			}
+		}
+	}
+
+	for (uint8_t x = 0; x < 16; x += 1) {
+		for (uint8_t z = 0; z < 16; z += 1) {
+			for (uint8_t y = 0; y < 16; y += 1) {
+				uint8_t rem = y % 3;
+				if (rem != 0) {
+					uint8_t off = y - rem;
+
+					cubeNoises[x * 256 + y * 16 + z].nz1 = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].nz1, cubeNoises[x * 256 + (off + 3) * 16 + z].nz1, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz2 = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].nz2, cubeNoises[x * 256 + (off + 3) * 16 + z].nz2, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nz = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].nz, cubeNoises[x * 256 + (off + 3) * 16 + z].nz, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].nzc = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].nzc, cubeNoises[x * 256 + (off + 3) * 16 + z].nzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].cnzc = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].cnzc, cubeNoises[x * 256 + (off + 3) * 16 + z].cnzc, rem);
+
+					cubeNoises[x * 256 + y * 16 + z].inzc = interpolateCubeValue(
+						cubeNoises[x * 256 + (off)* 16 + z].inzc, cubeNoises[x * 256 + (off + 3) * 16 + z].inzc, rem);
+				}
+			}
+		}
+	}
+	
+	for (uint8_t x = 0; x < 16; x++) {
+		float xf = worldPos.x + x;
+		for (uint8_t z = 0; z < 16; z++) {
+			float zf = worldPos.z + z;
+
+			for (uint8_t y = 0; y < 16; y++) {
+				float yf = worldPos.y + y;
+
+				float yh = yf - cubeNoises[x * 256 + y * 16 + z].nz;
+
+				int type = 0;
+
+				if (yh <= 0) {
+					if (cubeNoises[x * 256 + y * 16 + z].nzc < 0.45) {
+						if (yh <= 0 && yh > -1) {
+							type = 1;
+						}
+						else if (yh <= -1 && yh > -5) {
+							type = 2;
+						}
+						else {
+							if (cubeNoises[x * 256 + y * 16 + z].cnzc > 0.8) {
+								type = 4;
+							}
+							else if (cubeNoises[x * 256 + y * 16 + z].inzc > 0.8) {
+								type = 5;
+							}
+							else {
+								type = 3;
+							}
+
+						}
+					} else {
+						type = 0;
+					}
+				}
+				
+				m_cubes[x * 256 + y * 16 + z] = setProp(0, x * 256 + y * 16 + z, PROP_POS_MASK, PROP_POS_EXP);
+				m_cubes[x * 256 + y * 16 + z] = setProp(m_cubes[x * 256 + y * 16 + z], type, PORP_ID_MASK, PORP_ID_EXP);
+			}
+		}
 	}
 	
 	memset(m_chunkBorderData, 0, sizeof(uint64_t) * 4 * 6);
@@ -115,9 +288,7 @@ void Chunk::update() {
 void Chunk::getChunkBorders() {
 	if(m_foundAllBorders == 0) {
 		int found_count = 0;
-		
-		//printf("Update: %s\n", m_pos.to_string().c_str());
-		
+				
 		for(int i = 0; i < 6; i++) {
 			if(m_neighborChunks[i] == NULL) {
 				m_neighborChunks[i] = ChunkManager::getChunkFromIndex(ChunkManager::getChunkAt(m_pos.add(pos_offs[i])));
@@ -194,33 +365,27 @@ void Chunk::calcRenderCubes() {
 				
 				if(getProp(cube, PORP_ID_MASK, PORP_ID_EXP)) {
 					if (isCubeTrasparent(x-1, y, z)) {
-						int ID = setProp(cube, 3, PORP_ID_MASK, PORP_ID_EXP);
-						m_renderCubes.push_back(setProp(ID, 2, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(setProp(cube, 2, PROP_FACE_MASK, PROP_FACE_EXP));
 					}
 					
 					if (isCubeTrasparent(x+1, y, z)) {
-						int ID = setProp(cube, 2, PORP_ID_MASK, PORP_ID_EXP);
-						m_renderCubes.push_back(setProp(ID, 3, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(setProp(cube, 3, PROP_FACE_MASK, PROP_FACE_EXP));
 					}
 					
 					if (isCubeTrasparent(x, y, z-1)) {
-						int ID = setProp(cube, 8, PORP_ID_MASK, PORP_ID_EXP);
-						m_renderCubes.push_back(setProp(ID, 1, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(setProp(cube, 1, PROP_FACE_MASK, PROP_FACE_EXP));
 					}
 					
 					if (isCubeTrasparent(x, y, z+1)) {
-						int ID = setProp(cube, 1, PORP_ID_MASK, PORP_ID_EXP);
-						m_renderCubes.push_back(setProp(ID, 0, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(setProp(cube, 0, PROP_FACE_MASK, PROP_FACE_EXP));
 					}
 					
 					if (isCubeTrasparent(x, y-1, z)) {
-						int ID = setProp(cube, 6, PORP_ID_MASK, PORP_ID_EXP);
-						m_renderCubes.push_back(setProp(ID, 4, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(setProp(cube, 4, PROP_FACE_MASK, PROP_FACE_EXP));
 					}
 					
 					if (isCubeTrasparent(x, y+1, z)) {
-						int ID = setProp(cube, 5, PORP_ID_MASK, PORP_ID_EXP);
-						m_renderCubes.push_back(setProp(ID, 5, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(setProp(cube, 5, PROP_FACE_MASK, PROP_FACE_EXP));
 					}
 				}
 			}

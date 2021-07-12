@@ -114,9 +114,9 @@ int main() {
 	ChunkRenderer::init(device, msaaBuffer);
 	Camera::init(window);
 	
-	for(int x = -2; x < 3; x++) {
-		for(int z = -2; z < 3; z++) {
-			for(int y = -4; y < 2; y++) {
+	for(int x = -6; x < 6; x++) {
+		for(int z = -6; z < 6; z++) {
+			for(int y = -4; y < 4; y++) {
 				ChunkManager::addChunk(Vec3i(x, y, z));
 			}
 		}

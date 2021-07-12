@@ -93,6 +93,7 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 	pipelineCreateInfo.extent.height = m_framebuffer->height;
 	pipelineCreateInfo.pushConstantRanges = &push_constant;
 	pipelineCreateInfo.pushConstantRangeCount = 1;
+	pipelineCreateInfo.polyMode = VK_POLYGON_MODE_FILL;
 	
 	vklCreateGraphicsPipeline(device, &m_pipeline, &pipelineCreateInfo);
 	
