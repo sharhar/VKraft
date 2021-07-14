@@ -8,6 +8,8 @@
 #include "Cursor.h"
 #include "TextObject.h"
 
+#include <stdio.h>
+
 class Timer {
 private:
 	double m_startTime;
@@ -111,6 +113,8 @@ int main() {
 	VKLFrameBuffer* msaaBuffer;
 	vklCreateFrameBuffer(device->deviceGraphicsContexts[0], &msaaBuffer, swapChain->width * msaaAmount, swapChain->height * msaaAmount, VK_FORMAT_R8G8B8A8_UNORM, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 	
+	ChunkManager::init();
+
 	ChunkRenderer::init(device, msaaBuffer);
 	Camera::init(window);
 	
@@ -145,7 +149,7 @@ int main() {
 	
 	vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
 	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
-	
+
 	TextObject* fpsText = new TextObject(16);
 	TextObject* rpsText = new TextObject(16);
 	TextObject* posText = new TextObject(64);
@@ -163,15 +167,16 @@ int main() {
 	Timer renderTime("RenderTime");
 
 	while (!glfwWindowShouldClose(window)) {
-		frameTime.start();
-		
-		renderTime.start();
-		
 		glfwPollEvents();
 
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
+
+		frameTime.start();
+		
+		renderTime.start();
+		
 		
 		glfwGetWindowSize(window, &width, &height);
 
@@ -259,6 +264,7 @@ int main() {
 	delete rpsText;
 	delete posText;
 	
+	ChunkManager::destroy();
 	BG::destroy();
 	Cursor::destroy();
 	TextObject::destroy();

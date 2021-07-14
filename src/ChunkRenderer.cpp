@@ -125,6 +125,11 @@ void ChunkRenderer::init(VKLDevice* device, VKLFrameBuffer* framebuffer) {
 
 void ChunkRenderer::rebuildPipeline() {
 	vklDestroyPipeline(m_device, m_pipeline);
+
+	VkPushConstantRange push_constant;
+	push_constant.offset = 0;
+	push_constant.size = sizeof(float) * (16 * 2 + 3);
+	push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	
 	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
 	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
@@ -134,26 +139,31 @@ void ChunkRenderer::rebuildPipeline() {
 	pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
 	pipelineCreateInfo.extent.width = m_framebuffer->width;
 	pipelineCreateInfo.extent.height = m_framebuffer->height;
+	pipelineCreateInfo.pushConstantRanges = &push_constant;
+	pipelineCreateInfo.pushConstantRangeCount = 1;
 	
 	vklCreateGraphicsPipeline(m_device, &m_pipeline, &pipelineCreateInfo);
 }
 
 void ChunkRenderer::render(VkCommandBuffer cmdBuffer) {
 	m_device->pvkCmdPushConstants(cmdBuffer, m_pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 16 * 2, m_chunkUniformBufferData);
-	
+
 	VkViewport viewport = { 0, 0, m_framebuffer->width, m_framebuffer->height, 0, 1 };
 	VkRect2D scissor = { {0, 0}, {m_framebuffer->width, m_framebuffer->height} };
 	VkDeviceSize offsets = 0;
-	
+
 	m_device->pvkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 	m_device->pvkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 	m_device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipeline);
 	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertBuffer->buffer, &offsets);
 	m_device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipelineLayout, 0, 1, &m_uniform->descriptorSet, 0, NULL);
-	
-	for (Chunk chunk: ChunkManager::getChunks()) {
-		m_device->pvkCmdPushConstants(cmdBuffer, m_pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(float) * 16 * 2, sizeof(float) * 3, &chunk.renderPos);
-		chunk.render(cmdBuffer);
+
+	for (int i = 0; i < ChunkManager::getChunkCount(); i++) {
+		Chunk* chunk = ChunkManager::getChunkFromIndex(i);
+		if (chunk->renderable()) {
+			m_device->pvkCmdPushConstants(cmdBuffer, m_pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(float) * 16 * 2, sizeof(float) * 3, &chunk->renderPos);
+			chunk->render(cmdBuffer);
+		}
 	}
 }
 

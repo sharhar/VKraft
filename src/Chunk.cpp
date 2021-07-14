@@ -70,10 +70,16 @@ inline float interpolateCubeValue(float val0, float val3, uint8_t rem) {
 	return val0 + m * rem;
 }
 
-Chunk::Chunk(Vec3i pos) {
+Chunk::Chunk() {
+	m_instBuffer = NULL;
+	m_pos = Vec3i(0, 0, 0);
+	m_foundAllBorders = 0;
+	renderPos = Vec3(0, 0, 0);
+}
+
+void Chunk::init(Vec3i pos) {
 	m_pos = pos;
 	Vec3i worldPos = Vec3i(pos.x * 16, pos.y * 16, pos.z * 16);
-	m_foundAllBorders = 0;
 	
 	renderPos = Vec3(pos.x * 16.0f, - pos.y * 16.0f, pos.z * 16.0f);
 	
@@ -220,7 +226,7 @@ Chunk::Chunk(Vec3i pos) {
 
 				float yh = yf - cubeNoises[x * 256 + y * 16 + z].nz;
 
-				int type = 0;
+				uint8_t type = 0;
 
 				if (yh <= 0) {
 					if (cubeNoises[x * 256 + y * 16 + z].nzc < 0.45) {
@@ -247,12 +253,16 @@ Chunk::Chunk(Vec3i pos) {
 					}
 				}
 				
-				m_cubes[x * 256 + y * 16 + z] = setProp(0, x * 256 + y * 16 + z, PROP_POS_MASK, PROP_POS_EXP);
-				m_cubes[x * 256 + y * 16 + z] = setProp(m_cubes[x * 256 + y * 16 + z], type, PORP_ID_MASK, PORP_ID_EXP);
+				m_cubes[x * 256 + y * 16 + z] = type;
 			}
 		}
 	}
 	
+	delete heightNoise;
+	delete caveNoise;
+	delete oreNoise;
+	delete[] cubeNoises;
+
 	memset(m_chunkBorderData, 0, sizeof(uint64_t) * 4 * 6);
 	m_foundAllBorders = 0;
 	
@@ -292,10 +302,6 @@ void Chunk::getChunkBorders() {
 		for(int i = 0; i < 6; i++) {
 			if(m_neighborChunks[i] == NULL) {
 				m_neighborChunks[i] = ChunkManager::getChunkFromIndex(ChunkManager::getChunkAt(m_pos.add(pos_offs[i])));
-				
-				if(m_neighborChunks[i] != NULL) {
-					//printf("ID2: %d\n", i);
-				}
 			}
 			
 			if(m_neighborChunks[i] != NULL) {
@@ -316,15 +322,19 @@ void Chunk::getChunkBorders() {
 }
 
 void Chunk::render(VkCommandBuffer cmdBuffer) {
-	if(m_foundAllBorders && m_renderCubes.size()) {
-		VkDeviceSize offsets = 0;
-		m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instBuffer->buffer, &offsets);
-		m_device->pvkCmdDraw(cmdBuffer, 6, m_renderCubes.size(), 0, 0);
-	}
+	VkDeviceSize offsets = 0;
+	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instBuffer->buffer, &offsets);
+	m_device->pvkCmdDraw(cmdBuffer, 6, m_renderCubes.size(), 0, 0);
+}
+
+uint8_t Chunk::renderable() {
+	return m_foundAllBorders && m_renderCubes.size();
 }
 
 void Chunk::destroy() {
-	vklDestroyBuffer(m_device, m_instBuffer);
+	if (m_instBuffer != NULL) {
+		vklDestroyBuffer(m_device, m_instBuffer);
+	}
 }
 
 uint32_t Chunk::isCubeTrasparent(int x, int y, int z) {
@@ -352,7 +362,15 @@ uint32_t Chunk::isCubeTrasparent(int x, int y, int z) {
 		return getChunkBorderBit(FRONT_CHUNK_BORDER, 16 * x + y);
 	}
 	
-	return getProp(m_cubes[x * 256 + y * 16 + z], PORP_ID_MASK, PORP_ID_EXP) == 0;
+	return m_cubes[x * 256 + y * 16 + z] == 0;
+}
+
+uint32_t calcCubeFace(uint8_t type, uint8_t face, uint32_t pos) {
+	uint32_t result = 0;
+	result = setProp(result, face, PROP_FACE_MASK, PROP_FACE_EXP);
+	result = setProp(result, pos, PROP_POS_MASK, PROP_POS_EXP);
+	result = setProp(result, type, PORP_ID_MASK, PORP_ID_EXP);
+	return result;
 }
 
 void Chunk::calcRenderCubes() {
@@ -361,31 +379,32 @@ void Chunk::calcRenderCubes() {
 	for(int x = 0; x < 16; x++) {
 		for(int y = 0; y < 16; y++) {
 			for(int z = 0; z < 16; z++) {
-				uint32_t cube = m_cubes[x * 256 + y * 16 + z];
+				uint32_t index = x * 256 + y * 16 + z;
+				uint8_t cube = m_cubes[index];
 				
-				if(getProp(cube, PORP_ID_MASK, PORP_ID_EXP)) {
+				if (cube) {
 					if (isCubeTrasparent(x-1, y, z)) {
-						m_renderCubes.push_back(setProp(cube, 2, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(calcCubeFace(cube, 2, index));
 					}
 					
 					if (isCubeTrasparent(x+1, y, z)) {
-						m_renderCubes.push_back(setProp(cube, 3, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(calcCubeFace(cube, 3, index));
 					}
 					
 					if (isCubeTrasparent(x, y, z-1)) {
-						m_renderCubes.push_back(setProp(cube, 1, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(calcCubeFace(cube, 1, index));
 					}
 					
 					if (isCubeTrasparent(x, y, z+1)) {
-						m_renderCubes.push_back(setProp(cube, 0, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(calcCubeFace(cube, 0, index));
 					}
 					
 					if (isCubeTrasparent(x, y-1, z)) {
-						m_renderCubes.push_back(setProp(cube, 4, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(calcCubeFace(cube, 4, index));
 					}
 					
 					if (isCubeTrasparent(x, y+1, z)) {
-						m_renderCubes.push_back(setProp(cube, 5, PROP_FACE_MASK, PROP_FACE_EXP));
+						m_renderCubes.push_back(calcCubeFace(cube, 5, index));
 					}
 				}
 			}
@@ -393,7 +412,7 @@ void Chunk::calcRenderCubes() {
 	}
 }
 
-void Chunk::setChunkBorderBit(int borderID, int cubePos, uint32_t value) {
+void Chunk::setChunkBorderBit(int borderID, int cubePos, uint8_t value) {
 	int arrayOffset = cubePos / 64;
 	int bitOffset = cubePos % 64;
 	
@@ -412,22 +431,22 @@ uint32_t Chunk::getChunkBorderBit(int borderID, int cubePos) {
 void Chunk::calcChunkBorderData() {
 	for(int x = 0; x < 16; x++) {
 		for(int z = 0; z < 16; z++) {
-			setChunkBorderBit(BOTTOM_CHUNK_BORDER, x * 16 + z, getProp(m_cubes[x * 256 + 15 * 16 + z], PORP_ID_MASK, PORP_ID_EXP));
-			setChunkBorderBit(TOP_CHUNK_BORDER   , x * 16 + z, getProp(m_cubes[x * 256 +  0 * 16 + z], PORP_ID_MASK, PORP_ID_EXP));
+			setChunkBorderBit(BOTTOM_CHUNK_BORDER, x * 16 + z, m_cubes[x * 256 + 15 * 16 + z]);
+			setChunkBorderBit(TOP_CHUNK_BORDER   , x * 16 + z, m_cubes[x * 256 +  0 * 16 + z]);
 		}
 	}
 	
 	for(int y = 0; y < 16; y++) {
 		for(int z = 0; z < 16; z++) {
-			setChunkBorderBit(LEFT_CHUNK_BORDER , y * 16 + z, getProp(m_cubes[15 * 256 + y * 16 + z], PORP_ID_MASK, PORP_ID_EXP));
-			setChunkBorderBit(RIGHT_CHUNK_BORDER, y * 16 + z, getProp(m_cubes[ 0 * 256 + y * 16 + z], PORP_ID_MASK, PORP_ID_EXP));
+			setChunkBorderBit(LEFT_CHUNK_BORDER , y * 16 + z, m_cubes[15 * 256 + y * 16 + z]);
+			setChunkBorderBit(RIGHT_CHUNK_BORDER, y * 16 + z, m_cubes[ 0 * 256 + y * 16 + z]);
 		}
 	}
 	
 	for(int x = 0; x < 16; x++) {
 		for(int y = 0; y < 16; y++) {
-			setChunkBorderBit(BACK_CHUNK_BORDER , x * 16 + y, getProp(m_cubes[x * 256 + y * 16 + 15], PORP_ID_MASK, PORP_ID_EXP));
-			setChunkBorderBit(FRONT_CHUNK_BORDER, x * 16 + y, getProp(m_cubes[x * 256 + y * 16 +  0], PORP_ID_MASK, PORP_ID_EXP));
+			setChunkBorderBit(BACK_CHUNK_BORDER , x * 16 + y, m_cubes[x * 256 + y * 16 + 15]);
+			setChunkBorderBit(FRONT_CHUNK_BORDER, x * 16 + y, m_cubes[x * 256 + y * 16 + 0]);
 		}
 	}
 }
