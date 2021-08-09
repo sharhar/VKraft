@@ -6,7 +6,7 @@
 //
 
 #include "BG.h"
-
+/*
 VKLDevice* BG::m_device = NULL;
 VKLBuffer* BG::m_vertBuffer = NULL;
 VKLShader* BG::m_shader = NULL;
@@ -118,3 +118,4 @@ void BG::destroy() {
 	vklDestroyBuffer(m_device, m_vertBuffer);
 	
 }
+*/

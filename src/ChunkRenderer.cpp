@@ -11,6 +11,7 @@
 #include <vector>
 #include "lodepng.h"
 
+/*
 ChunkUniform* ChunkRenderer::m_chunkUniformBufferData = NULL;
 VKLDevice* ChunkRenderer::m_device = NULL;
 VKLFrameBuffer* ChunkRenderer::m_framebuffer = NULL;
@@ -170,3 +171,4 @@ void ChunkRenderer::destroy() {
 	vklDestroyFrameBuffer(m_device, m_framebuffer);
 	free(m_chunkUniformBufferData);
 }
+*/

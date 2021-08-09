@@ -9,7 +9,7 @@
 
 #include "lodepng.h"
 #include <iostream>
-
+/*
 VKLBuffer* TextObject::m_vertBuffer = NULL;
 VKLDevice* TextObject::m_device = NULL;
 VKLShader* TextObject::m_shader = NULL;
@@ -203,3 +203,4 @@ void TextObject::setCoords(float xPos, float yPos, float size) {
 	vklWriteToMemory(m_device, m_uniformBuffer->memory, buff, sizeof(float) * 3, sizeof(float) * 16);
 }
 
+*/

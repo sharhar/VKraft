@@ -1,6 +1,8 @@
 #include <VKL/VKL.h>
 #include <GLFW/glfw3.h>
 
+#include <iostream>
+
 #include "BG.h"
 #include "Camera.h"
 #include "ChunkRenderer.h"
@@ -70,105 +72,199 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 int main() {
 	glfwInit();
+	
+	VkExtent2D windowSize;
+	windowSize.width = 800;
+	windowSize.height = 600;
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	GLFWwindow* window = glfwCreateWindow(1600, 900, "VKraft", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(windowSize.width, windowSize.height, "VKraft", NULL, NULL);
 
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	glfwSetWindowFocusCallback(window, window_focus_callback);
-	glfwSetMouseButtonCallback(window, mouse_button_callback);
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	//glfwSetWindowFocusCallback(window, window_focus_callback);
+	//glfwSetMouseButtonCallback(window, mouse_button_callback);
 
-	VkBool32 debug = 0;
-
-#ifdef _DEBUG
-	debug = 1;
-#endif
-
-	uint32_t extensionCountGLFW = 0;
-	char** extensionsGLFW = (char**)glfwGetRequiredInstanceExtensions(&extensionCountGLFW);
-
-	VKLInstance* instance;
-	vklCreateInstance(&instance, NULL, extensionsGLFW[1], glfwGetInstanceProcAddress, debug);
-
-	VKLSurface* surface = (VKLSurface*) malloc(sizeof(VKLSurface));
-	glfwCreateWindowSurface(instance->instance, window, NULL, &surface->surface);
-
-	surface->width = 1280;
-	surface->height = 720;
-
-	VKLDevice* device;
-	VKLDeviceGraphicsContext** deviceContexts;
-	VKLDeviceComputeContext** deviceComps;
-	vklCreateDevice(instance, &device, &surface, 1, &deviceContexts, 1, &deviceComps);
-
-	VKLSwapChain* swapChain;
-	VKLFrameBuffer* backBuffer;
-	vklCreateSwapChain(device->deviceGraphicsContexts[0], &swapChain, VK_FALSE);
-	vklGetBackBuffer(swapChain, &backBuffer);
-
-	float msaaAmount = 1.4f;
+	uint32_t glfwExtensionCount = 0;
+	const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 	
-	VKLFrameBuffer* msaaBuffer;
-	vklCreateFrameBuffer(device->deviceGraphicsContexts[0], &msaaBuffer, swapChain->width * msaaAmount, swapChain->height * msaaAmount, VK_FORMAT_R8G8B8A8_UNORM, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	VKLInstanceCreateInfo instanceCreateInfo;
+	instanceCreateInfo.setProcAddr(glfwGetInstanceProcAddress)
+						.addExtensions(glfwExtensions, glfwExtensionCount)
+						.addExtension("VK_KHR_get_physical_device_properties2")
+						.makeDebug();
 	
-	ChunkRenderer::init(device, msaaBuffer);
-	Camera::init(window);
+	instanceCreateInfo.printSelections();
 	
-	for(int x = -6; x < 6; x++) {
-		for(int z = -6; z < 6; z++) {
-			for(int y = -4; y < 4; y++) {
-				ChunkManager::addChunk(Vec3i(x, y, z));
-			}
-		}
+	VKLInstance instance(instanceCreateInfo);
+	
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
+	glfwCreateWindowSurface(instance.handle(), window, NULL, &surface);
+	
+	const VKLPhysicalDevice& physicalDevice = instance.getPhysicalDevices()[0];
+	
+	for (int i = 0; i < physicalDevice.getQueueFamilyProperties().size(); i++) {
+		printf("%d: %d (%d)\n", i, physicalDevice.getQueueFamilyProperties()[i].queueFlags, physicalDevice.getQueueFamilyProperties()[i].queueCount);
 	}
-
-	BG::init(device, swapChain, msaaBuffer);
-	Cursor::init(device, swapChain, msaaBuffer);
-	TextObject::init(device, msaaBuffer);
 	
+	VKLDeviceCreateInfo deviceCreateInfo;
+	deviceCreateInfo.seyPhysicalDevice(physicalDevice)
+					.addExtension("VK_KHR_swapchain").addExtension("VK_KHR_portability_subset")
+					.setQueueTypeCount(VKL_QUEUE_TYPE_GRAPHICS, 1)
+					.setQueueTypeCount(VKL_QUEUE_TYPE_COMPUTE, 1)
+					.setQueueTypeCount(VKL_QUEUE_TYPE_TRANSFER, 1);
+	
+	VKLDevice device(deviceCreateInfo);
+	
+	VKLQueue graphicsQueue = device.getQueue(VKL_QUEUE_TYPE_GRAPHICS, 0);
+	
+	VKLSwapChainCreateInfo swapChainCreateInfo;
+	swapChainCreateInfo.setQueue(graphicsQueue).setSurface(surface).setPresentMode(VK_PRESENT_MODE_IMMEDIATE_KHR);
+	
+	VKLSwapChain swapChain(swapChainCreateInfo);
+	
+	VkClearValue clearColor;
+	clearColor.color.float32[0] = 0.25f;
+	clearColor.color.float32[1] = 0.45f;
+	clearColor.color.float32[2] = 1.0f;
+	clearColor.color.float32[3] = 1.0f;
+	
+	swapChain.setClearValue(clearColor, 0);
+	
+	Cursor cursor(&device, &swapChain, &graphicsQueue);
+	
+	VKLCommandBuffer cmdBuffer(&graphicsQueue);
+	
+	VkFence renderFence = device.createFence(0);
+	
+	Timer frameTime("FrameTime");
+	Timer renderTime("RenderTime");
+
 	double ct = glfwGetTime();
 	double dt = ct;
 
 	float accDT = 0;
 	uint32_t frames = 0;
 	uint32_t fps = 0;
-
-	int width, height;
-	int pwidth, pheight;
-
-	glfwGetWindowSize(window, &width, &height);
-	pwidth = width;
-	pheight = height;
 	
-	VkCommandBuffer cmdBuffer;
-	vklAllocateCommandBuffer(device->deviceGraphicsContexts[0], &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-	
-	vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
-	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
-	
-	TextObject* fpsText = new TextObject(16);
-	TextObject* rpsText = new TextObject(16);
-	TextObject* posText = new TextObject(64);
-
-	fpsText->setCoords(20, 20, 42);
-	fpsText->setText("FPS:0");
-	
-	rpsText->setCoords(20, 68, 42);
-	rpsText->setText("RPS:0");
-	
-	posText->setCoords(20, 116, 32);
-	posText->setText("POS: 100, 100, 100");
-	
-	Timer frameTime("FrameTime");
-	Timer renderTime("RenderTime");
-
 	while (!glfwWindowShouldClose(window)) {
 		frameTime.start();
 		
-		renderTime.start();
-		
 		glfwPollEvents();
+		
+		dt = glfwGetTime() - ct;
+		ct = glfwGetTime();
 
+		accDT += dt;
+		frames++;
+
+		if (accDT > 1) {
+			fps = frames;
+			
+			std::cout << ("FPS:" + std::to_string((int) (1.0 / frameTime.getLapTime()))) << std::endl;
+			//std::cout << ("RPS:" + std::to_string((int)(1.0 / renderTime.getLapTime()))) << std::endl;
+			
+			//std::cout << "FPS:" + std::to_string(frameTime.getLapTime()) << std::endl;
+			//std::cout << "RPS:" + std::to_string(renderTime.getLapTime()) << std::endl;
+			
+			//fpsText->setText("FPS:" + std::to_string((int) (1.0 / frameTime.getLapTime())));
+			//rpsText->setText("RPS:" + std::to_string((int)(1.0 / renderTime.getLapTime())));
+			
+			frameTime.reset();
+			//renderTime.reset();
+			
+			frames = 0;
+			accDT = 0;
+		}
+		
+		cmdBuffer.begin();
+		
+		swapChain.beingRender(&cmdBuffer);
+		
+		cursor.render(&cmdBuffer);
+		
+		swapChain.endRender(&cmdBuffer);
+		
+		cmdBuffer.end();
+		
+		graphicsQueue.submit(&cmdBuffer, renderFence);
+		
+		device.waitForFence(renderFence);
+		device.resetFence(renderFence);
+		
+		swapChain.present();
+		
+		frameTime.stop();
+	}
+	
+	device.destroyFence(renderFence);
+	
+	cmdBuffer.destroy();
+	
+	swapChain.destroy();
+	
+	cursor.destroy();
+	device.destroy();
+	
+	instance.destroySurface(surface);
+	instance.destroy();
+	
+	glfwDestroyWindow(window);
+	glfwTerminate();
+
+	return 0;
+}
+
+/*
+
+float msaaAmount = 1.4f;
+
+VKLFrameBuffer* msaaBuffer;
+vklCreateFrameBuffer(device->deviceGraphicsContexts[0], &msaaBuffer, swapChain->width * msaaAmount, swapChain->height * msaaAmount, VK_FORMAT_R8G8B8A8_UNORM, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+ChunkRenderer::init(device, msaaBuffer);
+Camera::init(window);
+
+for(int x = -6; x < 6; x++) {
+	for(int z = -6; z < 6; z++) {
+		for(int y = -4; y < 4; y++) {
+			ChunkManager::addChunk(Vec3i(x, y, z));
+		}
+	}
+}
+
+BG::init(device, swapChain, msaaBuffer);
+Cursor::init(device, swapChain, msaaBuffer);
+TextObject::init(device, msaaBuffer);
+
+int width, height;
+int pwidth, pheight;
+
+glfwGetWindowSize(window, &width, &height);
+pwidth = width;
+pheight = height;
+
+VkCommandBuffer cmdBuffer;
+vklAllocateCommandBuffer(device->deviceGraphicsContexts[0], &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+
+vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
+vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
+
+TextObject* fpsText = new TextObject(16);
+TextObject* rpsText = new TextObject(16);
+TextObject* posText = new TextObject(64);
+
+fpsText->setCoords(20, 20, 42);
+fpsText->setText("FPS:0");
+
+rpsText->setCoords(20, 68, 42);
+rpsText->setText("RPS:0");
+
+posText->setCoords(20, 116, 32);
+posText->setText("POS: 100, 100, 100");
+
+
+
+/*
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
@@ -195,25 +291,6 @@ int main() {
 		
 		pwidth = width;
 		pheight = height;
-		
-		dt = glfwGetTime() - ct;
-		ct = glfwGetTime();
-
-		accDT += dt;
-		frames++;
-
-		if (accDT > 1) {
-			fps = frames;
-			
-			fpsText->setText("FPS:" + std::to_string((int) (1.0 / frameTime.getLapTime())));
-			rpsText->setText("RPS:" + std::to_string((int)(1.0 / renderTime.getLapTime())));
-			
-			frameTime.reset();
-			renderTime.reset();
-			
-			frames = 0;
-			accDT = 0;
-		}
 		
 		
 		Camera::update(dt);
@@ -248,30 +325,21 @@ int main() {
 		
 		vklExecuteCommandBuffer(device->deviceGraphicsContexts[0], cmdBuffer);
 		
-		renderTime.stop();
+ */
+		//renderTime.stop();
 
-		vklPresent(swapChain);
+	//	vklPresent(swapChain);
 		
-		frameTime.stop();
-	}
-	
-	delete fpsText;
-	delete rpsText;
-	delete posText;
-	
-	BG::destroy();
-	Cursor::destroy();
-	TextObject::destroy();
-	ChunkRenderer::destroy();
-	Camera::destroy();
-	
-	vklDestroySwapChain(swapChain);
-	vklDestroyDevice(device);
-	vklDestroySurface(instance, surface);
-	vklDestroyInstance(instance);
+		//frameTime.stop();
 
-	glfwDestroyWindow(window);
-	glfwTerminate();
+/*
+delete fpsText;
+delete rpsText;
+delete posText;
 
-	return 0;
-}
+BG::destroy();
+Cursor::destroy();
+TextObject::destroy();
+ChunkRenderer::destroy();
+Camera::destroy();
+*/

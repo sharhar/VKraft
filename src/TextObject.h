@@ -10,7 +10,7 @@
 
 #include <VKL/VKL.h>
 #include <string>
-
+/*
 class TextObject {
 public:
 	static void init(VKLDevice* device, VKLFrameBuffer* framebuffer);
@@ -37,5 +37,5 @@ private:
 	VKLBuffer* m_uniformBuffer;
 	int m_charNum;
 };
-
+*/
 #endif /* TextObject_h */

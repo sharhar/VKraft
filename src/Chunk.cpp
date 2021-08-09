@@ -38,7 +38,7 @@ Vec3i pos_offs[6] = {
 	Vec3i(0, 0, 1),
 };
 
-VKLDevice* Chunk::m_device = NULL;
+//VKLDevice* Chunk::m_device = NULL;
 
 static int getProp(int num, int mask, int exp) {
 	return (num >> exp) & mask;
@@ -48,9 +48,9 @@ static int setProp(int num, int val, int mask, int exp) {
 	return (val << exp) | (num & (~(mask << exp)));
 }
 
-void Chunk::init(VKLDevice* device) {
-	m_device = device;
-}
+//void Chunk::init(VKLDevice* device) {
+//	m_device = device;
+//}
 
 typedef struct CubeNoise {
 	float nz1;
@@ -280,7 +280,7 @@ void Chunk::update() {
 		calcRenderCubes();
 		
 		if(m_renderCubes.size()) {
-			vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_instBuffer,  m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			//vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_instBuffer,  m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 		}
 	}
 }
@@ -318,13 +318,13 @@ void Chunk::getChunkBorders() {
 void Chunk::render(VkCommandBuffer cmdBuffer) {
 	if(m_foundAllBorders && m_renderCubes.size()) {
 		VkDeviceSize offsets = 0;
-		m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instBuffer->buffer, &offsets);
-		m_device->pvkCmdDraw(cmdBuffer, 6, m_renderCubes.size(), 0, 0);
+		//m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instBuffer->buffer, &offsets);
+		//m_device->pvkCmdDraw(cmdBuffer, 6, m_renderCubes.size(), 0, 0);
 	}
 }
 
 void Chunk::destroy() {
-	vklDestroyBuffer(m_device, m_instBuffer);
+	//vklDestroyBuffer(m_device, m_instBuffer);
 }
 
 uint32_t Chunk::isCubeTrasparent(int x, int y, int z) {

@@ -14,7 +14,7 @@
 
 class Chunk {
 public:
-	static void init(VKLDevice* device);
+	//static void init(VKLDevice* device);
 	
 	Chunk(Vec3i pos);
 	void render(VkCommandBuffer cmdBuffer);
@@ -25,8 +25,8 @@ public:
 	
 	Vec3 renderPos;
 private:
-	static VKLDevice* m_device;
-	VKLBuffer* m_instBuffer;
+	//static VKLDevice* m_device;
+	//VKLBuffer* m_instBuffer;
 	Vec3i m_pos;
 	uint32_t m_cubes[16*16*16];
 	std::vector<uint32_t> m_renderCubes;

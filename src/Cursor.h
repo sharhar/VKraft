@@ -12,19 +12,32 @@
 
 class Cursor {
 public:
-	static void init(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* framebuffer);
-	static void rebuildPipeline(VKLSwapChain* swapChain, VKLFrameBuffer* framebuffer);
-	static void updateProjection(int width, int height);
-	static void render(VkCommandBuffer cmdBuff);
-	static void destroy();
+	Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue* queue);
+	void updateProjection(int width, int height);
+	void render(VKLCommandBuffer* cmdBuffer);
+	void destroy();
 private:
-	static VKLDevice* m_device;
+	const VKLDevice* m_device;
+	VKLQueue* m_queue;
 	
-	static VKLBuffer* m_vertBuffer;
-	static VKLBuffer* m_uniformBuffer;
-	static VKLShader* m_shader;
-	static VKLUniformObject* m_uniform;
-	static VKLPipeline* m_pipeline;
+	VKLBuffer m_vertBuffer;
+	VKLShader m_shader;
+	
+	VKLPipeline m_pipeline;
+	
+	float m_screenSize[2];
+	
+	VkDescriptorPool m_pool;
+	VkDescriptorSet m_descSet;
+	VkSampler m_sampler;
+	
+	VKLImage m_tempImage;
+	
+	
+	//VKLBuffer* m_uniformBuffer;
+	
+	//VKLUniformObject* m_uniform;
+	
 };
 
 #endif /* Cursor_h */

@@ -15,6 +15,7 @@
 #include <thread>
 #include <vector>
 
+/*
 typedef struct ChunkUniform {
 	float view[16] = { 1, 0, 0, 0,
 		0, 1, 0, 0,
@@ -50,5 +51,5 @@ private:\
 	static VKLPipeline* m_pipeline;
 	static VKLTexture* m_texture;
 };
-
+*/
 #endif /* ChunkRenderer_h */

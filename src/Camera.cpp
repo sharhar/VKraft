@@ -144,7 +144,7 @@ void Camera::update(float dt) {
 	renderPos.y = -pos.y;
 	renderPos.z = pos.z;
 
-	getWorldview(ChunkRenderer::getUniform()->view, renderPos, rot);
+	//getWorldview(ChunkRenderer::getUniform()->view, renderPos, rot);
 }
 
 void Camera::destroy() {

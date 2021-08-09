@@ -184,3 +184,35 @@ static void getModelview(float* mat, Vec3 pos, Vec3 rot, Vec3 scale) {
 	mat[14] = pos.z;
 	mat[15] = 1;
 }
+
+static char* readBinaryFile(const char *filename, size_t* size) {
+	char *buffer = NULL;
+	size_t string_size, read_size;
+	FILE *handler = fopen(filename, "rb");
+
+	if (handler) {
+		fseek(handler, 0, SEEK_END);
+		string_size = ftell(handler);
+		rewind(handler);
+
+		buffer = (char*)malloc(sizeof(char) * (string_size + 1));
+
+		read_size = fread(buffer, sizeof(char), string_size, handler);
+
+		buffer[string_size] = '\0';
+
+		if (string_size != read_size) {
+			printf("Error occured while reading file!\nstring_size = %zu\nread_size = %zu\n\n", string_size, read_size);
+			free(buffer);
+			buffer = NULL;
+		}
+
+		*size = read_size;
+
+		fclose(handler);
+	} else {
+		printf("Did not find file!\n");
+	}
+
+	return buffer;
+}

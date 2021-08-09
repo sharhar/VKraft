@@ -9,7 +9,7 @@
 #define BG_h
 
 #include <VKL/VKL.h>
-
+/*
 class BG {
 public:
 	static void init(VKLDevice* device, VKLSwapChain* swapChain, VKLFrameBuffer* framebuffer);
@@ -24,5 +24,5 @@ private:
 	static VKLUniformObject* m_uniform;
 	static VKLPipeline* m_pipeline;
 };
-
+*/
 #endif /* BG_h */
