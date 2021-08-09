@@ -10,6 +10,8 @@
 #include "Cursor.h"
 #include "TextObject.h"
 
+#include <stdio.h>
+
 class Timer {
 private:
 	double m_startTime;
@@ -93,7 +95,14 @@ int main() {
 						.addExtension("VK_KHR_get_physical_device_properties2")
 						.makeDebug();
 	
+<<<<<<< HEAD
 	instanceCreateInfo.printSelections();
+=======
+	ChunkManager::init();
+
+	ChunkRenderer::init(device, msaaBuffer);
+	Camera::init(window);
+>>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72
 	
 	VKLInstance instance(instanceCreateInfo);
 	
@@ -198,9 +207,21 @@ int main() {
 	
 	device.destroyFence(renderFence);
 	
+<<<<<<< HEAD
 	cmdBuffer.destroy();
 	
 	swapChain.destroy();
+=======
+	vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
+	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
+
+	TextObject* fpsText = new TextObject(16);
+	TextObject* rpsText = new TextObject(16);
+	TextObject* posText = new TextObject(64);
+
+	fpsText->setCoords(20, 20, 42);
+	fpsText->setText("FPS:0");
+>>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72
 	
 	cursor.destroy();
 	device.destroy();
@@ -211,6 +232,7 @@ int main() {
 	glfwDestroyWindow(window);
 	glfwTerminate();
 
+<<<<<<< HEAD
 	return 0;
 }
 
@@ -261,6 +283,10 @@ rpsText->setText("RPS:0");
 
 posText->setCoords(20, 116, 32);
 posText->setText("POS: 100, 100, 100");
+=======
+	while (!glfwWindowShouldClose(window)) {
+		glfwPollEvents();
+>>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72
 
 
 
@@ -268,6 +294,11 @@ posText->setText("POS: 100, 100, 100");
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
+
+		frameTime.start();
+		
+		renderTime.start();
+		
 		
 		glfwGetWindowSize(window, &width, &height);
 
@@ -330,6 +361,7 @@ posText->setText("POS: 100, 100, 100");
 
 	//	vklPresent(swapChain);
 		
+<<<<<<< HEAD
 		//frameTime.stop();
 
 /*
@@ -343,3 +375,29 @@ TextObject::destroy();
 ChunkRenderer::destroy();
 Camera::destroy();
 */
+=======
+		frameTime.stop();
+	}
+	
+	delete fpsText;
+	delete rpsText;
+	delete posText;
+	
+	ChunkManager::destroy();
+	BG::destroy();
+	Cursor::destroy();
+	TextObject::destroy();
+	ChunkRenderer::destroy();
+	Camera::destroy();
+	
+	vklDestroySwapChain(swapChain);
+	vklDestroyDevice(device);
+	vklDestroySurface(instance, surface);
+	vklDestroyInstance(instance);
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
+
+	return 0;
+}
+>>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72

@@ -15,12 +15,16 @@
 
 class ChunkManager {
 public:
-	static const std::vector<Chunk>& getChunks();
+	static uint32_t getChunkCount();
 	static void addChunk(Vec3i pos);
 	static int getChunkAt(Vec3i pos);
 	static Chunk* getChunkFromIndex(int index);
+	static void init();
+	static void destroy();
 private:
-	static std::vector<Chunk> m_chunks;
+	//static std::vector<Chunk> m_chunks;
+	static Chunk* m_chunks;
+	static uint32_t m_chunkCount;
 };
 
 #endif /* ChunkManager_h */

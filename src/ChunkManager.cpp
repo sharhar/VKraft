@@ -7,19 +7,25 @@
 
 #include "ChunkManager.h"
 
-std::vector<Chunk> ChunkManager::m_chunks = std::vector<Chunk>();
+Chunk* ChunkManager::m_chunks = NULL;
+uint32_t ChunkManager::m_chunkCount = 0;
 
-const std::vector<Chunk>& ChunkManager::getChunks() {
-	return m_chunks;
+uint32_t ChunkManager::getChunkCount() {
+	return m_chunkCount;
+}
+
+void ChunkManager::init() {
+	m_chunks = new Chunk[16*16*16];
 }
 
 void ChunkManager::addChunk(Vec3i pos) {
-	m_chunks.push_back(Chunk(pos));
-	m_chunks.back().updateNearChunks();
+	m_chunkCount++;
+	m_chunks[m_chunkCount-1].init(pos);
+	m_chunks[m_chunkCount-1].updateNearChunks();
 }
 
 int ChunkManager::getChunkAt(Vec3i pos) {
-	for(int i = 0; i < m_chunks.size(); i++) {
+	for(int i = 0; i < m_chunkCount; i++) {
 		if(m_chunks[i].atPos(pos)) {
 			return i;
 		}
@@ -33,5 +39,13 @@ Chunk* ChunkManager::getChunkFromIndex(int index) {
 		return NULL;
 	}
 	
-	return &(m_chunks.data()[index]);
+	return &(m_chunks[index]);
+}
+
+void ChunkManager::destroy() {
+	for (int i = 0; i < m_chunkCount; i++) {
+		m_chunks[i].destroy();
+	}
+
+	delete[] m_chunks;
 }
