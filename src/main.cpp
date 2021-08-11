@@ -89,22 +89,10 @@ int main() {
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 	
-	VKLInstanceCreateInfo instanceCreateInfo;
-	instanceCreateInfo.setProcAddr(glfwGetInstanceProcAddress)
+	VKLInstance instance(VKLInstanceCreateInfo()
+						.procAddr(glfwGetInstanceProcAddress)
 						.addExtensions(glfwExtensions, glfwExtensionCount)
-						.addExtension("VK_KHR_get_physical_device_properties2")
-						.makeDebug();
-	
-<<<<<<< HEAD
-	instanceCreateInfo.printSelections();
-=======
-	ChunkManager::init();
-
-	ChunkRenderer::init(device, msaaBuffer);
-	Camera::init(window);
->>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72
-	
-	VKLInstance instance(instanceCreateInfo);
+						.debug(VK_TRUE));
 	
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
 	glfwCreateWindowSurface(instance.handle(), window, NULL, &surface);
@@ -115,21 +103,21 @@ int main() {
 		printf("%d: %d (%d)\n", i, physicalDevice.getQueueFamilyProperties()[i].queueFlags, physicalDevice.getQueueFamilyProperties()[i].queueCount);
 	}
 	
-	VKLDeviceCreateInfo deviceCreateInfo;
-	deviceCreateInfo.seyPhysicalDevice(physicalDevice)
-					.addExtension("VK_KHR_swapchain").addExtension("VK_KHR_portability_subset")
-					.setQueueTypeCount(VKL_QUEUE_TYPE_GRAPHICS, 1)
-					.setQueueTypeCount(VKL_QUEUE_TYPE_COMPUTE, 1)
-					.setQueueTypeCount(VKL_QUEUE_TYPE_TRANSFER, 1);
-	
-	VKLDevice device(deviceCreateInfo);
-	
+	VKLDevice device(VKLDeviceCreateInfo()
+						.physicalDevice(physicalDevice)
+						.addExtension("VK_KHR_swapchain")//.addExtension("VK_KHR_portability_subset")
+						.queueTypeCount(VKL_QUEUE_TYPE_GRAPHICS, 1)
+						.queueTypeCount(VKL_QUEUE_TYPE_COMPUTE, 1)
+						.queueTypeCount(VKL_QUEUE_TYPE_TRANSFER, 1));
+
 	VKLQueue graphicsQueue = device.getQueue(VKL_QUEUE_TYPE_GRAPHICS, 0);
+	VKLQueue computeQueue = device.getQueue(VKL_QUEUE_TYPE_COMPUTE, 0);
+	VKLQueue transferQueue = device.getQueue(VKL_QUEUE_TYPE_TRANSFER, 0);
 	
-	VKLSwapChainCreateInfo swapChainCreateInfo;
-	swapChainCreateInfo.setQueue(graphicsQueue).setSurface(surface).setPresentMode(VK_PRESENT_MODE_IMMEDIATE_KHR);
-	
-	VKLSwapChain swapChain(swapChainCreateInfo);
+	VKLSwapChain swapChain(VKLSwapChainCreateInfo()
+							.queue(graphicsQueue)
+							.surface(surface)
+							.presentMode(VK_PRESENT_MODE_IMMEDIATE_KHR));
 	
 	VkClearValue clearColor;
 	clearColor.color.float32[0] = 0.25f;
@@ -148,12 +136,21 @@ int main() {
 	Timer frameTime("FrameTime");
 	Timer renderTime("RenderTime");
 
+	TextObject::init(&device, &transferQueue, &swapChain);
+
 	double ct = glfwGetTime();
 	double dt = ct;
 
 	float accDT = 0;
 	uint32_t frames = 0;
 	uint32_t fps = 0;
+
+	int width, height;
+	int pwidth, pheight;
+
+	glfwGetWindowSize(window, &width, &height);
+	pwidth = width;
+	pheight = height;
 	
 	while (!glfwWindowShouldClose(window)) {
 		frameTime.start();
@@ -205,24 +202,13 @@ int main() {
 		frameTime.stop();
 	}
 	
+	TextObject::destroy();
+
 	device.destroyFence(renderFence);
 	
-<<<<<<< HEAD
 	cmdBuffer.destroy();
 	
 	swapChain.destroy();
-=======
-	vklSetClearColor(msaaBuffer, 0.25f, 0.45f, 1.0f, 1.0f );
-	vklSetClearColor(backBuffer, 1.0f, 0.0f, 1.0f, 1.0f );
-
-	TextObject* fpsText = new TextObject(16);
-	TextObject* rpsText = new TextObject(16);
-	TextObject* posText = new TextObject(64);
-
-	fpsText->setCoords(20, 20, 42);
-	fpsText->setText("FPS:0");
->>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72
-	
 	cursor.destroy();
 	device.destroy();
 	
@@ -232,7 +218,6 @@ int main() {
 	glfwDestroyWindow(window);
 	glfwTerminate();
 
-<<<<<<< HEAD
 	return 0;
 }
 
@@ -258,12 +243,7 @@ BG::init(device, swapChain, msaaBuffer);
 Cursor::init(device, swapChain, msaaBuffer);
 TextObject::init(device, msaaBuffer);
 
-int width, height;
-int pwidth, pheight;
 
-glfwGetWindowSize(window, &width, &height);
-pwidth = width;
-pheight = height;
 
 VkCommandBuffer cmdBuffer;
 vklAllocateCommandBuffer(device->deviceGraphicsContexts[0], &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
@@ -361,7 +341,6 @@ posText->setText("POS: 100, 100, 100");
 
 	//	vklPresent(swapChain);
 		
-<<<<<<< HEAD
 		//frameTime.stop();
 
 /*
@@ -375,29 +354,3 @@ TextObject::destroy();
 ChunkRenderer::destroy();
 Camera::destroy();
 */
-=======
-		frameTime.stop();
-	}
-	
-	delete fpsText;
-	delete rpsText;
-	delete posText;
-	
-	ChunkManager::destroy();
-	BG::destroy();
-	Cursor::destroy();
-	TextObject::destroy();
-	ChunkRenderer::destroy();
-	Camera::destroy();
-	
-	vklDestroySwapChain(swapChain);
-	vklDestroyDevice(device);
-	vklDestroySurface(instance, surface);
-	vklDestroyInstance(instance);
-
-	glfwDestroyWindow(window);
-	glfwTerminate();
-
-	return 0;
-}
->>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72

@@ -10,12 +10,9 @@ include_directories(
 
 if(MSVC)
 	add_executable(VKraft ${GRAPHER_H} ${GRAPHER_SRC})
-	file(COPY "${CMAKE_SOURCE_DIR}/res" DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug")
-	file(COPY "${CMAKE_SOURCE_DIR}/res" DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release")
-	file(COPY "${CMAKE_SOURCE_DIR}/res" DESTINATION "${CMAKE_BINARY_DIR}/src")
+	add_compile_definitions(UTIL_DIR_PRE="../../")
 else()
 	add_executable(VKraft ${GRAPHER_H} ${GRAPHER_SRC})
-	file(COPY "${CMAKE_SOURCE_DIR}/src/arial.ttf" DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 endif()
 
 target_link_libraries (VKraft LINK_PUBLIC VKL)

@@ -188,7 +188,18 @@ static void getModelview(float* mat, Vec3 pos, Vec3 rot, Vec3 scale) {
 static char* readBinaryFile(const char *filename, size_t* size) {
 	char *buffer = NULL;
 	size_t string_size, read_size;
-	FILE *handler = fopen(filename, "rb");
+
+	std::string f_name;
+
+#ifdef _DEBUG
+#ifdef UTIL_DIR_PRE
+	f_name.append(UTIL_DIR_PRE);
+#endif
+#endif
+
+	f_name.append(filename);
+
+	FILE *handler = fopen(f_name.c_str(), "rb");
 
 	if (handler) {
 		fseek(handler, 0, SEEK_END);

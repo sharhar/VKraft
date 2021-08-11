@@ -33,7 +33,7 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 						.setMemoryUsage(VMA_MEMORY_USAGE_GPU_ONLY)
 						.setUsage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 	
-	m_vertBuffer.build(vertBufferCreateInfo);
+	m_vertBuffer.create(vertBufferCreateInfo);
 	m_vertBuffer.uploadData(queue, cursorVerts, 12 * 2 * sizeof(float), 0);
 	
 	size_t vertSize = 0;
@@ -50,124 +50,19 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 						.setStride(sizeof(float) * 2)
 						.addAttrib(0, VK_FORMAT_R32G32_SFLOAT, 0)
 					.end()
-					.addDescriptorSet()
-						.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
-					.end()
+					//.addDescriptorSet()
+					//	.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
+					//.end()
 					.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2);
 	
-	m_shader.build(shaderCreateInfo);
-	
-	VkDescriptorPoolSize poolSize;
-	poolSize.descriptorCount = 1;
-	poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	
-	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
-	memset(&descriptorPoolCreateInfo, 0, sizeof(VkDescriptorPoolCreateInfo));
-	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolCreateInfo.maxSets = 1;
-	descriptorPoolCreateInfo.poolSizeCount = 1;
-	descriptorPoolCreateInfo.pPoolSizes = &poolSize;
+	m_shader.create(shaderCreateInfo);
 
-	VK_CALL(m_device->vk.CreateDescriptorPool(device->handle(), &descriptorPoolCreateInfo,
-											  device->allocationCallbacks(), &m_pool));
-	
-	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo;
-	memset(&descriptorSetAllocateInfo, 0, sizeof(VkDescriptorSetAllocateInfo));
-	descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	descriptorSetAllocateInfo.descriptorPool = m_pool;
-	descriptorSetAllocateInfo.descriptorSetCount = 1;
-	descriptorSetAllocateInfo.pSetLayouts = m_shader.getDescriptorSetLayouts();
-
-	VK_CALL(m_device->vk.AllocateDescriptorSets(device->handle(), &descriptorSetAllocateInfo, &m_descSet));
-	
-	VKLImageCreateInfo tempImageCreateInfo;
-	tempImageCreateInfo.setDevice(m_device).setExtent(4, 4, 1)
-						.setFormat(VK_FORMAT_R32G32B32A32_SFLOAT)
-						.setUsage(VK_IMAGE_USAGE_SAMPLED_BIT)
-						.setMemoryUsage(VMA_MEMORY_USAGE_GPU_ONLY);
-	
-	m_tempImage.build(tempImageCreateInfo);
-	
-	m_tempImage.setNewAccessMask(VK_ACCESS_SHADER_READ_BIT);
-	m_tempImage.setNewLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	
-	m_queue->getCmdBuffer()->begin();
-	m_queue->getCmdBuffer()->imageBarrier(&m_tempImage,
-										  VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-	m_queue->getCmdBuffer()->end();
-	
-	m_tempImage.resetBarrier();
-	
-	m_queue->submit(m_queue->getCmdBuffer(), VK_NULL_HANDLE);
-	
-	m_queue->waitIdle();
-	
-	VkSamplerCreateInfo samplerCreateInfo;
-	memset(&samplerCreateInfo, 0, sizeof(VkSamplerCreateInfo));
-	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
-	samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
-	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerCreateInfo.mipLodBias = 0;
-	samplerCreateInfo.anisotropyEnable = VK_FALSE;
-	samplerCreateInfo.maxAnisotropy = 0;
-	samplerCreateInfo.minLod = 0;
-	samplerCreateInfo.maxLod = 0;
-	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-
-	VK_CALL(m_device->vk.CreateSampler(device->handle(), &samplerCreateInfo, NULL, &m_sampler));
-	
-	VkDescriptorImageInfo descriptorImageInfo;
-	memset(&descriptorImageInfo, 0, sizeof(VkDescriptorImageInfo));
-	descriptorImageInfo.sampler = m_sampler;
-	descriptorImageInfo.imageView = m_tempImage.view();
-	descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	VkWriteDescriptorSet writeDescriptor;
-	memset(&writeDescriptor, 0, sizeof(VkWriteDescriptorSet));
-	writeDescriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writeDescriptor.dstSet = m_descSet;
-	writeDescriptor.dstBinding = 0;
-	writeDescriptor.dstArrayElement = 0;
-	writeDescriptor.descriptorCount = 1;
-	writeDescriptor.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	writeDescriptor.pImageInfo = &descriptorImageInfo;
-	writeDescriptor.pBufferInfo = NULL;
-	writeDescriptor.pTexelBufferView = NULL;
-
-	m_device->vk.UpdateDescriptorSets(device->handle(), 1, &writeDescriptor, 0, NULL);
-	
 	VKLPipelineCreateInfo pipelineCreateInfo;
 	pipelineCreateInfo.setShader(&m_shader).setRenderTarget(renderTarget);
-	
-	m_pipeline.build(pipelineCreateInfo);
-	
+
+	m_pipeline.create(pipelineCreateInfo);
+
 	/*
-	VkDescriptorSetLayoutBinding bindings[2];
-	bindings[0].binding = 0;
-	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	bindings[0].descriptorCount = 1;
-	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	bindings[0].pImmutableSamplers = NULL;
-
-	bindings[1].binding = 1;
-	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	bindings[1].descriptorCount = 1;
-	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	bindings[1].pImmutableSamplers = NULL;
-
-	VKLShaderCreateInfo shaderCreateInfo;
-	memset(&shaderCreateInfo, 0, sizeof(VKLShaderCreateInfo));
-	shaderCreateInfo.shaderPaths = shaderPaths;
-	shaderCreateInfo.shaderStages = stages;
-	shaderCreateInfo.shaderCount = 2;
-	shaderCreateInfo.bindings = bindings;
-	shaderCreateInfo.bindingsCount = 2;
-	
 	
 	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
 	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
@@ -226,17 +121,17 @@ void Cursor::render(VKLCommandBuffer* cmdBuffer) {
 	m_device->vk.CmdPushConstants(cmdBuffer->handle(), m_shader.getPipelineLayout(),
 								  VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2, m_screenSize);
 	
-	m_device->vk.CmdBindDescriptorSets(cmdBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-									   m_shader.getPipelineLayout(), 0, 1, &m_descSet, 0, NULL);
+	//m_device->vk.CmdBindDescriptorSets(cmdBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+	//								   m_shader.getPipelineLayout(), 0, 1, &m_descSet, 0, NULL);
 	
 	m_device->vk.CmdDraw(cmdBuffer->handle(), 12, 1, 0, 0);
 }
 
 void Cursor::destroy() {
-	m_tempImage.destroy();
+	//m_tempImage.destroy();
 	
-	m_device->vk.DestroySampler(m_device->handle(), m_sampler, m_device->allocationCallbacks());
-	m_device->vk.DestroyDescriptorPool(m_device->handle(), m_pool, m_device->allocationCallbacks());
+	//m_device->vk.DestroySampler(m_device->handle(), m_sampler, m_device->allocationCallbacks());
+	//m_device->vk.DestroyDescriptorPool(m_device->handle(), m_pool, m_device->allocationCallbacks());
 	
 	m_pipeline.destroy();
 	m_shader.destroy();

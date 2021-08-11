@@ -4,17 +4,16 @@
 
 layout (location = 0) in vec2 pos;
 
-layout( std140, binding = 0 ) uniform UniformBufferObject {
-	mat4 proj;
-	vec2 off;
-} UBO;
-
 layout( location = 0 ) out struct vert_out {
     vec2 uv;
 } OUT;
 
+layout( push_constant ) uniform constants {
+	vec2 screenSize;
+} PC;
+
 void main() {
-	vec4 screenCoord = UBO.proj * vec4(pos.x + UBO.off.x, pos.y + UBO.off.y, 0.0, 1.0);
-    gl_Position = screenCoord;
-	OUT.uv = vec2(screenCoord.x/2 + 0.5, screenCoord.y/2 + 0.5);
+	vec2 raw_pos = pos / PC.screenSize;
+    gl_Position = vec4(2.0 * raw_pos.x, 2.0 * raw_pos.y, 0.0, 1.0);
+	OUT.uv = raw_pos + 0.5;
 }

@@ -71,7 +71,7 @@ inline float interpolateCubeValue(float val0, float val3, uint8_t rem) {
 }
 
 Chunk::Chunk() {
-	m_instBuffer = NULL;
+	//m_instBuffer = NULL;
 	m_pos = Vec3i(0, 0, 0);
 	m_foundAllBorders = 0;
 	renderPos = Vec3(0, 0, 0);
@@ -322,7 +322,6 @@ void Chunk::getChunkBorders() {
 }
 
 void Chunk::render(VkCommandBuffer cmdBuffer) {
-<<<<<<< HEAD
 	if(m_foundAllBorders && m_renderCubes.size()) {
 		VkDeviceSize offsets = 0;
 		//m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instBuffer->buffer, &offsets);
@@ -330,26 +329,13 @@ void Chunk::render(VkCommandBuffer cmdBuffer) {
 	}
 }
 
-/*
 void Chunk::destroy() {
 	//vklDestroyBuffer(m_device, m_instBuffer);
-=======
-	VkDeviceSize offsets = 0;
-	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instBuffer->buffer, &offsets);
-	m_device->pvkCmdDraw(cmdBuffer, 6, m_renderCubes.size(), 0, 0);
 }
 
 uint8_t Chunk::renderable() {
 	return m_foundAllBorders && m_renderCubes.size();
 }
-
-void Chunk::destroy() {
-	if (m_instBuffer != NULL) {
-		vklDestroyBuffer(m_device, m_instBuffer);
-	}
->>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72
-}
- */
 
 uint32_t Chunk::isCubeTrasparent(int x, int y, int z) {
 	if(x == -1) {
