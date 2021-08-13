@@ -104,8 +104,8 @@ int main() {
 	}
 	
 	VKLDevice device(VKLDeviceCreateInfo()
-						.physicalDevice(physicalDevice)
-						.addExtension("VK_KHR_swapchain")//.addExtension("VK_KHR_portability_subset")
+						.physicalDevice(&physicalDevice)
+						.addExtension("VK_KHR_swapchain")
 						.queueTypeCount(VKL_QUEUE_TYPE_GRAPHICS, 1)
 						.queueTypeCount(VKL_QUEUE_TYPE_COMPUTE, 1)
 						.queueTypeCount(VKL_QUEUE_TYPE_TRANSFER, 1));
@@ -115,7 +115,7 @@ int main() {
 	VKLQueue transferQueue = device.getQueue(VKL_QUEUE_TYPE_TRANSFER, 0);
 	
 	VKLSwapChain swapChain(VKLSwapChainCreateInfo()
-							.queue(graphicsQueue)
+							.queue(&graphicsQueue)
 							.surface(surface)
 							.presentMode(VK_PRESENT_MODE_IMMEDIATE_KHR));
 	
@@ -134,7 +134,6 @@ int main() {
 	VkFence renderFence = device.createFence(0);
 	
 	Timer frameTime("FrameTime");
-	Timer renderTime("RenderTime");
 
 	TextObject::init(&device, &transferQueue, &swapChain);
 
@@ -160,6 +159,10 @@ int main() {
 		dt = glfwGetTime() - ct;
 		ct = glfwGetTime();
 
+		//if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+		//	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		//}
+
 		accDT += dt;
 		frames++;
 
@@ -167,16 +170,10 @@ int main() {
 			fps = frames;
 			
 			std::cout << ("FPS:" + std::to_string((int) (1.0 / frameTime.getLapTime()))) << std::endl;
-			//std::cout << ("RPS:" + std::to_string((int)(1.0 / renderTime.getLapTime()))) << std::endl;
-			
-			//std::cout << "FPS:" + std::to_string(frameTime.getLapTime()) << std::endl;
-			//std::cout << "RPS:" + std::to_string(renderTime.getLapTime()) << std::endl;
 			
 			//fpsText->setText("FPS:" + std::to_string((int) (1.0 / frameTime.getLapTime())));
-			//rpsText->setText("RPS:" + std::to_string((int)(1.0 / renderTime.getLapTime())));
 			
 			frameTime.reset();
-			//renderTime.reset();
 			
 			frames = 0;
 			accDT = 0;
@@ -196,7 +193,7 @@ int main() {
 		
 		device.waitForFence(renderFence);
 		device.resetFence(renderFence);
-		
+
 		swapChain.present();
 		
 		frameTime.stop();
@@ -243,8 +240,6 @@ BG::init(device, swapChain, msaaBuffer);
 Cursor::init(device, swapChain, msaaBuffer);
 TextObject::init(device, msaaBuffer);
 
-
-
 VkCommandBuffer cmdBuffer;
 vklAllocateCommandBuffer(device->deviceGraphicsContexts[0], &cmdBuffer, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 
@@ -266,14 +261,7 @@ posText->setText("POS: 100, 100, 100");
 =======
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
->>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72
-
-
-
-/*
-		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		}
+>>>>>>> 59ba778313f8d601a5965c07913de1dc2b868b72=
 
 		frameTime.start();
 		
@@ -335,15 +323,7 @@ posText->setText("POS: 100, 100, 100");
 		vklEndCommandBuffer(device, cmdBuffer);
 		
 		vklExecuteCommandBuffer(device->deviceGraphicsContexts[0], cmdBuffer);
-		
- */
-		//renderTime.stop();
-
-	//	vklPresent(swapChain);
-		
-		//frameTime.stop();
-
-/*
+	
 delete fpsText;
 delete rpsText;
 delete posText;

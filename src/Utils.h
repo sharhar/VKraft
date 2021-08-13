@@ -191,11 +191,11 @@ static char* readBinaryFile(const char *filename, size_t* size) {
 
 	std::string f_name;
 
-#ifdef _DEBUG
+//#ifdef _DEBUG
 #ifdef UTIL_DIR_PRE
 	f_name.append(UTIL_DIR_PRE);
 #endif
-#endif
+//#endif
 
 	f_name.append(filename);
 
@@ -222,7 +222,7 @@ static char* readBinaryFile(const char *filename, size_t* size) {
 
 		fclose(handler);
 	} else {
-		printf("Did not find file!\n");
+		printf("Did not find file %s!\n", filename);
 	}
 
 	return buffer;

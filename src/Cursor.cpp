@@ -29,9 +29,9 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 		 2.5f,  25 };
 	 
 	VKLBufferCreateInfo vertBufferCreateInfo;
-	vertBufferCreateInfo.setDevice(device).setSize(12 * 2 * sizeof(float))
-						.setMemoryUsage(VMA_MEMORY_USAGE_GPU_ONLY)
-						.setUsage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	vertBufferCreateInfo.device(device).size(12 * 2 * sizeof(float))
+						.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY)
+						.usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 	
 	m_vertBuffer.create(vertBufferCreateInfo);
 	m_vertBuffer.uploadData(queue, cursorVerts, 12 * 2 * sizeof(float), 0);
@@ -43,13 +43,9 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 	uint32_t* fragCode = (uint32_t*)readBinaryFile("res/cursor-frag.spv", &fragSize);
 	
 	VKLShaderCreateInfo shaderCreateInfo;
-	shaderCreateInfo.setDevice(device)
+	shaderCreateInfo.device(device)
 					.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
 					.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
-					.addVertexInputBinding(0)
-						.setStride(sizeof(float) * 2)
-						.addAttrib(0, VK_FORMAT_R32G32_SFLOAT, 0)
-					.end()
 					//.addDescriptorSet()
 					//	.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
 					//.end()
@@ -58,9 +54,16 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 	m_shader.create(shaderCreateInfo);
 
 	VKLPipelineCreateInfo pipelineCreateInfo;
-	pipelineCreateInfo.setShader(&m_shader).setRenderTarget(renderTarget);
+	pipelineCreateInfo.shader(&m_shader).renderTarget(renderTarget);
 
-	m_pipeline.create(pipelineCreateInfo);
+	m_pipeline.create(VKLPipelineCreateInfo()
+							.shader(&m_shader)
+							.renderTarget(renderTarget)
+							.vertexInput
+								.addBinding(0, sizeof(float) * 2)
+									.addAttrib(0, VK_FORMAT_R32G32_SFLOAT, 0)
+								.end()
+							.end());
 
 	/*
 	

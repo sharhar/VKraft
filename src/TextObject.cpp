@@ -33,10 +33,10 @@ void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, co
 		1, 1, 1, 1
 	};
 
-	m_vertBuffer.create(VKLBufferCreateInfo().setDevice(m_device)
-											.setSize(6 * 4 * sizeof(float))
-											.setUsage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)
-											.setMemoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
+	m_vertBuffer.create(VKLBufferCreateInfo()
+									.device(m_device).size(6 * 4 * sizeof(float))
+									.usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+									.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
 
 	m_vertBuffer.uploadData(transferQueue, verts, 6 * 4 * sizeof(float), 0);
 
@@ -46,8 +46,9 @@ void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, co
 	size_t fragSize = 0;
 	uint32_t* fragCode = (uint32_t*)readBinaryFile("res/font-frag.spv", &fragSize);
 
+	/*
 	m_shader.create(VKLShaderCreateInfo()
-						.setDevice(m_device)
+						.device(m_device)
 						.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
 						.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
 						.addVertexInputBinding(0)
@@ -66,7 +67,8 @@ void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, co
 						.end());
 
 	m_pipeline.create(VKLPipelineCreateInfo().setShader(&m_shader).setRenderTarget(renderTarget));
-	
+	*/
+
 	/*
 	
 	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
