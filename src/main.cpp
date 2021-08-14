@@ -118,6 +118,12 @@ int main() {
 							.queue(&graphicsQueue)
 							.surface(surface)
 							.presentMode(VK_PRESENT_MODE_IMMEDIATE_KHR));
+
+	VKLRenderPass renderPass(VKLRenderPassCreateInfo().device(&device)
+								.addAttachment(VK_FORMAT_R16G16B16A16_SFLOAT).end()
+								.addSubpass()
+									.addColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+								.end());
 	
 	VkClearValue clearColor;
 	clearColor.color.float32[0] = 0.25f;
@@ -205,6 +211,8 @@ int main() {
 	
 	cmdBuffer.destroy();
 	
+	renderPass.destroy();
+
 	swapChain.destroy();
 	cursor.destroy();
 	device.destroy();
@@ -217,6 +225,45 @@ int main() {
 
 	return 0;
 }
+
+/*
+VkAttachmentDescription passAttachments[2];
+	memset(passAttachments, 0, sizeof(VkAttachmentDescription) * 2);
+	passAttachments[0].format = createInfo.m_createInfo.imageFormat;
+	passAttachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+	passAttachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	passAttachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	passAttachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	passAttachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	passAttachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	passAttachments[1].format = VK_FORMAT_D32_SFLOAT;
+	passAttachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+	passAttachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	passAttachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	passAttachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	passAttachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	passAttachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference colorAttachmentReference;
+	memset(&colorAttachmentReference, 0, sizeof(VkAttachmentReference));
+	colorAttachmentReference.attachment = 0;
+	colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depthAttachmentReference;
+	memset(&depthAttachmentReference, 0, sizeof(VkAttachmentReference));
+	depthAttachmentReference.attachment = 1;
+	depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass;
+	memset(&subpass, 0, sizeof(VkSubpassDescription));
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorAttachmentReference;
+	subpass.pDepthStencilAttachment = NULL;//&depthAttachmentReference;
+*/
 
 /*
 

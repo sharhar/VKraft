@@ -42,19 +42,13 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 	size_t fragSize = 0;
 	uint32_t* fragCode = (uint32_t*)readBinaryFile("res/cursor-frag.spv", &fragSize);
 	
-	VKLShaderCreateInfo shaderCreateInfo;
-	shaderCreateInfo.device(device)
-					.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
-					.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
-					//.addDescriptorSet()
-					//	.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
-					//.end()
-					.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2);
-	
-	m_shader.create(shaderCreateInfo);
-
-	VKLPipelineCreateInfo pipelineCreateInfo;
-	pipelineCreateInfo.shader(&m_shader).renderTarget(renderTarget);
+	m_shader.create(VKLShaderCreateInfo().device(device)
+							.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
+							.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
+							//.addDescriptorSet()
+							//	.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
+							//.end()
+							.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2));
 
 	m_pipeline.create(VKLPipelineCreateInfo()
 							.shader(&m_shader)
@@ -66,17 +60,6 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 							.end());
 
 	/*
-	
-	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
-	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
-	pipelineCreateInfo.shader = m_shader;
-	pipelineCreateInfo.renderPass = swapChain->backBuffer->renderPass;
-	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
-	pipelineCreateInfo.extent.width = swapChain->width;
-	pipelineCreateInfo.extent.height = swapChain->height;
-
-	vklCreateGraphicsPipeline(device, &m_pipeline, &pipelineCreateInfo);
 	
 	vklCreateUniformObject(device, &m_uniform, m_shader);
 	
