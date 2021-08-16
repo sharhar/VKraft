@@ -11,6 +11,8 @@ include_directories(
 if(MSVC)
 	add_executable(VKraft ${GRAPHER_H} ${GRAPHER_SRC})
 	add_compile_definitions(UTIL_DIR_PRE="../../")
+	add_compile_definitions(VKL_SURFACE_WIN32)
+	add_compile_definitions(VKL_SURFACE_GLFW)
 else()
 	add_executable(VKraft ${GRAPHER_H} ${GRAPHER_SRC})
 endif()

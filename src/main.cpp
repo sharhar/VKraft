@@ -1,5 +1,8 @@
 #include <VKL/VKL.h>
+
+#define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 
 #include <iostream>
 
@@ -93,11 +96,27 @@ int main() {
 						.procAddr(glfwGetInstanceProcAddress)
 						.addExtensions(glfwExtensions, glfwExtensionCount)
 						.debug(VK_TRUE));
+
+	VKLSurface surface(VKLSurfaceCreateInfoGLFW()
+						.instance(&instance)
+						.window(window)
+						.createSurfaceFunc(glfwCreateWindowSurface));
+		
+		/*
+		VKLSurfaceCreateInfoWin32()
+						.instance(&instance)
+						.hwnd(glfwGetWin32Window(window)));
+	*/
+	//VkSurfaceKHR surfaceHandle = VK_NULL_HANDLE;
+	//glfwCreateWindowSurface(instance.handle(), window, NULL, &surfaceHandle);
 	
-	VkSurfaceKHR surface = VK_NULL_HANDLE;
-	glfwCreateWindowSurface(instance.handle(), window, NULL, &surface);
-	
+	//VKLSurface surface(VKLSurfaceCreateInfoHandle().instance(&instance).handle(surfaceHandle));
+
 	const VKLPhysicalDevice& physicalDevice = instance.getPhysicalDevices()[0];
+
+	printf("%s\n", physicalDevice.getProperties().deviceName);
+	printf("%d\n", physicalDevice.getProperties().deviceType);
+	printf("%d\n", physicalDevice.getProperties().deviceID);
 	
 	for (int i = 0; i < physicalDevice.getQueueFamilyProperties().size(); i++) {
 		printf("%d: %d (%d)\n", i, physicalDevice.getQueueFamilyProperties()[i].queueFlags, physicalDevice.getQueueFamilyProperties()[i].queueCount);
@@ -116,7 +135,7 @@ int main() {
 	
 	VKLSwapChain swapChain(VKLSwapChainCreateInfo()
 							.queue(&graphicsQueue)
-							.surface(surface)
+							.surface(surface.handle())
 							.presentMode(VK_PRESENT_MODE_IMMEDIATE_KHR));
 
 	VKLRenderPass renderPass(VKLRenderPassCreateInfo().device(&device)
@@ -138,17 +157,8 @@ int main() {
 	VKLCommandBuffer cmdBuffer(&graphicsQueue);
 	
 	VkFence renderFence = device.createFence(0);
-	
-	Timer frameTime("FrameTime");
 
 	TextObject::init(&device, &transferQueue, &swapChain);
-
-	double ct = glfwGetTime();
-	double dt = ct;
-
-	float accDT = 0;
-	uint32_t frames = 0;
-	uint32_t fps = 0;
 
 	int width, height;
 	int pwidth, pheight;
@@ -158,32 +168,11 @@ int main() {
 	pheight = height;
 	
 	while (!glfwWindowShouldClose(window)) {
-		frameTime.start();
-		
 		glfwPollEvents();
 		
-		dt = glfwGetTime() - ct;
-		ct = glfwGetTime();
-
 		//if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		//	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		//}
-
-		accDT += dt;
-		frames++;
-
-		if (accDT > 1) {
-			fps = frames;
-			
-			std::cout << ("FPS:" + std::to_string((int) (1.0 / frameTime.getLapTime()))) << std::endl;
-			
-			//fpsText->setText("FPS:" + std::to_string((int) (1.0 / frameTime.getLapTime())));
-			
-			frameTime.reset();
-			
-			frames = 0;
-			accDT = 0;
-		}
 		
 		cmdBuffer.begin();
 		
@@ -201,8 +190,6 @@ int main() {
 		device.resetFence(renderFence);
 
 		swapChain.present();
-		
-		frameTime.stop();
 	}
 	
 	TextObject::destroy();
@@ -217,7 +204,8 @@ int main() {
 	cursor.destroy();
 	device.destroy();
 	
-	instance.destroySurface(surface);
+	surface.destroy();
+	//instance.destroySurface(surface);
 	instance.destroy();
 	
 	glfwDestroyWindow(window);
