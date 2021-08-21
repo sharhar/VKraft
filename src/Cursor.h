@@ -1,10 +1,3 @@
-//
-//  Cursor.h
-//  VKraft
-//
-//  Created by Shahar Sandhaus on 6/11/21.
-//
-
 #ifndef Cursor_h
 #define Cursor_h
 
@@ -28,13 +21,6 @@ private:
 	float m_screenSize[2];
 	
 	VKLDescriptorSet* m_descriptorSet;
-	
-	VKLImage m_tempImage;
-	
-	
-	//VKLBuffer* m_uniformBuffer;
-	
-	//VKLUniformObject* m_uniform;
 	
 };
 

@@ -118,11 +118,6 @@ void Cursor::render(VKLCommandBuffer* cmdBuffer) {
 }
 
 void Cursor::destroy() {
-	//m_tempImage.destroy();
-	
-	//m_device->vk.DestroySampler(m_device->handle(), m_sampler, m_device->allocationCallbacks());
-	//m_device->vk.DestroyDescriptorPool(m_device->handle(), m_pool, m_device->allocationCallbacks());
-	
 	m_descriptorSet->destroy();
 	
 	delete m_descriptorSet;

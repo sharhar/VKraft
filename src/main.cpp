@@ -152,8 +152,11 @@ int main() {
 	
 	transferQueue.getCmdBuffer()->begin();
 	
-	backBuffer.cmdTransitionBarrier(transferQueue.getCmdBuffer(), VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-	backBufferRef.cmdTransitionBarrier(transferQueue.getCmdBuffer(), VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	backBuffer.cmdTransitionBarrier(transferQueue.getCmdBuffer(), VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+									VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	
+	backBufferRef.cmdTransitionBarrier(transferQueue.getCmdBuffer(), VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+									   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 	
 	transferQueue.getCmdBuffer()->end();
 	
@@ -163,30 +166,20 @@ int main() {
 	VKLImageView backBufferView(VKLImageViewCreateInfo().image(&backBuffer));
 	VKLImageView backBufferRefView(VKLImageViewCreateInfo().image(&backBufferRef));
 	
-	VkImageView tempViews[2];
-	tempViews[0] = backBufferView.handle();
-	tempViews[1] = backBufferRefView.handle();
+	VKLFramebuffer framebuffer(VKLFramebufferCreateInfo()
+								.renderPass(&renderPass)
+								.addAttachment(&backBufferView)
+								.addAttachment(&backBufferRefView)
+								.extent(800, 600, 1));
+
+	VkClearValue clearColor;
+	clearColor.color.float32[0] = 0.25f;
+	clearColor.color.float32[1] = 0.45f;
+	clearColor.color.float32[2] = 1.0f;
+	clearColor.color.float32[3] = 1.0f;
 	
-	VkFramebufferCreateInfo frameBufferCreateInfo;
-	memset(&frameBufferCreateInfo, 0, sizeof(VkFramebufferCreateInfo));
-	frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	frameBufferCreateInfo.renderPass = renderPass.handle();
-	frameBufferCreateInfo.attachmentCount = 2;
-	frameBufferCreateInfo.pAttachments = tempViews;
-	frameBufferCreateInfo.width = 800;
-	frameBufferCreateInfo.height = 600;
-	frameBufferCreateInfo.layers = 1;
-	
-	VkFramebuffer frameBuffer;
-	
-	VK_CALL(device.vk.CreateFramebuffer(device.handle(), &frameBufferCreateInfo, device.allocationCallbacks(), &frameBuffer));
-	
-	VkClearValue clearColor[2];
-	clearColor[0].color.float32[0] = 0.25f;
-	clearColor[0].color.float32[1] = 0.45f;
-	clearColor[0].color.float32[2] = 1.0f;
-	clearColor[0].color.float32[3] = 1.0f;
-	clearColor[1] = clearColor[0];
+	framebuffer.setClearValue(clearColor, 0);
+	framebuffer.setClearValue(clearColor, 1);
 	
 	Cursor cursor(&device, &renderPass, &graphicsQueue, backBufferRefView.handle());
 	
@@ -210,27 +203,13 @@ int main() {
 		
 		cmdBuffer.begin();
 		
-		VkRect2D area;
-		area.offset.x = 0;
-		area.offset.y = 0;
-		area.extent.width = 800;
-		area.extent.height = 600;
+		framebuffer.beginRenderPass(&cmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
 		
-		VkRenderPassBeginInfo renderPassBeginInfo;
-		memset(&renderPassBeginInfo, 0, sizeof(VkRenderPassBeginInfo));
-		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBeginInfo.renderPass = renderPass.handle();
-		renderPassBeginInfo.framebuffer = frameBuffer;
-		renderPassBeginInfo.renderArea = area;
-		renderPassBeginInfo.clearValueCount = 2;
-		renderPassBeginInfo.pClearValues = clearColor;
-		device.vk.CmdBeginRenderPass(cmdBuffer.handle(), &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		
-		device.vk.CmdNextSubpass(cmdBuffer.handle(), VK_SUBPASS_CONTENTS_INLINE);
+		cmdBuffer.nextSubpass(VK_SUBPASS_CONTENTS_INLINE);
 		
 		cursor.render(&cmdBuffer);
 		
-		device.vk.CmdEndRenderPass(cmdBuffer.handle());
+		cmdBuffer.endRenderPass();
 		
 		cmdBuffer.end();
 		
@@ -240,11 +219,11 @@ int main() {
 		swapChain.present(&backBuffer);
 	}
 	
-	device.vk.DestroyFramebuffer(device.handle(), frameBuffer, device.allocationCallbacks());
-	
 	TextObject::destroy();
 
 	cmdBuffer.destroy();
+	
+	framebuffer.destroy();
 	
 	backBufferRefView.destroy();
 	backBufferRef.destroy();
