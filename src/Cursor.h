@@ -12,7 +12,7 @@
 
 class Cursor {
 public:
-	Cursor(const VKLDevice* device, VKLRenderPass* renderPass, VKLQueue* queue);
+	Cursor(const VKLDevice* device, VKLRenderPass* renderPass, VKLQueue* queue, VkImageView view);
 	void updateProjection(int width, int height);
 	void render(VKLCommandBuffer* cmdBuffer);
 	void destroy();
@@ -27,9 +27,7 @@ private:
 	
 	float m_screenSize[2];
 	
-	VkDescriptorPool m_pool;
-	VkDescriptorSet m_descSet;
-	VkSampler m_sampler;
+	VKLDescriptorSet* m_descriptorSet;
 	
 	VKLImage m_tempImage;
 	

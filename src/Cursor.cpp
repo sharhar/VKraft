@@ -8,7 +8,7 @@
 #include "Cursor.h"
 #include "Utils.h"
 
-Cursor::Cursor(const VKLDevice* device, VKLRenderPass* renderPass, VKLQueue* queue) {
+Cursor::Cursor(const VKLDevice* device, VKLRenderPass* renderPass, VKLQueue* queue, VkImageView view) {
 	m_device = device;
 	m_queue = queue;
 	
@@ -45,19 +45,23 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderPass* renderPass, VKLQueue* que
 	m_shader.create(VKLShaderCreateInfo().device(device)
 							.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
 							.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
-							//.addDescriptorSet()
-							//	.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
-							//.end()
+							.addDescriptorSet()
+								.addBinding(0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
+							.end()
 							.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2));
 
 	m_pipeline.create(VKLPipelineCreateInfo()
 							.shader(&m_shader)
-							.renderPass(renderPass)
+							.renderPass(renderPass, 1)
 							.vertexInput
 								.addBinding(0, sizeof(float) * 2)
 									.addAttrib(0, VK_FORMAT_R32G32_SFLOAT, 0)
 								.end()
 							.end());
+	
+	m_descriptorSet = new VKLDescriptorSet(&m_shader, 0);
+	
+	m_descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_NULL_HANDLE);
 
 	/*
 	
@@ -100,6 +104,7 @@ void Cursor::updateProjection(int width, int height) {
 void Cursor::render(VKLCommandBuffer* cmdBuffer) {
 	VkDeviceSize vertexOffsets = 0;
 	VkBuffer tempBuffHandle = m_vertBuffer.handle();
+	VkDescriptorSet descSet = m_descriptorSet->handle();
 	
 	m_device->vk.CmdBindVertexBuffers(cmdBuffer->handle(), 0, 1, &tempBuffHandle, &vertexOffsets);
 	m_device->vk.CmdBindPipeline(cmdBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline.handle());
@@ -107,8 +112,7 @@ void Cursor::render(VKLCommandBuffer* cmdBuffer) {
 	m_device->vk.CmdPushConstants(cmdBuffer->handle(), m_shader.getPipelineLayout(),
 								  VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2, m_screenSize);
 	
-	//m_device->vk.CmdBindDescriptorSets(cmdBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-	//								   m_shader.getPipelineLayout(), 0, 1, &m_descSet, 0, NULL);
+	m_device->vk.CmdBindDescriptorSets(cmdBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_shader.getPipelineLayout(), 0, 1, &descSet, 0, NULL);
 	
 	m_device->vk.CmdDraw(cmdBuffer->handle(), 12, 1, 0, 0);
 }
@@ -118,6 +122,10 @@ void Cursor::destroy() {
 	
 	//m_device->vk.DestroySampler(m_device->handle(), m_sampler, m_device->allocationCallbacks());
 	//m_device->vk.DestroyDescriptorPool(m_device->handle(), m_pool, m_device->allocationCallbacks());
+	
+	m_descriptorSet->destroy();
+	
+	delete m_descriptorSet;
 	
 	m_pipeline.destroy();
 	m_shader.destroy();

@@ -119,9 +119,21 @@ int main() {
 							.presentMode(VK_PRESENT_MODE_IMMEDIATE_KHR));
 
 	VKLRenderPass renderPass(VKLRenderPassCreateInfo().device(&device)
-								.addAttachment(VK_FORMAT_R16G16B16A16_SFLOAT).end()
+								.addAttachment(VK_FORMAT_R16G16B16A16_SFLOAT) // actual back buffer
+									.layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+								.end()
+								.addAttachment(VK_FORMAT_R16G16B16A16_SFLOAT).end() // temp color ref for post-processing
 								.addSubpass()
 									.addColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+									.addColorAttachment(1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+								.end()
+								.addSubpass()
+									.addInputAttachment(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+									.addColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+								.end()
+								.addSubpassDependency(0, 1, VK_DEPENDENCY_BY_REGION_BIT)
+									.access(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)
+									.stages(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 								.end());
 	
 	VKLImage backBuffer(VKLImageCreateInfo()
@@ -131,9 +143,17 @@ int main() {
 							.usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
 							.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
 	
+	VKLImage backBufferRef(VKLImageCreateInfo()
+							.device(&device)
+							.extent(800, 600, 1)
+							.format(VK_FORMAT_R16G16B16A16_SFLOAT)
+							.usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+							.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
+	
 	transferQueue.getCmdBuffer()->begin();
 	
 	backBuffer.cmdTransitionBarrier(transferQueue.getCmdBuffer(), VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	backBufferRef.cmdTransitionBarrier(transferQueue.getCmdBuffer(), VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 	
 	transferQueue.getCmdBuffer()->end();
 	
@@ -141,15 +161,18 @@ int main() {
 	transferQueue.waitIdle();
 	
 	VKLImageView backBufferView(VKLImageViewCreateInfo().image(&backBuffer));
+	VKLImageView backBufferRefView(VKLImageViewCreateInfo().image(&backBufferRef));
 	
-	VkImageView tempView = backBufferView.handle();
+	VkImageView tempViews[2];
+	tempViews[0] = backBufferView.handle();
+	tempViews[1] = backBufferRefView.handle();
 	
 	VkFramebufferCreateInfo frameBufferCreateInfo;
 	memset(&frameBufferCreateInfo, 0, sizeof(VkFramebufferCreateInfo));
 	frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	frameBufferCreateInfo.renderPass = renderPass.handle();
-	frameBufferCreateInfo.attachmentCount = 1;
-	frameBufferCreateInfo.pAttachments = &tempView;
+	frameBufferCreateInfo.attachmentCount = 2;
+	frameBufferCreateInfo.pAttachments = tempViews;
 	frameBufferCreateInfo.width = 800;
 	frameBufferCreateInfo.height = 600;
 	frameBufferCreateInfo.layers = 1;
@@ -158,13 +181,14 @@ int main() {
 	
 	VK_CALL(device.vk.CreateFramebuffer(device.handle(), &frameBufferCreateInfo, device.allocationCallbacks(), &frameBuffer));
 	
-	VkClearValue clearColor;
-	clearColor.color.float32[0] = 0.25f;
-	clearColor.color.float32[1] = 0.45f;
-	clearColor.color.float32[2] = 1.0f;
-	clearColor.color.float32[3] = 1.0f;
+	VkClearValue clearColor[2];
+	clearColor[0].color.float32[0] = 0.25f;
+	clearColor[0].color.float32[1] = 0.45f;
+	clearColor[0].color.float32[2] = 1.0f;
+	clearColor[0].color.float32[3] = 1.0f;
+	clearColor[1] = clearColor[0];
 	
-	Cursor cursor(&device, &renderPass, &graphicsQueue);
+	Cursor cursor(&device, &renderPass, &graphicsQueue, backBufferRefView.handle());
 	
 	VKLCommandBuffer cmdBuffer(&graphicsQueue);
 
@@ -186,8 +210,6 @@ int main() {
 		
 		cmdBuffer.begin();
 		
-		backBuffer.cmdTransitionBarrier(&cmdBuffer, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-		
 		VkRect2D area;
 		area.offset.x = 0;
 		area.offset.y = 0;
@@ -200,16 +222,15 @@ int main() {
 		renderPassBeginInfo.renderPass = renderPass.handle();
 		renderPassBeginInfo.framebuffer = frameBuffer;
 		renderPassBeginInfo.renderArea = area;
-		renderPassBeginInfo.clearValueCount = 1;
-		renderPassBeginInfo.pClearValues = &clearColor;
-		
+		renderPassBeginInfo.clearValueCount = 2;
+		renderPassBeginInfo.pClearValues = clearColor;
 		device.vk.CmdBeginRenderPass(cmdBuffer.handle(), &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		
+		device.vk.CmdNextSubpass(cmdBuffer.handle(), VK_SUBPASS_CONTENTS_INLINE);
 		
 		cursor.render(&cmdBuffer);
 		
 		device.vk.CmdEndRenderPass(cmdBuffer.handle());
-		
-		backBuffer.cmdTransitionBarrier(&cmdBuffer, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 		
 		cmdBuffer.end();
 		
@@ -224,6 +245,9 @@ int main() {
 	TextObject::destroy();
 
 	cmdBuffer.destroy();
+	
+	backBufferRefView.destroy();
+	backBufferRef.destroy();
 	
 	backBufferView.destroy();
 	backBuffer.destroy();
