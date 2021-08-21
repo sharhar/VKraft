@@ -8,7 +8,7 @@
 #include "Cursor.h"
 #include "Utils.h"
 
-Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue* queue) {
+Cursor::Cursor(const VKLDevice* device, VKLRenderPass* renderPass, VKLQueue* queue) {
 	m_device = device;
 	m_queue = queue;
 	
@@ -52,7 +52,7 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 
 	m_pipeline.create(VKLPipelineCreateInfo()
 							.shader(&m_shader)
-							.renderTarget(renderTarget)
+							.renderPass(renderPass)
 							.vertexInput
 								.addBinding(0, sizeof(float) * 2)
 									.addAttrib(0, VK_FORMAT_R32G32_SFLOAT, 0)
@@ -71,7 +71,7 @@ Cursor::Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue*
 	updateProjection(swapChain->width, swapChain->height);
 	 */
 	
-	updateProjection(renderTarget->getRenderArea().extent.width, renderTarget->getRenderArea().extent.height);
+	updateProjection(800, 600);//renderTarget->getRenderArea().extent.width, renderTarget->getRenderArea().extent.height);
 }
 
 void Cursor::updateProjection(int width, int height) {

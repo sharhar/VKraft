@@ -12,7 +12,7 @@
 
 class Cursor {
 public:
-	Cursor(const VKLDevice* device, VKLRenderTarget* renderTarget, VKLQueue* queue);
+	Cursor(const VKLDevice* device, VKLRenderPass* renderPass, VKLQueue* queue);
 	void updateProjection(int width, int height);
 	void render(VKLCommandBuffer* cmdBuffer);
 	void destroy();

@@ -13,15 +13,15 @@
 #include "Utils.h"
 
 const VKLDevice* TextObject::m_device = NULL;
-const VKLRenderTarget* TextObject::m_renderTarget = NULL;
+const VKLRenderPass* TextObject::m_renderPass = NULL;
 
 VKLBuffer TextObject::m_vertBuffer;
 VKLShader TextObject::m_shader;
 VKLPipeline TextObject::m_pipeline;
 
-void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, const VKLRenderTarget* renderTarget) {
+void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, const VKLRenderPass* renderPass) {
 	m_device = device;
-	m_renderTarget = renderTarget;
+	m_renderPass = renderPass;
 	
 	float verts[24] = {
 		0, 0, 0, 0,
@@ -107,11 +107,11 @@ void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, co
 }
 
 void TextObject::updateProjection() {
-	VkRect2D area = m_renderTarget->getRenderArea();
+	//VkRect2D area = m_renderTarget->getRenderArea();
 
-	float r = area.extent.width;
+	float r = 800;//area.extent.width;
 	float l = 0;
-	float t = area.extent.height;
+	float t = 600;//area.extent.height;
 	float b = 0;
 	float f = 1;
 	float n = -1;

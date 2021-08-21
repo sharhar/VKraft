@@ -13,7 +13,7 @@
 
 class TextObject {
 public:
-	static void init(const VKLDevice* device, const VKLQueue* transferQueue, const VKLRenderTarget* renderTarget);
+	static void init(const VKLDevice* device, const VKLQueue* transferQueue, const VKLRenderPass* renderPass);
 	void updateProjection();
 	static void destroy();
 	
@@ -24,7 +24,7 @@ public:
 	
 private:
 	static const VKLDevice* m_device;
-	static const VKLRenderTarget* m_renderTarget;
+	static const VKLRenderPass* m_renderPass;
 
 	static VKLBuffer m_vertBuffer;
 	static VKLShader m_shader;

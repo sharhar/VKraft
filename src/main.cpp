@@ -1,6 +1,6 @@
 #include <VKL/VKL.h>
 
-#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_COCOA
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
@@ -96,41 +96,21 @@ int main() {
 						.procAddr(glfwGetInstanceProcAddress)
 						.addExtensions(glfwExtensions, glfwExtensionCount)
 						.debug(VK_TRUE));
-
-	VKLSurface surface(VKLSurfaceCreateInfoGLFW()
-						.instance(&instance)
-						.window(window)
-						.createSurfaceFunc(glfwCreateWindowSurface));
-		
-		/*
-		VKLSurfaceCreateInfoWin32()
-						.instance(&instance)
-						.hwnd(glfwGetWin32Window(window)));
-	*/
-	//VkSurfaceKHR surfaceHandle = VK_NULL_HANDLE;
-	//glfwCreateWindowSurface(instance.handle(), window, NULL, &surfaceHandle);
 	
-	//VKLSurface surface(VKLSurfaceCreateInfoHandle().instance(&instance).handle(surfaceHandle));
-
-	const VKLPhysicalDevice& physicalDevice = instance.getPhysicalDevices()[0];
-
-	printf("%s\n", physicalDevice.getProperties().deviceName);
-	printf("%d\n", physicalDevice.getProperties().deviceType);
-	printf("%d\n", physicalDevice.getProperties().deviceID);
+	VkSurfaceKHR surfaceHandle;
+	glfwCreateWindowSurface(instance.handle(), window, NULL, &surfaceHandle);
 	
-	for (int i = 0; i < physicalDevice.getQueueFamilyProperties().size(); i++) {
-		printf("%d: %d (%d)\n", i, physicalDevice.getQueueFamilyProperties()[i].queueFlags, physicalDevice.getQueueFamilyProperties()[i].queueCount);
-	}
+	VKLSurface surface(VKLSurfaceCreateInfoHandle().instance(&instance).handle(surfaceHandle));
 	
 	VKLDevice device(VKLDeviceCreateInfo()
-						.physicalDevice(&physicalDevice)
+						.physicalDevice(&instance.getPhysicalDevices()[0])
 						.addExtension("VK_KHR_swapchain")
 						.queueTypeCount(VKL_QUEUE_TYPE_GRAPHICS, 1)
 						.queueTypeCount(VKL_QUEUE_TYPE_COMPUTE, 1)
 						.queueTypeCount(VKL_QUEUE_TYPE_TRANSFER, 1));
 
 	VKLQueue graphicsQueue = device.getQueue(VKL_QUEUE_TYPE_GRAPHICS, 0);
-	VKLQueue computeQueue = device.getQueue(VKL_QUEUE_TYPE_COMPUTE, 0);
+	//VKLQueue computeQueue = device.getQueue(VKL_QUEUE_TYPE_COMPUTE, 0);
 	VKLQueue transferQueue = device.getQueue(VKL_QUEUE_TYPE_TRANSFER, 0);
 	
 	VKLSwapChain swapChain(VKLSwapChainCreateInfo()
@@ -144,21 +124,51 @@ int main() {
 									.addColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
 								.end());
 	
+	VKLImage backBuffer(VKLImageCreateInfo()
+							.device(&device)
+							.extent(800, 600, 1)
+							.format(VK_FORMAT_R16G16B16A16_SFLOAT)
+							.usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+							.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
+	
+	transferQueue.getCmdBuffer()->begin();
+	
+	backBuffer.cmdTransitionBarrier(transferQueue.getCmdBuffer(), VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	
+	transferQueue.getCmdBuffer()->end();
+	
+	transferQueue.submit(transferQueue.getCmdBuffer(), VK_NULL_HANDLE);
+	transferQueue.waitIdle();
+	
+	VKLImageView backBufferView(VKLImageViewCreateInfo().image(&backBuffer));
+	
+	VkImageView tempView = backBufferView.handle();
+	
+	VkFramebufferCreateInfo frameBufferCreateInfo;
+	memset(&frameBufferCreateInfo, 0, sizeof(VkFramebufferCreateInfo));
+	frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	frameBufferCreateInfo.renderPass = renderPass.handle();
+	frameBufferCreateInfo.attachmentCount = 1;
+	frameBufferCreateInfo.pAttachments = &tempView;
+	frameBufferCreateInfo.width = 800;
+	frameBufferCreateInfo.height = 600;
+	frameBufferCreateInfo.layers = 1;
+	
+	VkFramebuffer frameBuffer;
+	
+	VK_CALL(device.vk.CreateFramebuffer(device.handle(), &frameBufferCreateInfo, device.allocationCallbacks(), &frameBuffer));
+	
 	VkClearValue clearColor;
 	clearColor.color.float32[0] = 0.25f;
 	clearColor.color.float32[1] = 0.45f;
 	clearColor.color.float32[2] = 1.0f;
 	clearColor.color.float32[3] = 1.0f;
 	
-	swapChain.setClearValue(clearColor, 0);
-	
-	Cursor cursor(&device, &swapChain, &graphicsQueue);
+	Cursor cursor(&device, &renderPass, &graphicsQueue);
 	
 	VKLCommandBuffer cmdBuffer(&graphicsQueue);
-	
-	VkFence renderFence = device.createFence(0);
 
-	TextObject::init(&device, &transferQueue, &swapChain);
+	TextObject::init(&device, &transferQueue, &renderPass);
 
 	int width, height;
 	int pwidth, pheight;
@@ -176,27 +186,47 @@ int main() {
 		
 		cmdBuffer.begin();
 		
-		swapChain.beingRender(&cmdBuffer);
+		backBuffer.cmdTransitionBarrier(&cmdBuffer, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+		
+		VkRect2D area;
+		area.offset.x = 0;
+		area.offset.y = 0;
+		area.extent.width = 800;
+		area.extent.height = 600;
+		
+		VkRenderPassBeginInfo renderPassBeginInfo;
+		memset(&renderPassBeginInfo, 0, sizeof(VkRenderPassBeginInfo));
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.renderPass = renderPass.handle();
+		renderPassBeginInfo.framebuffer = frameBuffer;
+		renderPassBeginInfo.renderArea = area;
+		renderPassBeginInfo.clearValueCount = 1;
+		renderPassBeginInfo.pClearValues = &clearColor;
+		
+		device.vk.CmdBeginRenderPass(cmdBuffer.handle(), &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		
 		cursor.render(&cmdBuffer);
 		
-		swapChain.endRender(&cmdBuffer);
+		device.vk.CmdEndRenderPass(cmdBuffer.handle());
+		
+		backBuffer.cmdTransitionBarrier(&cmdBuffer, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 		
 		cmdBuffer.end();
 		
-		graphicsQueue.submit(&cmdBuffer, renderFence);
-		
-		device.waitForFence(renderFence);
-		device.resetFence(renderFence);
+		graphicsQueue.submit(&cmdBuffer, VK_NULL_HANDLE);
+		graphicsQueue.waitIdle();
 
-		swapChain.present();
+		swapChain.present(&backBuffer);
 	}
+	
+	device.vk.DestroyFramebuffer(device.handle(), frameBuffer, device.allocationCallbacks());
 	
 	TextObject::destroy();
 
-	device.destroyFence(renderFence);
-	
 	cmdBuffer.destroy();
+	
+	backBufferView.destroy();
+	backBuffer.destroy();
 	
 	renderPass.destroy();
 
@@ -205,7 +235,6 @@ int main() {
 	device.destroy();
 	
 	surface.destroy();
-	//instance.destroySurface(surface);
 	instance.destroy();
 	
 	glfwDestroyWindow(window);
