@@ -29,10 +29,10 @@ Cursor::Cursor(Application* application) {
 	m_vertBuffer.uploadData(m_application->transferQueue, cursorVerts, 12 * 2 * sizeof(float), 0);
 	
 	size_t vertSize = 0;
-	uint32_t* vertCode = (uint32_t*)readBinaryFile("res/cursor-vert.spv", &vertSize);
+	uint32_t* vertCode = (uint32_t*)FileUtils::readBinaryFile("res/cursor-vert.spv", &vertSize);
 	
 	size_t fragSize = 0;
-	uint32_t* fragCode = (uint32_t*)readBinaryFile("res/cursor-frag.spv", &fragSize);
+	uint32_t* fragCode = (uint32_t*)FileUtils::readBinaryFile("res/cursor-frag.spv", &fragSize);
 	
 	m_shader.create(VKLShaderCreateInfo().device(&m_application->device)
 							.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")

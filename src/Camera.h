@@ -15,6 +15,8 @@
 #include <thread>
 #include <chrono>
 
+using namespace MathUtils;
+
 class Camera {
 public:
 	static void init(GLFWwindow* window);

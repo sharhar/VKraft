@@ -41,10 +41,10 @@ void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, co
 	m_vertBuffer.uploadData(transferQueue, verts, 6 * 4 * sizeof(float), 0);
 
 	size_t vertSize = 0;
-	uint32_t* vertCode = (uint32_t*)readBinaryFile("res/font-vert.spv", &vertSize);
+	uint32_t* vertCode = (uint32_t*)FileUtils::readBinaryFile("res/font-vert.spv", &vertSize);
 
 	size_t fragSize = 0;
-	uint32_t* fragCode = (uint32_t*)readBinaryFile("res/font-frag.spv", &fragSize);
+	uint32_t* fragCode = (uint32_t*)FileUtils::readBinaryFile("res/font-frag.spv", &fragSize);
 
 	/*
 	m_shader.create(VKLShaderCreateInfo()

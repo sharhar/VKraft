@@ -12,6 +12,8 @@
 #include <vector>
 #include "Utils.h"
 
+using namespace MathUtils;
+
 class Chunk {
 public:
 	//static void init(VKLDevice* device);
