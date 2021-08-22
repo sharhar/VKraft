@@ -16,15 +16,14 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
 	}
 }
 
-Application::Application(uint32_t width, uint32_t height, const char* title) {
+Application::Application(int width, int height, const char* title) {
 	glfwInit();
-	
-	VkExtent2D windowSize;
-	windowSize.width = 800;
-	windowSize.height = 600;
 
+	winWidth = width;
+	winHeight = height;
+	
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	window = glfwCreateWindow(windowSize.width, windowSize.height, "VKraft", NULL, NULL);
+	window = glfwCreateWindow(width, height, "VKraft", NULL, NULL);
 
 	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	//glfwSetWindowFocusCallback(window, window_focus_callback);
@@ -56,7 +55,7 @@ Application::Application(uint32_t width, uint32_t height, const char* title) {
 	
 	swapChain.create(VKLSwapChainCreateInfo()
 						.queue(graphicsQueue)
-						.surface(surface.handle())
+						.surface(&surface)
 						.presentMode(VK_PRESENT_MODE_IMMEDIATE_KHR));
 
 	renderPass.create(VKLRenderPassCreateInfo().device(&device)
@@ -77,12 +76,20 @@ Application::Application(uint32_t width, uint32_t height, const char* title) {
 							.stages(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 						.end());
 	
-	VKLImageCreateInfo backBuffersCreateInfo;
-	backBuffersCreateInfo.device(&device)
-						.extent(800, 600, 1)
-						.format(VK_FORMAT_R16G16B16A16_SFLOAT)
-						.usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
-						.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY);
+	backBuffersCreateInfo.device(&device).format(VK_FORMAT_R16G16B16A16_SFLOAT).memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY);
+	
+	cmdBuffer = new VKLCommandBuffer(graphicsQueue);
+	
+	cursor = new Cursor(this);
+	
+	createBackBuffer(width, height);
+}
+
+
+void Application::createBackBuffer(uint32_t width, uint32_t height) {
+	backBuffersCreateInfo.extent(width, height, 1);
+	
+	backBuffersCreateInfo.usage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 	
 	backBuffers[0].create(backBuffersCreateInfo);
 	
@@ -110,7 +117,7 @@ Application::Application(uint32_t width, uint32_t height, const char* title) {
 							.renderPass(&renderPass)
 							.addAttachment(&backBufferViews[0])
 							.addAttachment(&backBufferViews[1])
-							.extent(800, 600, 1));
+							.extent(width, height, 1));
 	
 	VkClearValue clearColor;
 	clearColor.color.float32[0] = 0.25f;
@@ -121,36 +128,68 @@ Application::Application(uint32_t width, uint32_t height, const char* title) {
 	framebuffer.setClearValue(clearColor, 0);
 	framebuffer.setClearValue(clearColor, 1);
 	
-	cmdBuffer = new VKLCommandBuffer(graphicsQueue);
-	
-	cursor = new Cursor(this);
+	cursor->bindInputAttachment(&backBufferViews[1]);
 }
 
 void Application::mainLoop() {
 	while (!glfwWindowShouldClose(window)) {
-		glfwPollEvents();
-		
-		//if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-		//	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		//}
-		
-		cmdBuffer->begin();
-		
-		framebuffer.beginRenderPass(cmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
-		
-		cmdBuffer->nextSubpass(VK_SUBPASS_CONTENTS_INLINE);
-		
-		cursor->render(cmdBuffer);
-		
-		cmdBuffer->endRenderPass();
-		
-		cmdBuffer->end();
-		
-		graphicsQueue->submit(cmdBuffer, VK_NULL_HANDLE);
-		graphicsQueue->waitIdle();
-
-		swapChain.present(&backBuffers[0]);
+		pollWindowEvents();
+		render();
 	}
+}
+
+
+void Application::pollWindowEvents() {
+	glfwPollEvents();
+	
+	//if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+	//	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	//}
+	
+	int width, height;
+	glfwGetWindowSize(window, &width, &height);
+	
+	if(winWidth != width || winHeight != height) {
+		winWidth = width;
+		winHeight = height;
+		
+		framebuffer.destroy();
+		
+		backBufferViews[0].destroy();
+		backBufferViews[1].destroy();
+		
+		backBuffers[0].destroy();
+		backBuffers[1].destroy();
+		
+		createBackBuffer(width, height);
+		
+		swapChain.rebuild();
+	}
+}
+
+void Application::render() {
+	cmdBuffer->begin();
+	
+	framebuffer.beginRenderPass(cmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
+	
+	cmdBuffer->nextSubpass(VK_SUBPASS_CONTENTS_INLINE);
+	
+	cmdBuffer->setViewPort(0, winWidth, winHeight);
+	cmdBuffer->setViewPort(1, winWidth, winHeight);
+	
+	cmdBuffer->setScissor(0, winWidth, winHeight);
+	cmdBuffer->setScissor(1, winWidth, winHeight);
+	
+	cursor->render(cmdBuffer);
+	
+	cmdBuffer->endRenderPass();
+	
+	cmdBuffer->end();
+	
+	graphicsQueue->submit(cmdBuffer, VK_NULL_HANDLE);
+	graphicsQueue->waitIdle();
+
+	swapChain.present(&backBuffers[0]);
 }
 
 void Application::destroy() {

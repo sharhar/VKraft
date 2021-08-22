@@ -6,7 +6,7 @@
 class Cursor {
 public:
 	Cursor(Application* application);
-	void updateProjection(int width, int height);
+	void bindInputAttachment(const VKLImageView* view);
 	void render(VKLCommandBuffer* cmdBuffer);
 	void destroy();
 private:

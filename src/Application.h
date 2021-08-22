@@ -52,7 +52,7 @@ public:
 
 class Application {
 public:
-	Application(uint32_t width, uint32_t height, const char* title);
+	Application(int width, int height, const char* title);
 	
 	void mainLoop();
 	
@@ -64,12 +64,17 @@ public:
 	VKLSurface surface;
 	VKLDevice device;
 	
+	int winWidth;
+	int winHeight;
+	
 	const VKLQueue* graphicsQueue;
 	const VKLQueue* computeQueue;
 	const VKLQueue* transferQueue;
 	
 	VKLSwapChain swapChain;
 	VKLRenderPass renderPass;
+	
+	VKLImageCreateInfo backBuffersCreateInfo;
 	
 	VKLImage backBuffers[2];
 	VKLImageView backBufferViews[2];
@@ -80,6 +85,10 @@ public:
 	
 	Cursor* cursor;
 	
+private:
+	void createBackBuffer(uint32_t width, uint32_t height);
+	void pollWindowEvents();
+	void render();
 };
 
-#endif /* Application_hpp */
+#endif /* Application_h */

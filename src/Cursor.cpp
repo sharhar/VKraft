@@ -1,10 +1,3 @@
-//
-//  Cursor.cpp
-//  VKraft
-//
-//  Created by Shahar Sandhaus on 6/11/21.
-//
-
 #include "Cursor.h"
 #include "Application.h"
 #include "Utils.h"
@@ -59,45 +52,11 @@ Cursor::Cursor(Application* application) {
 							.end());
 	
 	m_descriptorSet = new VKLDescriptorSet(&m_shader, 0);
-	
-	m_descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, m_application->backBufferViews[1].handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_NULL_HANDLE);
-
-	/*
-	
-	vklCreateUniformObject(device, &m_uniform, m_shader);
-	
-	vklCreateBuffer(device, &m_uniformBuffer, VK_FALSE, sizeof(float) * 18, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	
-	vklSetUniformBuffer(m_device, m_uniform, m_uniformBuffer, 0);
-	vklSetUniformFramebuffer(m_device, m_uniform, framebuffer, 1);
-	
-	updateProjection(swapChain->width, swapChain->height);
-	 */
-	
-	updateProjection(800, 600);//renderTarget->getRenderArea().extent.width, renderTarget->getRenderArea().extent.height);
 }
 
-void Cursor::updateProjection(int width, int height) {
-	m_screenSize[0] = (float)width;
-	m_screenSize[1] = (float)height;
-	/*
-	float r = width;
-	float l = 0;
-	float t = height;
-	float b = 0;
-	float f = 1;
-	float n = -1;
 
-	float uniformData[] = {
-		2 / (r - l), 0, 0, 0,
-		0, 2 / (t - b), 0, 0,
-		0, 0, -2 / (f - n), 0,
-		-(r + l) / (r - l), -(t + b) / (t - b), -(f + n) / (f - n), 1,
-
-		width/2.0f, height/2.0f
-	};
-	 */
-	//vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 18, 0);
+void Cursor::bindInputAttachment(const VKLImageView* view) {
+	m_descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, view->handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_NULL_HANDLE);
 }
 
 void Cursor::render(VKLCommandBuffer* cmdBuffer) {
@@ -107,6 +66,9 @@ void Cursor::render(VKLCommandBuffer* cmdBuffer) {
 	
 	m_application->device.vk.CmdBindVertexBuffers(cmdBuffer->handle(), 0, 1, &tempBuffHandle, &vertexOffsets);
 	m_application->device.vk.CmdBindPipeline(cmdBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline.handle());
+	
+	m_screenSize[0] = (float)m_application->winWidth;
+	m_screenSize[1] = (float)m_application->winHeight;
 	
 	m_application->device.vk.CmdPushConstants(cmdBuffer->handle(), m_shader.getPipelineLayout(),
 								  VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2, m_screenSize);
