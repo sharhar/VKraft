@@ -1,17 +1,16 @@
 #ifndef Cursor_h
 #define Cursor_h
 
-#include <VKL/VKL.h>
+#include "Base.h"
 
 class Cursor {
 public:
-	Cursor(const VKLDevice* device, VKLRenderPass* renderPass, VKLQueue* queue, VkImageView view);
+	Cursor(Application* application);
 	void updateProjection(int width, int height);
 	void render(VKLCommandBuffer* cmdBuffer);
 	void destroy();
 private:
-	const VKLDevice* m_device;
-	VKLQueue* m_queue;
+	Application* m_application;
 	
 	VKLBuffer m_vertBuffer;
 	VKLShader m_shader;

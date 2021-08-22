@@ -55,7 +55,6 @@ endif()
 
 include_directories(
 	"${GLFW_SOURCE_DIR}/include"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include"
 	"${CMAKE_CURRENT_SOURCE_DIR}/VKL/include"
 )
 
