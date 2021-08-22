@@ -60,22 +60,15 @@ void Cursor::bindInputAttachment(const VKLImageView* view) {
 }
 
 void Cursor::render(VKLCommandBuffer* cmdBuffer) {
-	VkDeviceSize vertexOffsets = 0;
-	VkBuffer tempBuffHandle = m_vertBuffer.handle();
-	VkDescriptorSet descSet = m_descriptorSet->handle();
-	
-	m_application->device.vk.CmdBindVertexBuffers(cmdBuffer->handle(), 0, 1, &tempBuffHandle, &vertexOffsets);
-	m_application->device.vk.CmdBindPipeline(cmdBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline.handle());
-	
 	m_screenSize[0] = (float)m_application->winWidth;
 	m_screenSize[1] = (float)m_application->winHeight;
 	
-	m_application->device.vk.CmdPushConstants(cmdBuffer->handle(), m_shader.getPipelineLayout(),
-								  VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2, m_screenSize);
+	cmdBuffer->bindVertexBuffer(m_vertBuffer, 0, 0);
+	cmdBuffer->bindPipeline(m_pipeline);
+	cmdBuffer->bindDescriptorSet(m_descriptorSet);
+	cmdBuffer->pushConstants(m_pipeline, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2, m_screenSize);
 	
-	m_application->device.vk.CmdBindDescriptorSets(cmdBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_shader.getPipelineLayout(), 0, 1, &descSet, 0, NULL);
-	
-	m_application->device.vk.CmdDraw(cmdBuffer->handle(), 12, 1, 0, 0);
+	cmdBuffer->draw(12, 1, 0, 0);
 }
 
 void Cursor::destroy() {

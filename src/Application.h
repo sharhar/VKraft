@@ -45,19 +45,23 @@ public:
 		
 		VKLImage fontImage;
 		VKLImageView fontImageView;
+		VkSampler sampler;
 		
-		VKLBuffer uniformBuffer;
+		VKLDescriptorSet* descriptorSet;
 	};
 	
 	TextRenderingData textRenderingData;
+	
+	TextObject* fpsText;
 	
 private:
 	void createBackBuffer(uint32_t width, uint32_t height);
 	void pollWindowEvents();
 	void render();
 	
-	void setupTextRenderingData();   // These functions are both implemented in TextObject.cpp for orginizational purposes
-	void cleanUpTextRenderingData(); //
+	void setupTextRenderingData();                                  // These functions are both implemented in TextObject.cpp for orginizational purposes
+	void perpareTextRendering(const VKLCommandBuffer* cmdBuff);     //
+	void cleanUpTextRenderingData();                                //
 };
 
 #endif /* Application_h */

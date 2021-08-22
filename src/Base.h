@@ -13,5 +13,6 @@
 
 class Application;
 class Cursor;
+class TextObject;
 
 #endif /* Base_h */

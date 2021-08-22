@@ -10,8 +10,8 @@
 void Application::setupTextRenderingData() {
 	float verts[24] = {
 		0, 0, 0, 0,
-		0, 1, 0, 1,
 		1, 0, 1, 0,
+		0, 1, 0, 1,
 		
 		0, 1, 0, 1,
 		1, 0, 1, 0,
@@ -36,9 +36,9 @@ void Application::setupTextRenderingData() {
 						.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
 						.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
 						.addDescriptorSet()
-							.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT)
-							.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
-						.end());
+							.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
+						.end()
+						.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 5));
 
 	textRenderingData.pipeline.create(VKLPipelineCreateInfo()
 									  .shader(&textRenderingData.shader)
@@ -84,9 +84,52 @@ void Application::setupTextRenderingData() {
 										   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	
 	textRenderingData.fontImage.uploadData(transferQueue, imageData.data(), imageData.size(), sizeof(char) * 4);
+	
+	textRenderingData.fontImage.transition(transferQueue,
+										   VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+										   VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+	
+	textRenderingData.fontImageView.create(VKLImageViewCreateInfo().image(&textRenderingData.fontImage));
+	
+	textRenderingData.descriptorSet = new VKLDescriptorSet(&textRenderingData.shader, 0);
+	
+	VkSamplerCreateInfo samplerCreateInfo;
+	memset(&samplerCreateInfo, 0, sizeof(VkSamplerCreateInfo));
+	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+	samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.mipLodBias = 0;
+	samplerCreateInfo.anisotropyEnable = VK_FALSE;
+	samplerCreateInfo.maxAnisotropy = 0;
+	samplerCreateInfo.minLod = 0;
+	samplerCreateInfo.maxLod = 0;
+	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+
+	VK_CALL(device.vk.CreateSampler(device.handle(), &samplerCreateInfo, device.allocationCallbacks(), &textRenderingData.sampler));
+	
+	textRenderingData.descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+												textRenderingData.fontImageView.handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textRenderingData.sampler);
+}
+
+void Application::perpareTextRendering(const VKLCommandBuffer* cmdBuff) {
+	cmdBuff->bindVertexBuffer(textRenderingData.vertBuffer, 0, 0);
+	cmdBuff->bindPipeline(textRenderingData.pipeline);
+	cmdBuff->bindDescriptorSet(textRenderingData.descriptorSet);
 }
 
 void Application::cleanUpTextRenderingData() {
+	device.vk.DestroySampler(device.handle(), textRenderingData.sampler, device.allocationCallbacks());
+	
+	textRenderingData.descriptorSet->destroy();
+	
+	delete textRenderingData.descriptorSet;
+	
+	textRenderingData.fontImageView.destroy();
 	textRenderingData.fontImage.destroy();
 	
 	textRenderingData.pipeline.destroy();
@@ -94,49 +137,25 @@ void Application::cleanUpTextRenderingData() {
 	textRenderingData.vertBuffer.destroy();
 }
 
-void TextObject::updateProjection() {
-	//VkRect2D area = m_renderTarget->getRenderArea();
-
-	float r = 800;//area.extent.width;
-	float l = 0;
-	float t = 600;//area.extent.height;
-	float b = 0;
-	float f = 1;
-	float n = -1;
-
-	float uniformData[] = {
-		2 / (r - l), 0, 0, 0,
-		0, 2 / (t - b), 0, 0,
-		0, 0, -2 / (f - n), 0,
-		-(r + l) / (r - l), -(t + b) / (t - b), -(f + n) / (f - n), 1
-	};
+TextObject::TextObject(Application* application, int maxCharNum) {
+	m_application = application;
 	
-	//vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 16, 0);
-}
-
-TextObject::TextObject(int maxCharNum) {
-	/*
-	vklCreateBuffer(m_device, &m_uniformBuffer, VK_FALSE, sizeof(float) * 19, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	vklCreateBuffer(m_device, &m_instanceBuffer, VK_FALSE, sizeof(int) * maxCharNum, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	
-	vklCreateUniformObject(m_device, &m_uniform, m_shader);
-	
-	vklSetUniformBuffer(m_device, m_uniform, m_uniformBuffer, 0);
-	vklSetUniformTexture(m_device, m_uniform, m_texture, 1);
-	*/
-	updateProjection();
+	m_instanceBuffer.create(VKLBufferCreateInfo()
+							.device(&application->device)
+							.memoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU)
+							.size(sizeof(int) * maxCharNum)
+							.usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
 }
 
 void TextObject::render(VKLCommandBuffer* cmdBuffer) {
-	/*
-	VkDeviceSize offsets = 0;
-	m_device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipeline);
-	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertBuffer->buffer, &offsets);
-	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instanceBuffer->buffer, &offsets);
-	m_device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipelineLayout, 0, 1, &m_uniform->descriptorSet, 0, NULL);
+	m_pcBuff[0] = m_application->winWidth;
+	m_pcBuff[1] = m_application->winHeight;
 	
-	m_device->pvkCmdDraw(cmdBuffer, 6, m_charNum, 0, 0);
-	*/
+	cmdBuffer->bindVertexBuffer(m_instanceBuffer, 1, 0);
+	cmdBuffer->pushConstants(m_application->textRenderingData.pipeline, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 5, m_pcBuff);
+	
+	cmdBuffer->draw(6, m_charNum, 0, 0);
+	
 }
 
 void TextObject::setText(const std::string& str) {
@@ -146,7 +165,7 @@ void TextObject::setText(const std::string& str) {
 		ids[i] = (int) str[i];
 	}
 	
-	//vklWriteToMemory(m_device, m_instanceBuffer->memory, ids, sizeof(int) * str.length(), 0);
+	m_instanceBuffer.setData(ids, sizeof(int) * str.length(), 0);
 	
 	delete[] ids;
 	
@@ -155,5 +174,10 @@ void TextObject::setText(const std::string& str) {
 
 void TextObject::setCoords(float xPos, float yPos, float size) {
 	float buff[3] = {xPos, yPos, size};
-	//vklWriteToMemory(m_device, m_uniformBuffer->memory, buff, sizeof(float) * 3, sizeof(float) * 16);
+	
+	memcpy(&m_pcBuff[2], buff, sizeof(float) * 3);
+}
+
+void TextObject::destroy() {
+	m_instanceBuffer.destroy();
 }

@@ -1,5 +1,8 @@
 #include "Application.h"
 #include "Cursor.h"
+#include "TextObject.h"
+
+#include <string>
 
 static void window_focus_callback(GLFWwindow* window, int focused) {
 	if (focused) {
@@ -68,8 +71,8 @@ Application::Application(int width, int height, const char* title) {
 							.addColorAttachment(1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
 						.end()
 						.addSubpass()
-							.addInputAttachment(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 							.addColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+							.addInputAttachment(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 						.end()
 						.addSubpassDependency(0, 1, VK_DEPENDENCY_BY_REGION_BIT)
 							.access(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)
@@ -85,8 +88,12 @@ Application::Application(int width, int height, const char* title) {
 	createBackBuffer(width, height);
 	
 	setupTextRenderingData();
+	
+	fpsText = new TextObject(this, 25);
+	
+	fpsText->setText("Hello World!");
+	fpsText->setCoords(20, 20, 32);
 }
-
 
 void Application::createBackBuffer(uint32_t width, uint32_t height) {
 	backBuffersCreateInfo.extent(width, height, 1);
@@ -171,15 +178,19 @@ void Application::pollWindowEvents() {
 void Application::render() {
 	cmdBuffer->begin();
 	
-	framebuffer.beginRenderPass(cmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
-	
-	cmdBuffer->nextSubpass(VK_SUBPASS_CONTENTS_INLINE);
+	cmdBuffer->beginRenderPass(framebuffer, VK_SUBPASS_CONTENTS_INLINE);
 	
 	cmdBuffer->setViewPort(0, winWidth, winHeight);
 	cmdBuffer->setViewPort(1, winWidth, winHeight);
 	
 	cmdBuffer->setScissor(0, winWidth, winHeight);
 	cmdBuffer->setScissor(1, winWidth, winHeight);
+	
+	perpareTextRendering(cmdBuffer);
+	
+	fpsText->render(cmdBuffer);
+	
+	cmdBuffer->nextSubpass(VK_SUBPASS_CONTENTS_INLINE);
 	
 	cursor->render(cmdBuffer);
 	
@@ -193,6 +204,9 @@ void Application::render() {
 }
 
 void Application::destroy() {
+	fpsText->destroy();
+	delete fpsText;
+	
 	cleanUpTextRenderingData();
 	
 	cursor->destroy();

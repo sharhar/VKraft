@@ -1,21 +1,24 @@
 #ifndef TextObject_h
 #define TextObject_h
 
-#include <VKL/VKL.h>
-#include <string>
+#include "Base.h"
 
 class TextObject {
 public:
-	void updateProjection();
+	TextObject(Application* application, int maxCharNum);
 	
-	TextObject(int maxCharNum);
 	void render(VKLCommandBuffer* cmdBuffer);
 	void setText(const std::string& str);
 	void setCoords(float xPos, float yPos, float size);
 	
+	void destroy();
+	
 private:
+	Application* m_application;
+	
+	float m_pcBuff[5];
+	
 	VKLBuffer m_instanceBuffer;
-	VKLBuffer m_uniformBuffer;
 	int m_charNum;
 };
 
