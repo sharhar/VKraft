@@ -1,10 +1,3 @@
-//
-//  FontEngine.hpp
-//  VKraft
-//
-//  Created by Shahar Sandhaus on 6/11/21.
-//
-
 #ifndef TextObject_h
 #define TextObject_h
 
@@ -13,27 +6,16 @@
 
 class TextObject {
 public:
-	static void init(const VKLDevice* device, const VKLQueue* transferQueue, const VKLRenderPass* renderPass);
 	void updateProjection();
-	static void destroy();
 	
 	TextObject(int maxCharNum);
-	void render(VkCommandBuffer cmdBuffer);
+	void render(VKLCommandBuffer* cmdBuffer);
 	void setText(const std::string& str);
 	void setCoords(float xPos, float yPos, float size);
 	
 private:
-	static const VKLDevice* m_device;
-	static const VKLRenderPass* m_renderPass;
-
-	static VKLBuffer m_vertBuffer;
-	static VKLShader m_shader;
-	//VKLUniformObject* m_uniform;
-	static VKLImage m_texture;
-	static VKLPipeline m_pipeline;
-	
-	VKLBuffer* m_instanceBuffer;
-	VKLBuffer* m_uniformBuffer;
+	VKLBuffer m_instanceBuffer;
+	VKLBuffer m_uniformBuffer;
 	int m_charNum;
 };
 

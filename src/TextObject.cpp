@@ -1,10 +1,3 @@
-//
-//  FontEngine.cpp
-//  VKraft
-//
-//  Created by Shahar Sandhaus on 6/11/21.
-//
-
 #include "TextObject.h"
 
 #include "lodepng.h"
@@ -12,17 +5,9 @@
 
 #include "Utils.h"
 
-const VKLDevice* TextObject::m_device = NULL;
-const VKLRenderPass* TextObject::m_renderPass = NULL;
+#include "Application.h"
 
-VKLBuffer TextObject::m_vertBuffer;
-VKLShader TextObject::m_shader;
-VKLPipeline TextObject::m_pipeline;
-
-void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, const VKLRenderPass* renderPass) {
-	m_device = device;
-	m_renderPass = renderPass;
-	
+void Application::setupTextRenderingData() {
 	float verts[24] = {
 		0, 0, 0, 0,
 		0, 1, 0, 1,
@@ -33,12 +18,12 @@ void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, co
 		1, 1, 1, 1
 	};
 
-	m_vertBuffer.create(VKLBufferCreateInfo()
-									.device(m_device).size(6 * 4 * sizeof(float))
-									.usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)
-									.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
+	textRenderingData.vertBuffer.create(VKLBufferCreateInfo()
+										.device(&device).size(6 * 4 * sizeof(float))
+										.usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+										.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
 
-	m_vertBuffer.uploadData(transferQueue, verts, 6 * 4 * sizeof(float), 0);
+	textRenderingData.vertBuffer.uploadData(transferQueue, verts, 6 * 4 * sizeof(float), 0);
 
 	size_t vertSize = 0;
 	uint32_t* vertCode = (uint32_t*)FileUtils::readBinaryFile("res/font-vert.spv", &vertSize);
@@ -46,64 +31,67 @@ void TextObject::init(const VKLDevice *device, const VKLQueue* transferQueue, co
 	size_t fragSize = 0;
 	uint32_t* fragCode = (uint32_t*)FileUtils::readBinaryFile("res/font-frag.spv", &fragSize);
 
-	/*
-	m_shader.create(VKLShaderCreateInfo()
-						.device(m_device)
+	textRenderingData.shader.create(VKLShaderCreateInfo()
+						.device(&device)
 						.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
 						.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
-						.addVertexInputBinding(0)
-							.setStride(sizeof(float) * 4)
-							.addAttrib(0, VK_FORMAT_R32G32_SFLOAT, 0)
-							.addAttrib(1, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 2)
-						.end()
-						.addVertexInputBinding(1)
-							.setStride(sizeof(int32_t))
-							.setInputRate(VK_VERTEX_INPUT_RATE_INSTANCE)
-							.addAttrib(2, VK_FORMAT_R32_SINT, 0)
-						.end()
 						.addDescriptorSet()
 							.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT)
 							.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
 						.end());
 
-	m_pipeline.create(VKLPipelineCreateInfo().setShader(&m_shader).setRenderTarget(renderTarget));
-	*/
-
-	/*
-	
-	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
-	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
-	pipelineCreateInfo.shader = m_shader;
-	pipelineCreateInfo.renderPass = framebuffer->renderPass;
-	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	pipelineCreateInfo.cullMode = VK_CULL_MODE_NONE;
-	pipelineCreateInfo.extent.width = framebuffer->width;
-	pipelineCreateInfo.extent.height = framebuffer->height;
-
-	vklCreateGraphicsPipeline(device, &m_pipeline, &pipelineCreateInfo);
+	textRenderingData.pipeline.create(VKLPipelineCreateInfo()
+									  .shader(&textRenderingData.shader)
+									  .renderPass(&renderPass, 0)
+									  .vertexInput
+										  .addBinding(0, sizeof(float) * 4)
+											  .addAttrib(0, VK_FORMAT_R32G32_SFLOAT, 0)
+											  .addAttrib(1, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 2)
+										  .end()
+										  .addBinding(1, sizeof(int32_t))
+											  .inputRate(VK_VERTEX_INPUT_RATE_INSTANCE)
+											  .addAttrib(2, VK_FORMAT_R32_SINT, 0)
+										  .end()
+										.end());
 
 	uint32_t tex_width, tex_height;
 	
 	std::vector<unsigned char> imageData;
 	
-	unsigned int error = lodepng::decode(imageData, tex_width, tex_height, "res/font.png");
+	std::string f_name;
+
+#ifdef UTIL_DIR_PRE
+	f_name.append(UTIL_DIR_PRE);
+#endif
+
+	f_name.append("res/font.png");
+	
+	unsigned int error = lodepng::decode(imageData, tex_width, tex_height, f_name);
 	
 	if (error != 0) {
 		std::cout << "Error loading image: " << error << "\n";
 	}
 	
-	VKLTextureCreateInfo textureCreateInfo;
-	textureCreateInfo.width = tex_width;
-	textureCreateInfo.height = tex_height;
-	textureCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	textureCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
-	textureCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-	textureCreateInfo.filter = VK_FILTER_LINEAR;
-	textureCreateInfo.colorSize = sizeof(char);
-	textureCreateInfo.colorCount = 4;
+	textRenderingData.fontImage.create(VKLImageCreateInfo()
+										.device(&device)
+										.extent(tex_width, tex_height, 1)
+										.format(VK_FORMAT_R8G8B8A8_UNORM)
+										.usage(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+										.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
 	
-	vklCreateStagedTexture(m_device->deviceGraphicsContexts[0], &m_texture, &textureCreateInfo, imageData.data());
-	*/
+	textRenderingData.fontImage.transition(transferQueue,
+										   VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+										   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	
+	textRenderingData.fontImage.uploadData(transferQueue, imageData.data(), imageData.size(), sizeof(char) * 4);
+}
+
+void Application::cleanUpTextRenderingData() {
+	textRenderingData.fontImage.destroy();
+	
+	textRenderingData.pipeline.destroy();
+	textRenderingData.shader.destroy();
+	textRenderingData.vertBuffer.destroy();
 }
 
 void TextObject::updateProjection() {
@@ -126,12 +114,6 @@ void TextObject::updateProjection() {
 	//vklWriteToMemory(m_device, m_uniformBuffer->memory, uniformData, sizeof(float) * 16, 0);
 }
 
-void TextObject::destroy() {
-	m_pipeline.destroy();
-	m_shader.destroy();
-	m_vertBuffer.destroy();
-}
-
 TextObject::TextObject(int maxCharNum) {
 	/*
 	vklCreateBuffer(m_device, &m_uniformBuffer, VK_FALSE, sizeof(float) * 19, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -145,7 +127,7 @@ TextObject::TextObject(int maxCharNum) {
 	updateProjection();
 }
 
-void TextObject::render(VkCommandBuffer cmdBuffer) {
+void TextObject::render(VKLCommandBuffer* cmdBuffer) {
 	/*
 	VkDeviceSize offsets = 0;
 	m_device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipeline);

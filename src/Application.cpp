@@ -83,6 +83,8 @@ Application::Application(int width, int height, const char* title) {
 	cursor = new Cursor(this);
 	
 	createBackBuffer(width, height);
+	
+	setupTextRenderingData();
 }
 
 
@@ -107,8 +109,7 @@ void Application::createBackBuffer(uint32_t width, uint32_t height) {
 	
 	transferQueue->getCmdBuffer()->end();
 	
-	transferQueue->submit(transferQueue->getCmdBuffer(), VK_NULL_HANDLE);
-	transferQueue->waitIdle();
+	transferQueue->submitAndWait(transferQueue->getCmdBuffer());
 	
 	backBufferViews[0].create(VKLImageViewCreateInfo().image(&backBuffers[0]));
 	backBufferViews[1].create(VKLImageViewCreateInfo().image(&backBuffers[1]));
@@ -186,13 +187,14 @@ void Application::render() {
 	
 	cmdBuffer->end();
 	
-	graphicsQueue->submit(cmdBuffer, VK_NULL_HANDLE);
-	graphicsQueue->waitIdle();
+	graphicsQueue->submitAndWait(cmdBuffer);
 
 	swapChain.present(&backBuffers[0]);
 }
 
 void Application::destroy() {
+	cleanUpTextRenderingData();
+	
 	cursor->destroy();
 	delete cursor;
 	

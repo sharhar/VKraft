@@ -38,10 +38,26 @@ public:
 	
 	Cursor* cursor;
 	
+	struct TextRenderingData {
+		VKLBuffer vertBuffer;
+		VKLShader shader;
+		VKLPipeline pipeline;
+		
+		VKLImage fontImage;
+		VKLImageView fontImageView;
+		
+		VKLBuffer uniformBuffer;
+	};
+	
+	TextRenderingData textRenderingData;
+	
 private:
 	void createBackBuffer(uint32_t width, uint32_t height);
 	void pollWindowEvents();
 	void render();
+	
+	void setupTextRenderingData();   // These functions are both implemented in TextObject.cpp for orginizational purposes
+	void cleanUpTextRenderingData(); //
 };
 
 #endif /* Application_h */
