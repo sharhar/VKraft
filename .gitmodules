@@ -1,3 +1,6 @@
 [submodule "VKL"]
 	path = VKL
 	url = https://github.com/sharhar/VKL.git
+[submodule "glfw"]
+	path = glfw
+	url = https://github.com/glfw/glfw.git
