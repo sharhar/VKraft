@@ -1,76 +1,64 @@
-//
-//  Camera.cpp
-//  VKraft
-//
-//  Created by Shahar Sandhaus on 6/12/21.
-//
-
+#include "Application.h"
 #include "Camera.h"
 #include "ChunkRenderer.h"
 
-Vec3 Camera::pos = Vec3(0, 8, -3);
-Vec3 Camera::renderPos = Vec3(0, 0, 0);
-Vec3 Camera::rot = Vec3(0, 90, 0);
-double Camera::prev_x = 0;
-double Camera::prev_y = 0;
-float Camera::yVel = 0;
-GLFWwindow* Camera::m_window = NULL;
-
-void Camera::init(GLFWwindow *window) {
-	m_window = window;
+Camera::Camera(Application* application) {
+	m_application = application;
 	
-	renderPos.x = pos.x;
-	renderPos.y = pos.y;
-	renderPos.z = pos.z;
+	m_pos = MathUtils::Vec3(0, 8, -3);
+	m_renderPos = m_pos;
+	m_rot = MathUtils::Vec3(0, 90, 0);
 	
 	double xpos, ypos;
-	glfwGetCursorPos(window, &xpos, &ypos);
+	glfwGetCursorPos(m_application->window, &xpos, &ypos);
 
-	prev_x = xpos;
-	prev_y = ypos;
+	m_prev_x = xpos;
+	m_prev_y = ypos;
+	
+	m_yVel = 0;
 }
 
 void Camera::update(float dt) {
-	bool focused = glfwGetInputMode(m_window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+	bool focused = glfwGetInputMode(m_application->window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
 
 	double xpos, ypos;
-	glfwGetCursorPos(m_window, &xpos, &ypos);
+	glfwGetCursorPos(m_application->window, &xpos, &ypos);
 
 	if (focused) {
 		float speed = 3.5f;
 
-		if (glfwGetKey(m_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+		if (glfwGetKey(m_application->window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
 			speed *= 2;
 		}
 
 		float xVel = 0;
 		float zVel = 0;
 
-		if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS) {
-			zVel -= speed * cos(rot.y*DEG_TO_RAD) * dt;
-			xVel += speed * sin(rot.y*DEG_TO_RAD) * dt;
+		if (glfwGetKey(m_application->window, GLFW_KEY_W) == GLFW_PRESS) {
+			zVel -= speed * cos(m_rot.y*DEG_TO_RAD) * dt;
+			xVel += speed * sin(m_rot.y*DEG_TO_RAD) * dt;
 		}
 
-		if (glfwGetKey(m_window, GLFW_KEY_S) == GLFW_PRESS) {
-			zVel += speed * cos(rot.y*DEG_TO_RAD) * dt;
-			xVel -= speed * sin(rot.y*DEG_TO_RAD) * dt;
+		if (glfwGetKey(m_application->window, GLFW_KEY_S) == GLFW_PRESS) {
+			zVel += speed * cos(m_rot.y*DEG_TO_RAD) * dt;
+			xVel -= speed * sin(m_rot.y*DEG_TO_RAD) * dt;
 		}
 
-		if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_PRESS) {
-			zVel -= speed * sin(rot.y*DEG_TO_RAD) * dt;
-			xVel -= speed * cos(rot.y*DEG_TO_RAD) * dt;
+		if (glfwGetKey(m_application->window, GLFW_KEY_A) == GLFW_PRESS) {
+			zVel -= speed * sin(m_rot.y*DEG_TO_RAD) * dt;
+			xVel -= speed * cos(m_rot.y*DEG_TO_RAD) * dt;
 		}
 
-		if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_PRESS) {
-			zVel += speed * sin(rot.y*DEG_TO_RAD) * dt;
-			xVel += speed * cos(rot.y*DEG_TO_RAD) * dt;
+		if (glfwGetKey(m_application->window, GLFW_KEY_D) == GLFW_PRESS) {
+			zVel += speed * sin(m_rot.y*DEG_TO_RAD) * dt;
+			xVel += speed * cos(m_rot.y*DEG_TO_RAD) * dt;
 		}
 		
-		if (glfwGetKey(m_window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-			pos.y += speed * dt;
+		if (glfwGetKey(m_application->window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+			m_pos.y += speed * dt;
 		}
-		if (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-			pos.y -= speed * dt;
+		if (glfwGetKey(m_application->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+			m_pos.y -= speed * dt;
 		}
 
 		/*
@@ -113,36 +101,36 @@ void Camera::update(float dt) {
 		fence = fence - 2;
 		 
 */
-		pos.x += xVel;
-		pos.z += zVel;
+		m_pos.x += xVel;
+		m_pos.z += zVel;
 		
-		float xdiff = (prev_x - xpos);
+		float xdiff = (m_prev_x - xpos);
 
 		if (xdiff != 0) {
-			rot.y -= 5 * xdiff * 0.085f;// *2 * dt;
+			m_rot.y -= 5 * xdiff * 0.085f;// *2 * dt;
 		}
 
-		float ydiff = (prev_y - ypos);
+		float ydiff = (m_prev_y - ypos);
 
 		if (ydiff != 0) {
-			rot.x += 5 * ydiff * 0.085f;// *2 * dt;
+			m_rot.x += 5 * ydiff * 0.085f;// *2 * dt;
 		}
 
-		if (rot.x > 90) {
-			rot.x = 90;
+		if (m_rot.x > 90) {
+			m_rot.x = 90;
 		}
 
-		if (rot.x < -90) {
-			rot.x = -90;
+		if (m_rot.x < -90) {
+			m_rot.x = -90;
 		}
 	}
 
-	prev_x = xpos;
-	prev_y = ypos;
+	m_prev_x = xpos;
+	m_prev_y = ypos;
 
-	renderPos.x = pos.x;
-	renderPos.y = -pos.y;
-	renderPos.z = pos.z;
+	m_renderPos.x = m_pos.x;
+	m_renderPos.y = -m_pos.y;
+	m_renderPos.z = m_pos.z;
 
 	//getWorldview(ChunkRenderer::getUniform()->view, renderPos, rot);
 }

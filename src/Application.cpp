@@ -1,6 +1,8 @@
 #include "Application.h"
 #include "Cursor.h"
 #include "TextObject.h"
+#include "Camera.h"
+#include "ChunkManager.h"
 
 #include <string>
 
@@ -28,9 +30,9 @@ Application::Application(int width, int height, const char* title) {
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	window = glfwCreateWindow(width, height, "VKraft", NULL, NULL);
 
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	//glfwSetWindowFocusCallback(window, window_focus_callback);
-	//glfwSetMouseButtonCallback(window, mouse_button_callback);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetWindowFocusCallback(window, window_focus_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -84,6 +86,18 @@ Application::Application(int width, int height, const char* title) {
 	cmdBuffer = new VKLCommandBuffer(graphicsQueue);
 	
 	cursor = new Cursor(this);
+	camera = new Camera(this);
+	chunkManager = new ChunkManager(this);
+	
+	for(int x = -6; x < 6; x++) {
+		printf("x: %d\n", x);
+		for(int z = -6; z < 6; z++) {
+			for(int y = -4; y < 4; y++) {
+				chunkManager->addChunk(Vec3i(x, y, z));
+			}
+		}
+	}
+
 	
 	createBackBuffer(width, height);
 	
@@ -140,7 +154,15 @@ void Application::createBackBuffer(uint32_t width, uint32_t height) {
 }
 
 void Application::mainLoop() {
+	double ct = glfwGetTime();
+	double dt = ct;
+	
 	while (!glfwWindowShouldClose(window)) {
+		dt = glfwGetTime() - ct;
+		ct = glfwGetTime();
+		
+		camera->update(dt);
+		
 		pollWindowEvents();
 		render();
 	}
@@ -150,9 +172,9 @@ void Application::mainLoop() {
 void Application::pollWindowEvents() {
 	glfwPollEvents();
 	
-	//if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-	//	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-	//}
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	}
 	
 	int width, height;
 	glfwGetWindowSize(window, &width, &height);
@@ -208,6 +230,11 @@ void Application::destroy() {
 	delete fpsText;
 	
 	cleanUpTextRenderingData();
+	
+	chunkManager->destroy();
+	
+	camera->destroy();
+	delete camera;
 	
 	cursor->destroy();
 	delete cursor;

@@ -1,13 +1,7 @@
-//
-//  Chunk.h
-//  VKraft
-//
-//  Created by Shahar Sandhaus on 6/12/21.
-//
-
 #ifndef Chunk_h
 #define Chunk_h
 
+#include "Base.h"
 #include <VKL/VKL.h>
 #include <vector>
 #include "Utils.h"
@@ -16,11 +10,9 @@ using namespace MathUtils;
 
 class Chunk {
 public:
-	//static void init(VKLDevice* device);
-	
 	Chunk();
-	void init(Vec3i pos);
-	void render(VkCommandBuffer cmdBuffer);
+	void init(ChunkManager* chunkManager, Vec3i pos);
+	void render(const VKLCommandBuffer* cmdBuffer);
 	void updateNearChunks();
 	void destroy();
 
@@ -29,8 +21,9 @@ public:
 	
 	Vec3 renderPos;
 private:
-	//static VKLDevice* m_device;
-	//VKLBuffer* m_instBuffer;
+	ChunkManager* m_chunkManager;
+	VKLBuffer m_instanceBuffer;
+	
 	Vec3i m_pos;
 	uint8_t m_cubes[16*16*16];
 	std::vector<uint32_t> m_renderCubes;

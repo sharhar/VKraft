@@ -8,6 +8,7 @@
 #include "Chunk.h"
 #include "ChunkManager.h"
 #include "FastNoise.h"
+#include "Application.h"
 
 #define PROP_FACE_MASK 7
 #define PROP_FACE_EXP 0
@@ -71,13 +72,14 @@ inline float interpolateCubeValue(float val0, float val3, uint8_t rem) {
 }
 
 Chunk::Chunk() {
-	//m_instBuffer = NULL;
 	m_pos = Vec3i(0, 0, 0);
 	m_foundAllBorders = 0;
 	renderPos = Vec3(0, 0, 0);
 }
 
-void Chunk::init(Vec3i pos) {
+void Chunk::init(ChunkManager* chunkManager, Vec3i pos) {
+	m_chunkManager = chunkManager;
+	
 	m_pos = pos;
 	Vec3i worldPos = Vec3i(pos.x * 16, pos.y * 16, pos.z * 16);
 	
@@ -269,7 +271,7 @@ void Chunk::init(Vec3i pos) {
 	calcChunkBorderData();
 	
 	for(int i = 0; i < 6; i++) {
-		m_neighborChunks[i] = ChunkManager::getChunkFromIndex(ChunkManager::getChunkAt(m_pos.add(pos_offs[i])));
+		m_neighborChunks[i] = m_chunkManager->getChunkFromIndex(m_chunkManager->getChunkAt(m_pos.add(pos_offs[i])));
 	}
 	
 	update();
@@ -290,7 +292,17 @@ void Chunk::update() {
 		calcRenderCubes();
 		
 		if(m_renderCubes.size()) {
-			//vklCreateStagedBuffer(m_device->deviceGraphicsContexts[0], &m_instBuffer,  m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			if(m_instanceBuffer.valid()) {
+				m_instanceBuffer.destroy();
+			}
+			
+			m_instanceBuffer.create(VKLBufferCreateInfo()
+										.device(&m_chunkManager->m_application->device)
+										.size(sizeof(int) * m_renderCubes.size())
+										.usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+										.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
+			
+			m_instanceBuffer.uploadData(m_chunkManager->m_application->transferQueue, m_renderCubes.data(), sizeof(int) * m_renderCubes.size(), 0);
 		}
 	}
 }
@@ -301,7 +313,7 @@ void Chunk::getChunkBorders() {
 				
 		for(int i = 0; i < 6; i++) {
 			if(m_neighborChunks[i] == NULL) {
-				m_neighborChunks[i] = ChunkManager::getChunkFromIndex(ChunkManager::getChunkAt(m_pos.add(pos_offs[i])));
+				m_neighborChunks[i] = m_chunkManager->getChunkFromIndex(m_chunkManager->getChunkAt(m_pos.add(pos_offs[i])));
 			}
 			
 			if(m_neighborChunks[i] != NULL) {
@@ -321,16 +333,15 @@ void Chunk::getChunkBorders() {
 	}
 }
 
-void Chunk::render(VkCommandBuffer cmdBuffer) {
+void Chunk::render(const VKLCommandBuffer* cmdBuffer) {
 	if(m_foundAllBorders && m_renderCubes.size()) {
-		VkDeviceSize offsets = 0;
-		//m_device->pvkCmdBindVertexBuffers(cmdBuffer, 1, 1, &m_instBuffer->buffer, &offsets);
-		//m_device->pvkCmdDraw(cmdBuffer, 6, m_renderCubes.size(), 0, 0);
+		cmdBuffer->bindVertexBuffer(m_instanceBuffer, 1, 0);
+		cmdBuffer->draw(6, m_renderCubes.size(), 0, 0);
 	}
 }
 
 void Chunk::destroy() {
-	//vklDestroyBuffer(m_device, m_instBuffer);
+	m_instanceBuffer.destroy();
 }
 
 uint8_t Chunk::renderable() {

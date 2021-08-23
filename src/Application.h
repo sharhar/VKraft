@@ -37,6 +37,8 @@ public:
 	VKLCommandBuffer* cmdBuffer;
 	
 	Cursor* cursor;
+	Camera* camera;
+	ChunkManager* chunkManager;
 	
 	struct TextRenderingData {
 		VKLBuffer vertBuffer;

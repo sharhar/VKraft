@@ -12,23 +12,24 @@
 #include <VKL/VKL.h>
 #include "Utils.h"
 
+#include "Base.h"
+
 #include <thread>
 #include <chrono>
 
-using namespace MathUtils;
-
 class Camera {
 public:
-	static void init(GLFWwindow* window);
-	static void update(float dt);
-	static void destroy();
-	static Vec3 pos;
+	Camera(Application* application);
+	void update(float dt);
+	void destroy();
 private:
-	static double prev_x, prev_y;
-	static float yVel;
-	static Vec3 renderPos;
-	static Vec3 rot;
-	static GLFWwindow* m_window;
+	Application* m_application;
+	
+	double m_prev_x, m_prev_y;
+	float m_yVel;
+	MathUtils::Vec3 m_renderPos;
+	MathUtils::Vec3 m_rot;
+	MathUtils::Vec3 m_pos;
 };
 
 #endif /* Camera_h */

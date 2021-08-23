@@ -14,5 +14,7 @@
 class Application;
 class Cursor;
 class TextObject;
+class Camera;
+class ChunkManager;
 
 #endif /* Base_h */

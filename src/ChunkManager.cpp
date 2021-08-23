@@ -1,26 +1,20 @@
-//
-//  ChunkManager.cpp
-//  VKraft
-//
-//  Created by Shahar Sandhaus on 6/24/21.
-//
-
+#include "Application.h"
 #include "ChunkManager.h"
 
-Chunk* ChunkManager::m_chunks = NULL;
-uint32_t ChunkManager::m_chunkCount = 0;
+ChunkManager::ChunkManager(Application* application) {
+	m_application = application;
+	
+	m_chunks = new Chunk[16*16*16];
+	m_chunkCount = 0;
+}
 
 uint32_t ChunkManager::getChunkCount() {
 	return m_chunkCount;
 }
 
-void ChunkManager::init() {
-	m_chunks = new Chunk[16*16*16];
-}
-
 void ChunkManager::addChunk(Vec3i pos) {
 	m_chunkCount++;
-	m_chunks[m_chunkCount-1].init(pos);
+	m_chunks[m_chunkCount-1].init(this, pos);
 	m_chunks[m_chunkCount-1].updateNearChunks();
 }
 
