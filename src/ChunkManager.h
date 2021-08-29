@@ -13,8 +13,8 @@ public:
 	ChunkManager(Application* application);
 	
 	uint32_t getChunkCount();
-	void addChunk(Vec3i pos);
-	int getChunkAt(Vec3i pos);
+	void addChunk(MathUtils::Vec3i pos);
+	int getChunkAt(MathUtils::Vec3i pos);
 	Chunk* getChunkFromIndex(int index);
 	
 	void destroy();

@@ -2,6 +2,7 @@
 #define Application_hpp
 
 #include "Base.h"
+#include "Texture.h"
 
 class Application {
 public:
@@ -29,8 +30,8 @@ public:
 	
 	VKLImageCreateInfo backBuffersCreateInfo;
 	
-	VKLImage backBuffers[2];
-	VKLImageView backBufferViews[2];
+	VKLImage backBuffers[3];
+	VKLImageView backBufferViews[3];
 	
 	VKLFramebuffer framebuffer;
 	
@@ -38,16 +39,16 @@ public:
 	
 	Cursor* cursor;
 	Camera* camera;
+	
 	ChunkManager* chunkManager;
+	ChunkRenderer* chunkRenderer;
 	
 	struct TextRenderingData {
 		VKLBuffer vertBuffer;
 		VKLShader shader;
 		VKLPipeline pipeline;
 		
-		VKLImage fontImage;
-		VKLImageView fontImageView;
-		VkSampler sampler;
+		Texture* texture;
 		
 		VKLDescriptorSet* descriptorSet;
 	};

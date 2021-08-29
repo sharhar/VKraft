@@ -8,14 +8,15 @@
 #ifndef ChunkRenderer_h
 #define ChunkRenderer_h
 
-#include <VKL/VKL.h>
+#include "Base.h"
 #include "Utils.h"
 #include "Chunk.h"
+
+#include "Texture.h"
 
 #include <thread>
 #include <vector>
 
-/*
 typedef struct ChunkUniform {
 	float view[16] = { 1, 0, 0, 0,
 		0, 1, 0, 0,
@@ -27,7 +28,7 @@ typedef struct ChunkUniform {
 		0, 0, 1, 0,
 		0, 0, 0, 1 };
 
-	Vec3 selected = Vec3( 0.5f, 0.5f, 0.5f );
+	MathUtils::Vec3 selected = MathUtils::Vec3( 0.5f, 0.5f, 0.5f );
 
 	float density = 1.0f / 200.0f;
 	float gradient = 25;
@@ -35,21 +36,25 @@ typedef struct ChunkUniform {
 
 class ChunkRenderer {
 public:
-	static void init(VKLDevice* device, VKLFrameBuffer* framebuffer);
-	static void rebuildPipeline();
-	static void render(VkCommandBuffer cmdBuffer);
-	static ChunkUniform* getUniform();
-	static void destroy();
-private:\
-	static ChunkUniform* m_chunkUniformBufferData;
+	ChunkRenderer(Application* application);
+	void rebuildPipeline();
+	void render(const VKLCommandBuffer* cmdBuffer);
+	ChunkUniform* getUniform();
+	void destroy();
+private:
+	ChunkUniform* m_chunkUniformBufferData;
+	Application* m_application;
 	
-	static VKLDevice* m_device;
-	static VKLFrameBuffer* m_framebuffer;
-	static VKLBuffer* m_vertBuffer;
-	static VKLShader* m_shader;
-	static VKLUniformObject* m_uniform;
-	static VKLPipeline* m_pipeline;
-	static VKLTexture* m_texture;
+	const VKLDevice* m_device;
+	const VKLFramebuffer* m_framebuffer;
+	
+	VKLBuffer m_vertBuffer;
+	VKLShader m_shader;
+	VKLPipeline m_pipeline;
+	
+	Texture* m_texture;
+	
+	VKLDescriptorSet* m_descriptorSet;
 };
-*/
+
 #endif /* ChunkRenderer_h */

@@ -16,5 +16,6 @@ class Cursor;
 class TextObject;
 class Camera;
 class ChunkManager;
+class ChunkRenderer;
 
 #endif /* Base_h */

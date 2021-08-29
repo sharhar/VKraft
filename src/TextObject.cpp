@@ -54,66 +54,11 @@ void Application::setupTextRenderingData() {
 										  .end()
 										.end());
 
-	uint32_t tex_width, tex_height;
-	
-	std::vector<unsigned char> imageData;
-	
-	std::string f_name;
-
-#ifdef UTIL_DIR_PRE
-	f_name.append(UTIL_DIR_PRE);
-#endif
-
-	f_name.append("res/font.png");
-	
-	unsigned int error = lodepng::decode(imageData, tex_width, tex_height, f_name);
-	
-	if (error != 0) {
-		std::cout << "Error loading image: " << error << "\n";
-	}
-	
-	textRenderingData.fontImage.create(VKLImageCreateInfo()
-										.device(&device)
-										.extent(tex_width, tex_height, 1)
-										.format(VK_FORMAT_R8G8B8A8_UNORM)
-										.usage(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-										.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
-	
-	textRenderingData.fontImage.transition(transferQueue,
-										   VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-										   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-	
-	textRenderingData.fontImage.uploadData(transferQueue, imageData.data(), imageData.size(), sizeof(char) * 4);
-	
-	textRenderingData.fontImage.transition(transferQueue,
-										   VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-										   VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-	
-	textRenderingData.fontImageView.create(VKLImageViewCreateInfo().image(&textRenderingData.fontImage));
+	textRenderingData.texture = new Texture(&device, transferQueue, "res/font.png", VK_FILTER_LINEAR);
 	
 	textRenderingData.descriptorSet = new VKLDescriptorSet(&textRenderingData.shader, 0);
 	
-	VkSamplerCreateInfo samplerCreateInfo;
-	memset(&samplerCreateInfo, 0, sizeof(VkSamplerCreateInfo));
-	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-	samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerCreateInfo.mipLodBias = 0;
-	samplerCreateInfo.anisotropyEnable = VK_FALSE;
-	samplerCreateInfo.maxAnisotropy = 0;
-	samplerCreateInfo.minLod = 0;
-	samplerCreateInfo.maxLod = 0;
-	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-
-	VK_CALL(device.vk.CreateSampler(device.handle(), &samplerCreateInfo, device.allocationCallbacks(), &textRenderingData.sampler));
-	
-	textRenderingData.descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-												textRenderingData.fontImageView.handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textRenderingData.sampler);
+	textRenderingData.descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, textRenderingData.texture->view()->handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textRenderingData.texture->sampler());
 }
 
 void Application::perpareTextRendering(const VKLCommandBuffer* cmdBuff) {
@@ -123,14 +68,11 @@ void Application::perpareTextRendering(const VKLCommandBuffer* cmdBuff) {
 }
 
 void Application::cleanUpTextRenderingData() {
-	device.vk.DestroySampler(device.handle(), textRenderingData.sampler, device.allocationCallbacks());
-	
 	textRenderingData.descriptorSet->destroy();
-	
 	delete textRenderingData.descriptorSet;
 	
-	textRenderingData.fontImageView.destroy();
-	textRenderingData.fontImage.destroy();
+	textRenderingData.texture->destroy();
+	delete textRenderingData.texture;
 	
 	textRenderingData.pipeline.destroy();
 	textRenderingData.shader.destroy();

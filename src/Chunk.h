@@ -6,25 +6,23 @@
 #include <vector>
 #include "Utils.h"
 
-using namespace MathUtils;
-
 class Chunk {
 public:
 	Chunk();
-	void init(ChunkManager* chunkManager, Vec3i pos);
+	void init(ChunkManager* chunkManager, MathUtils::Vec3i pos);
 	void render(const VKLCommandBuffer* cmdBuffer);
 	void updateNearChunks();
 	void destroy();
 
 	uint8_t renderable();
-	uint8_t atPos(Vec3i pos);
+	uint8_t atPos(MathUtils::Vec3i pos);
 	
-	Vec3 renderPos;
+	MathUtils::Vec3 renderPos;
 private:
 	ChunkManager* m_chunkManager;
 	VKLBuffer m_instanceBuffer;
 	
-	Vec3i m_pos;
+	MathUtils::Vec3i m_pos;
 	uint8_t m_cubes[16*16*16];
 	std::vector<uint32_t> m_renderCubes;
 	

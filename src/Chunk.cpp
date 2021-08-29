@@ -28,6 +28,8 @@
 #define BACK_CHUNK_BORDER 4
 #define FRONT_CHUNK_BORDER 5
 
+using namespace MathUtils;
+
 Vec3i pos_offs[6] = {
 	Vec3i(0, 1, 0),
 	Vec3i(0, -1, 0),

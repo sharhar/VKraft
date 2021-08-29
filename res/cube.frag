@@ -3,7 +3,8 @@
 
 layout ( set = 0, binding = 0 ) uniform sampler2D tex;
 
-layout (location = 0) out vec4 uFragColor;
+layout (location = 0) out vec4 uFragColor0;
+layout (location = 1) out vec4 uFragColor1;
 
 layout ( location = 0 ) in struct fragment_in {
     vec2 uv;
@@ -19,5 +20,6 @@ void main() {
 		discard;
 	}
 
-	uFragColor = cbColor * IN.brightness;
+	uFragColor0 = cbColor * IN.brightness;
+	uFragColor1 = uFragColor0;
 }

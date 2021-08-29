@@ -12,13 +12,13 @@ uint32_t ChunkManager::getChunkCount() {
 	return m_chunkCount;
 }
 
-void ChunkManager::addChunk(Vec3i pos) {
+void ChunkManager::addChunk(MathUtils::Vec3i pos) {
 	m_chunkCount++;
 	m_chunks[m_chunkCount-1].init(this, pos);
 	m_chunks[m_chunkCount-1].updateNearChunks();
 }
 
-int ChunkManager::getChunkAt(Vec3i pos) {
+int ChunkManager::getChunkAt(MathUtils::Vec3i pos) {
 	for(int i = 0; i < m_chunkCount; i++) {
 		if(m_chunks[i].atPos(pos)) {
 			return i;
