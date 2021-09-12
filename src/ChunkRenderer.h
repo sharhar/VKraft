@@ -49,7 +49,7 @@ private:
 	const VKLFramebuffer* m_framebuffer;
 	
 	VKLBuffer m_vertBuffer;
-	VKLShader m_shader;
+	VKLPipelineLayout m_layout;
 	VKLPipeline m_pipeline;
 	
 	Texture* m_texture;

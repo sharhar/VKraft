@@ -96,10 +96,10 @@ Application::Application(int width, int height, const char* title) {
 	
 	chunkManager = new ChunkManager(this);
 	
-	for(int x = -6; x < 6; x++) {
+	for(int x = -5; x < 5; x++) {
 		printf("x: %d\n", x);
-		for(int z = -6; z < 6; z++) {
-			for(int y = -4; y < 4; y++) {
+		for(int z = -2; z < 5; z++) {
+			for(int y = -3; y < 4; y++) {
 				chunkManager->addChunk(MathUtils::Vec3i(x, y, z));
 			}
 		}

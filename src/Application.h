@@ -45,7 +45,7 @@ public:
 	
 	struct TextRenderingData {
 		VKLBuffer vertBuffer;
-		VKLShader shader;
+		VKLPipelineLayout layout;
 		VKLPipeline pipeline;
 		
 		Texture* texture;

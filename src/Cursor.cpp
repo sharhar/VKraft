@@ -34,7 +34,7 @@ Cursor::Cursor(Application* application) {
 	size_t fragSize = 0;
 	uint32_t* fragCode = (uint32_t*)FileUtils::readBinaryFile("res/cursor-frag.spv", &fragSize);
 	
-	m_shader.create(VKLShaderCreateInfo().device(&m_application->device)
+	m_layout.create(VKLPipelineLayoutCreateInfo().device(&m_application->device)
 							.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
 							.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
 							.addDescriptorSet()
@@ -43,7 +43,7 @@ Cursor::Cursor(Application* application) {
 							.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 2));
 
 	m_pipeline.create(VKLPipelineCreateInfo()
-							.shader(&m_shader)
+							.layout(&m_layout)
 							.renderPass(&m_application->renderPass, 1)
 							.vertexInput
 								.addBinding(0, sizeof(float) * 2)
@@ -51,7 +51,7 @@ Cursor::Cursor(Application* application) {
 								.end()
 							.end());
 	
-	m_descriptorSet = new VKLDescriptorSet(&m_shader, 0);
+	m_descriptorSet = new VKLDescriptorSet(&m_layout, 0);
 }
 
 
@@ -77,7 +77,7 @@ void Cursor::destroy() {
 	delete m_descriptorSet;
 	
 	m_pipeline.destroy();
-	m_shader.destroy();
+	m_layout.destroy();
 	m_vertBuffer.destroy();
 }
 

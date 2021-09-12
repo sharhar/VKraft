@@ -21,6 +21,9 @@ public:
 private:
 	Application* m_application;
 	
+	VKLPipelineLayout m_layout;
+	VKLPipeline m_computePipeline;
+	
 	Chunk* m_chunks;
 	uint32_t m_chunkCount;
 	

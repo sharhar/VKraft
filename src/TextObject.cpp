@@ -31,7 +31,7 @@ void Application::setupTextRenderingData() {
 	size_t fragSize = 0;
 	uint32_t* fragCode = (uint32_t*)FileUtils::readBinaryFile("res/font-frag.spv", &fragSize);
 
-	textRenderingData.shader.create(VKLShaderCreateInfo()
+	textRenderingData.layout.create(VKLPipelineLayoutCreateInfo()
 						.device(&device)
 						.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
 						.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
@@ -41,7 +41,7 @@ void Application::setupTextRenderingData() {
 						.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 5));
 
 	textRenderingData.pipeline.create(VKLPipelineCreateInfo()
-									  .shader(&textRenderingData.shader)
+									  .layout(&textRenderingData.layout)
 									  .renderPass(&renderPass, 0)
 									  .vertexInput
 										  .addBinding(0, sizeof(float) * 4)
@@ -56,7 +56,7 @@ void Application::setupTextRenderingData() {
 
 	textRenderingData.texture = new Texture(&device, transferQueue, "res/font.png", VK_FILTER_LINEAR);
 	
-	textRenderingData.descriptorSet = new VKLDescriptorSet(&textRenderingData.shader, 0);
+	textRenderingData.descriptorSet = new VKLDescriptorSet(&textRenderingData.layout, 0);
 	
 	textRenderingData.descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, textRenderingData.texture->view()->handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textRenderingData.texture->sampler());
 }
@@ -75,7 +75,7 @@ void Application::cleanUpTextRenderingData() {
 	delete textRenderingData.texture;
 	
 	textRenderingData.pipeline.destroy();
-	textRenderingData.shader.destroy();
+	textRenderingData.layout.destroy();
 	textRenderingData.vertBuffer.destroy();
 }
 

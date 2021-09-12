@@ -31,7 +31,7 @@ ChunkRenderer::ChunkRenderer(Application* application) {
 	size_t fragSize = 0;
 	uint32_t* fragCode = (uint32_t*)FileUtils::readBinaryFile("res/cube-frag.spv", &fragSize);
 	
-	m_shader.create(VKLShaderCreateInfo().device(&application->device)
+	m_layout.create(VKLPipelineLayoutCreateInfo().device(&application->device)
 							.addShaderModule(vertCode, vertSize, VK_SHADER_STAGE_VERTEX_BIT, "main")
 							.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
 							.addDescriptorSet()
@@ -40,7 +40,7 @@ ChunkRenderer::ChunkRenderer(Application* application) {
 							.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * (16 * 2 + 3)));
 	
 	m_pipeline.create(VKLPipelineCreateInfo()
-							.shader(&m_shader)
+							.layout(&m_layout)
 							.renderPass(&application->renderPass, 0)
 							.vertexInput
 								.addBinding(0, sizeof(int32_t))
@@ -54,7 +54,7 @@ ChunkRenderer::ChunkRenderer(Application* application) {
 	
 	m_texture = new Texture(m_device, application->transferQueue, "res/pack.png", VK_FILTER_NEAREST);
 	
-	m_descriptorSet = new VKLDescriptorSet(&m_shader, 0);
+	m_descriptorSet = new VKLDescriptorSet(&m_layout, 0);
 	
 	m_descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, m_texture->view()->handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_texture->sampler());
 }
@@ -133,7 +133,7 @@ void ChunkRenderer::destroy() {
 	delete m_texture;
 	
 	m_pipeline.destroy();
-	m_shader.destroy();
+	m_layout.destroy();
 	m_vertBuffer.destroy();
 	
 	free(m_chunkUniformBufferData);

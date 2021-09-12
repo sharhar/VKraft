@@ -41,8 +41,6 @@ Vec3i pos_offs[6] = {
 	Vec3i(0, 0, 1),
 };
 
-//VKLDevice* Chunk::m_device = NULL;
-
 static int getProp(int num, int mask, int exp) {
 	return (num >> exp) & mask;
 }
@@ -50,10 +48,6 @@ static int getProp(int num, int mask, int exp) {
 static int setProp(int num, int val, int mask, int exp) {
 	return (val << exp) | (num & (~(mask << exp)));
 }
-
-//void Chunk::init(VKLDevice* device) {
-//	m_device = device;
-//}
 
 typedef struct CubeNoise {
 	float nz1;
