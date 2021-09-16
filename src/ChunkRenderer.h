@@ -55,6 +55,8 @@ private:
 	Texture* m_texture;
 	
 	VKLDescriptorSet* m_descriptorSet;
+	
+	friend class ChunkManager;
 };
 
 #endif /* ChunkRenderer_h */

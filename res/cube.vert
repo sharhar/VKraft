@@ -12,6 +12,7 @@
 
 layout ( location = 0 ) in int vert;
 layout ( location = 1 ) in int state;
+layout ( location = 2 ) in ivec3 chunkPos;
 
 layout( location = 0 ) out struct vert_out {
     vec2 uv;
@@ -33,8 +34,7 @@ int getTexID(int blockID) {
 layout( push_constant ) uniform constants {
 	mat4 view;
 	mat4 proj;
-	vec3 chunkPos;
-} PC;
+} PCRR;
 
 struct FaceInfo {
 	vec3 pos;
@@ -61,9 +61,13 @@ void main() {
 	int chunk_pos_int = getProp(state, PROP_POS_MASK, PROP_POS_EXP);
 	ivec3 chunk_pos_vec = ivec3(chunk_pos_int >> 8, -((chunk_pos_int >> 4) % 16), chunk_pos_int % 16);
 	
-	vec3 world_pos = vec3((v0 * face.off0) + (v1 * face.off1) + chunk_pos_vec) + face.pos + PC.chunkPos;
+	//vec3 myChunkPos = vec3(chunkIndex >> 6, (chunkIndex >> 3) % 8,  chunkIndex % 8) * 16.0;
 	
-	gl_Position = PC.proj * PC.view * vec4(world_pos, 1.0);
+	//int chInd = gl_InstanceIndex / 1536;
+	
+	vec3 world_pos = vec3((v0 * face.off0) + (v1 * face.off1) + chunk_pos_vec) + face.pos + vec3(chunkPos)*16.0;
+	
+	gl_Position = PCRR.proj * PCRR.view * vec4(world_pos, 1.0);
 	
 	int cubeID = getTexID(getProp(state, PROP_ID_MASK, PROP_ID_EXP));
 	

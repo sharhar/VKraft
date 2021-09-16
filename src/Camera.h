@@ -21,6 +21,9 @@ class Camera {
 public:
 	Camera(Application* application);
 	void update(float dt);
+	
+	const MathUtils::Vec3& pos() const;
+	
 	void destroy();
 private:
 	Application* m_application;

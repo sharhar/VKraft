@@ -56,6 +56,7 @@ public:
 	TextRenderingData textRenderingData;
 	
 	TextObject* fpsText;
+	TextObject* posText;
 	
 private:
 	void createBackBuffer(uint32_t width, uint32_t height);

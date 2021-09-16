@@ -1,17 +1,22 @@
 #version 430
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 16, local_size_y = 4, local_size_z = 16) in;
 
 layout(binding = 0, std430) buffer a {
-	float data[];
+	uint data[];
 } outArray;
 
 layout( push_constant ) uniform constants {
 	vec3 pos;
-	int seed;
+	uint seed;
 } PC;
 
 void main() {
-	vec3 mask = vec3((PC.seed & 4) >> 2, (PC.seed & 2) >> 1, PC.seed & 1);
+	uint cube = 1;//PC.seed & 0xff;
 	
-	outArray.data[gl_GlobalInvocationID.x] = dot(PC.pos, mask);
+	uint maskx = (gl_GlobalInvocationID.x & 1);
+	uint maskz = (gl_GlobalInvocationID.z & 1);
+	
+	uint mask = (maskx | maskz);
+	
+	outArray.data[64 * gl_GlobalInvocationID.x + 4 * gl_GlobalInvocationID.z + gl_GlobalInvocationID.y] = ((cube << 24) | (cube << 16) | (cube << 8) | cube);
 }

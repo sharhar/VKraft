@@ -97,14 +97,29 @@ Application::Application(int width, int height, const char* title) {
 	chunkManager = new ChunkManager(this);
 	
 	for(int x = -5; x < 5; x++) {
-		printf("x: %d\n", x);
 		for(int z = -2; z < 5; z++) {
 			for(int y = -3; y < 4; y++) {
-				chunkManager->addChunk(MathUtils::Vec3i(x, y, z));
+				chunkManager->queueChunk(MathUtils::Vec3i(x, y, z));
 			}
 		}
 	}
-
+	
+	//chunkManager->queueChunk(MathUtils::Vec3i(0, 0, 0));
+	//chunkManager->queueChunk(MathUtils::Vec3i(1, -2, 0));
+	//chunkManager->queueChunk(MathUtils::Vec3i(2, 2, 0));
+	//chunkManager->queueChunk(MathUtils::Vec3i(3, 0, 0));
+	//chunkManager->queueChunk(MathUtils::Vec3i(4, 0, 0));
+	//chunkManager->queueChunk(MathUtils::Vec3i(5, 0, 0));
+	//chunkManager->queueChunk(MathUtils::Vec3i(6, 0, 0));
+	
+	Timer tr("TTTTT");
+	
+	tr.start();
+	chunkManager->flushQueue();
+	tr.stop();
+	
+	tr.printLapTime();
+	
 	chunkRenderer = new ChunkRenderer(this);
 	
 	createBackBuffer(width, height);
@@ -115,6 +130,10 @@ Application::Application(int width, int height, const char* title) {
 	
 	fpsText->setText("Hello World!");
 	fpsText->setCoords(20, 20, 32);
+	
+	posText = new TextObject(this, 64);
+	posText->setText("POS: 0, 0, 0");
+	posText->setCoords(20, 52, 32);
 }
 
 void Application::createBackBuffer(uint32_t width, uint32_t height) {
@@ -221,6 +240,10 @@ void Application::pollWindowEvents() {
 		
 		swapChain.rebuild();
 	}
+	
+	std::string posStr = "POS: " + std::to_string(camera->pos().x) + ", " + std::to_string(camera->pos().y) + ", " + std::to_string(camera->pos().z);
+	
+	posText->setText(posStr);
 }
 
 void Application::render() {
@@ -238,6 +261,7 @@ void Application::render() {
 	chunkRenderer->render(cmdBuffer);
 	perpareTextRendering(cmdBuffer);
 	fpsText->render(cmdBuffer);
+	posText->render(cmdBuffer);
 	
 	cmdBuffer->nextSubpass(VK_SUBPASS_CONTENTS_INLINE);
 	cmdBuffer->setScissor(0, winWidth, winHeight);
@@ -253,6 +277,9 @@ void Application::render() {
 }
 
 void Application::destroy() {
+	posText->destroy();
+	delete posText;
+	
 	fpsText->destroy();
 	delete fpsText;
 	

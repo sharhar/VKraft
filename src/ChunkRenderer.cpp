@@ -36,8 +36,9 @@ ChunkRenderer::ChunkRenderer(Application* application) {
 							.addShaderModule(fragCode, fragSize, VK_SHADER_STAGE_FRAGMENT_BIT, "main")
 							.addDescriptorSet()
 								.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
+								//.addBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT)
 							.end()
-							.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * (16 * 2 + 3)));
+							.addPushConstant(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * (16 * 2)));
 	
 	m_pipeline.create(VKLPipelineCreateInfo()
 							.layout(&m_layout)
@@ -50,6 +51,10 @@ ChunkRenderer::ChunkRenderer(Application* application) {
 									.addAttrib(1, VK_FORMAT_R32_SINT, 0)
 									.inputRate(VK_VERTEX_INPUT_RATE_INSTANCE)
 								.end()
+								.addBinding(2, sizeof(int32_t) * 3)
+									.addAttrib(2, VK_FORMAT_R32G32B32_SINT, 0)
+									.inputRate(VK_VERTEX_INPUT_RATE_INSTANCE)
+								.end()
 							.end());
 	
 	m_texture = new Texture(m_device, application->transferQueue, "res/pack.png", VK_FILTER_NEAREST);
@@ -57,68 +62,24 @@ ChunkRenderer::ChunkRenderer(Application* application) {
 	m_descriptorSet = new VKLDescriptorSet(&m_layout, 0);
 	
 	m_descriptorSet->writeImage(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, m_texture->view()->handle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_texture->sampler());
+	//m_descriptorSet->writeBuffer(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &m_application->chunkManager->m_positionBuffer, 0, sizeof(uint32_t) * 512 * 3);
 }
 
 void ChunkRenderer::rebuildPipeline() {
-	//vklDestroyPipeline(m_device, m_pipeline);
-
-	/*
-	VkPushConstantRange push_constant;
-	push_constant.offset = 0;
-	push_constant.size = sizeof(float) * (16 * 2 + 3);
-	push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	
-	VKLGraphicsPipelineCreateInfo pipelineCreateInfo;
-	memset(&pipelineCreateInfo, 0, sizeof(VKLGraphicsPipelineCreateInfo));
-	pipelineCreateInfo.shader = m_shader;
-	pipelineCreateInfo.renderPass = m_framebuffer->renderPass;
-	pipelineCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	pipelineCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
-	pipelineCreateInfo.extent.width = m_framebuffer->width;
-	pipelineCreateInfo.extent.height = m_framebuffer->height;
-	pipelineCreateInfo.pushConstantRanges = &push_constant;
-	pipelineCreateInfo.pushConstantRangeCount = 1;
-	
-	vklCreateGraphicsPipeline(m_device, &m_pipeline, &pipelineCreateInfo);
-	 */
 }
 
 void ChunkRenderer::render(const VKLCommandBuffer* cmdBuffer) {
 	cmdBuffer->pushConstants(m_pipeline, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 16 * 2, m_chunkUniformBufferData);
 	
 	cmdBuffer->bindPipeline(m_pipeline);
-	cmdBuffer->bindVertexBuffer(m_vertBuffer, 0, 0);
 	cmdBuffer->bindDescriptorSet(m_descriptorSet);
 	
-	for (int i = 0; i < m_application->chunkManager->getChunkCount(); i++) {
-		Chunk* chunk = m_application->chunkManager->getChunkFromIndex(i);
-		if (chunk->renderable()) {
-			cmdBuffer->pushConstants(m_pipeline, VK_SHADER_STAGE_VERTEX_BIT, sizeof(float) * 16 * 2, sizeof(float) * 3, &chunk->renderPos);
-			chunk->render(cmdBuffer);
-		}
-	}
+	cmdBuffer->bindVertexBuffer(m_vertBuffer, 0, 0);
+	cmdBuffer->bindVertexBuffer(m_application->chunkManager->m_facesBuffer, 1, 0);
+	cmdBuffer->bindVertexBuffer(m_application->chunkManager->m_positionBuffer, 2, 0);
 	
-	/*
-	m_device->pvkCmdPushConstants(cmdBuffer, m_pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 16 * 2, m_chunkUniformBufferData);
-
-	VkViewport viewport = { 0, 0, m_framebuffer->width, m_framebuffer->height, 0, 1 };
-	VkRect2D scissor = { {0, 0}, {m_framebuffer->width, m_framebuffer->height} };
-	VkDeviceSize offsets = 0;
-
-	m_device->pvkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
-	m_device->pvkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
-	m_device->pvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipeline);
-	m_device->pvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertBuffer->buffer, &offsets);
-	m_device->pvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->pipelineLayout, 0, 1, &m_uniform->descriptorSet, 0, NULL);
-
-	for (int i = 0; i < ChunkManager::getChunkCount(); i++) {
-		Chunk* chunk = ChunkManager::getChunkFromIndex(i);
-		if (chunk->renderable()) {
-			m_device->pvkCmdPushConstants(cmdBuffer, m_pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(float) * 16 * 2, sizeof(float) * 3, &chunk->renderPos);
-			chunk->render(cmdBuffer);
-		}
-	}
-	 */
+	cmdBuffer->draw(6, m_application->chunkManager->m_faceNum, 0, 0);
 }
 
 ChunkUniform* ChunkRenderer::getUniform() {

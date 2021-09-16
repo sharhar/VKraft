@@ -25,7 +25,7 @@ void Camera::update(float dt) {
 	glfwGetCursorPos(m_application->window, &xpos, &ypos);
 
 	if (focused) {
-		float speed = 3.5f;
+		float speed = 15.5f;
 
 		if (glfwGetKey(m_application->window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
 			speed *= 2;
@@ -133,6 +133,10 @@ void Camera::update(float dt) {
 	m_renderPos.z = m_pos.z;
 
 	MathUtils::getWorldview(m_application->chunkRenderer->getUniform()->view, m_renderPos, m_rot);
+}
+
+const MathUtils::Vec3& Camera::pos() const {
+	return m_pos;
 }
 
 void Camera::destroy() {
