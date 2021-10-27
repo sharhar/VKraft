@@ -104,14 +104,6 @@ Application::Application(int width, int height, const char* title) {
 		}
 	}
 	
-	//chunkManager->queueChunk(MathUtils::Vec3i(0, 0, 0));
-	//chunkManager->queueChunk(MathUtils::Vec3i(1, -2, 0));
-	//chunkManager->queueChunk(MathUtils::Vec3i(2, 2, 0));
-	//chunkManager->queueChunk(MathUtils::Vec3i(3, 0, 0));
-	//chunkManager->queueChunk(MathUtils::Vec3i(4, 0, 0));
-	//chunkManager->queueChunk(MathUtils::Vec3i(5, 0, 0));
-	//chunkManager->queueChunk(MathUtils::Vec3i(6, 0, 0));
-	
 	Timer tr("TTTTT");
 	
 	tr.start();
