@@ -17,11 +17,6 @@ typedef struct CubeNoise {
 	float inzc;
 } CubeNoise;
 
-struct PC {
-	float x, y, z;
-	int seed;
-};
-
 ChunkManager::ChunkManager(Application* application) : m_cmdBuffer(application->computeQueue), m_transferCmdBuffer(application->transferQueue){
 	m_application = application;
 	
@@ -36,8 +31,8 @@ ChunkManager::ChunkManager(Application* application) : m_cmdBuffer(application->
 							.addShaderModule(shaderCode, shaderSize, VK_SHADER_STAGE_COMPUTE_BIT, "main")
 							.addDescriptorSet()
 								.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT)
-							.end()
-							.addPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(struct PC)));
+								.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT)
+							.end());
 	
 	m_computePipeline.create(VKLPipelineCreateInfo().layout(&m_layout));
 	
@@ -57,6 +52,12 @@ ChunkManager::ChunkManager(Application* application) : m_cmdBuffer(application->
 								.device(&application->device)
 								.usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
 								.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
+	
+	m_chunkInfoBuffer.create(VKLBufferCreateInfo()
+							 .size(sizeof(int) * (32*3 + 1))
+								   .device(&application->device)
+								   .usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+								   .memoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU));
 	
 	m_stagingBuffer.create(VKLBufferCreateInfo()
 						  .size(sizeof(uint8_t) * 16 * 16 * 16 * BATCH_SIZE)
@@ -87,6 +88,7 @@ ChunkManager::ChunkManager(Application* application) : m_cmdBuffer(application->
 	m_descSet = new VKLDescriptorSet(&m_layout, 0);
 	
 	m_descSet->writeBuffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_resultBuffer, 0, sizeof(uint8_t) * 16 * 16 * 16 * BATCH_SIZE);
+	m_descSet->writeBuffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_chunkInfoBuffer, 0, sizeof(int) * (32*3 + 1));
 }
 
 uint32_t ChunkManager::getChunkCount() {
@@ -98,12 +100,17 @@ void ChunkManager::queueChunk(MathUtils::Vec3i pos) {
 }
 
 void ChunkManager::processBatch(int startIndex, int batchSize) {
-	struct PC pc;
-	pc.x = 0;//worldPos.x;
-	pc.y = 0;//worldPos.y;
-	pc.z = 0;//worldPos.z;
+	int* chunkInfo = (int*)m_chunkInfoBuffer.map();
 	
-	pc.seed = 3;
+	for(int i = startIndex; i < startIndex + batchSize; i++) {
+		chunkInfo[(i - startIndex)*3 + 0] = m_queue[i].x;
+		chunkInfo[(i - startIndex)*3 + 1] = -m_queue[i].y;
+		chunkInfo[(i - startIndex)*3 + 2] = m_queue[i].z;
+	}
+	
+	chunkInfo[32*3] = 3;
+	
+	m_chunkInfoBuffer.unmap();
 	
 	VkSemaphore semaphore = m_application->device.createSemaphore();
 	
@@ -111,7 +118,6 @@ void ChunkManager::processBatch(int startIndex, int batchSize) {
 	
 	m_cmdBuffer.bindPipeline(m_computePipeline);
 	m_cmdBuffer.bindDescriptorSet(m_descSet);
-	m_cmdBuffer.pushConstants(m_computePipeline, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(struct PC), &pc);
 	
 	m_cmdBuffer.dispatch(batchSize, 1, 1);
 	
@@ -149,14 +155,13 @@ void ChunkManager::processBatch(int startIndex, int batchSize) {
 void ChunkManager::flushQueue() {
 	Timer tm("TM");
 	
-	tm.start();
+	
 	for(int i = 0; i < m_queue.size(); i += BATCH_SIZE) {
-		
+		tm.start();
 		processBatch(i, fmin(BATCH_SIZE, m_queue.size() - i));
-		
+		tm.stop();
 	}
 	
-	tm.stop();
 	tm.printLapTime();
 	tm.reset();
 	
@@ -205,6 +210,7 @@ void ChunkManager::destroy() {
 	m_facesStagingBuffer.destroy();
 	
 	m_positionBuffer.destroy();
+	m_chunkInfoBuffer.destroy();
 	//m_positionIndexBuffer.destroy();
 	
 	m_transferCmdBuffer.destroy();

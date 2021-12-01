@@ -30,6 +30,7 @@ private:
 	VKLPipeline m_computePipeline;
 	
 	VKLBuffer m_resultBuffer;
+	VKLBuffer m_chunkInfoBuffer;
 	VKLBuffer m_stagingBuffer;
 	
 	VKLBuffer m_facesBuffer;
