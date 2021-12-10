@@ -1,6 +1,5 @@
 #include "Application.h"
 #include "ChunkManager.h"
-#include "FastNoise.h"
 #include "Utils.h"
 
 #define BATCH_SIZE 32
@@ -26,7 +25,20 @@ ChunkManager::ChunkManager(Application* application) : m_cmdBuffer(application->
 	size_t shaderSize = 0;
 	uint32_t* shaderCode = (uint32_t*)FileUtils::readBinaryFile("res/world-gen.spv", &shaderSize);
 	
-	m_layout.create(VKLPipelineLayoutCreateInfo()
+	m_terrainLayout.create(VKLPipelineLayoutCreateInfo()
+							.device(&application->device)
+							.addShaderModule(shaderCode, shaderSize, VK_SHADER_STAGE_COMPUTE_BIT, "main")
+							.addDescriptorSet()
+								.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT)
+								.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT)
+								.addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT)
+							.end());
+	
+	free(shaderCode);
+	
+	shaderCode = (uint32_t*)FileUtils::readBinaryFile("res/heightmap.spv", &shaderSize);
+	
+	m_heightmapLayout.create(VKLPipelineLayoutCreateInfo()
 							.device(&application->device)
 							.addShaderModule(shaderCode, shaderSize, VK_SHADER_STAGE_COMPUTE_BIT, "main")
 							.addDescriptorSet()
@@ -34,16 +46,12 @@ ChunkManager::ChunkManager(Application* application) : m_cmdBuffer(application->
 								.addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT)
 							.end());
 	
-	m_computePipeline.create(VKLPipelineCreateInfo().layout(&m_layout));
+	free(shaderCode);
+	
+	m_terrainPipeline.create(VKLPipelineCreateInfo().layout(&m_terrainLayout));
+	m_heightmapPipeline.create(VKLPipelineCreateInfo().layout(&m_heightmapLayout));
 	
 	m_seed = 1337;
-	
-	m_heightNoise = new FastNoise(m_seed);
-	m_caveNoise = new FastNoise(m_seed);
-	m_caveNoise->SetFrequency(0.02);
-	m_caveNoise->SetCellularDistanceFunction(FastNoise::Euclidean);
-	m_caveNoise->SetCellularReturnType(FastNoise::Distance2Add);
-	m_oreNoise = new FastNoise(m_seed);
 	
 	m_cubeNoises = new CubeNoise[16 * 16 * 16];
 	
@@ -53,8 +61,14 @@ ChunkManager::ChunkManager(Application* application) : m_cmdBuffer(application->
 								.usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
 								.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
 	
+	m_heightmapBuffer.create(VKLBufferCreateInfo()
+							 .size(sizeof(int32_t) * 16 * 16 * BATCH_SIZE)
+								.device(&application->device)
+								.usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+								.memoryUsage(VMA_MEMORY_USAGE_GPU_ONLY));
+	
 	m_chunkInfoBuffer.create(VKLBufferCreateInfo()
-							 .size(sizeof(int) * (32*3 + 1))
+							 .size(sizeof(int) * (BATCH_SIZE * 3 + 1 + BATCH_SIZE * 2))
 								   .device(&application->device)
 								   .usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
 								   .memoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU));
@@ -85,10 +99,16 @@ ChunkManager::ChunkManager(Application* application) : m_cmdBuffer(application->
 	
 	m_faceNum = 0;
 	
-	m_descSet = new VKLDescriptorSet(&m_layout, 0);
+	m_terrainDescSet = new VKLDescriptorSet(&m_terrainLayout, 0);
 	
-	m_descSet->writeBuffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_resultBuffer, 0, sizeof(uint8_t) * 16 * 16 * 16 * BATCH_SIZE);
-	m_descSet->writeBuffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_chunkInfoBuffer, 0, sizeof(int) * (32*3 + 1));
+	m_terrainDescSet->writeBuffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_resultBuffer, 0, sizeof(uint8_t) * 16 * 16 * 16 * BATCH_SIZE);
+	m_terrainDescSet->writeBuffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_chunkInfoBuffer, 0, sizeof(int32_t) * (BATCH_SIZE * 3 + 1));
+	m_terrainDescSet->writeBuffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_heightmapBuffer, 0, sizeof(int32_t) * 16 * 16 * BATCH_SIZE);
+	
+	m_heightmapDescSet = new VKLDescriptorSet(&m_heightmapLayout, 0);
+	
+	m_heightmapDescSet->writeBuffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_heightmapBuffer, 0, sizeof(int32_t) * 16 * 16 * BATCH_SIZE);
+	m_heightmapDescSet->writeBuffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_chunkInfoBuffer, 0, sizeof(int32_t) * (BATCH_SIZE * 3 + 1));
 }
 
 uint32_t ChunkManager::getChunkCount() {
@@ -99,16 +119,26 @@ void ChunkManager::queueChunk(MathUtils::Vec3i pos) {
 	m_queue.push_back(pos);
 }
 
-void ChunkManager::processBatch(int startIndex, int batchSize) {
-	int* chunkInfo = (int*)m_chunkInfoBuffer.map();
+void ChunkManager::processBatch(int startIndex, int batchSize, Timer& tm) {
+	int32_t* chunkInfo = (int32_t*)m_chunkInfoBuffer.map();
+	
+	uint32_t heightmapChunkCount = 0;
 	
 	for(int i = startIndex; i < startIndex + batchSize; i++) {
 		chunkInfo[(i - startIndex)*3 + 0] = m_queue[i].x;
 		chunkInfo[(i - startIndex)*3 + 1] = -m_queue[i].y;
 		chunkInfo[(i - startIndex)*3 + 2] = m_queue[i].z;
+		
+		uint8_t foundHeightmapCoord = 0;
+		
+		if(!foundHeightmapCoord) {
+			chunkInfo[BATCH_SIZE*3+heightmapChunkCount*2+1] = m_queue[i].x;
+			chunkInfo[BATCH_SIZE*3+heightmapChunkCount*2+2] = m_queue[i].z;
+			heightmapChunkCount++;
+		}
 	}
-	
-	chunkInfo[32*3] = 3;
+ 
+	chunkInfo[32*3] = m_seed;
 	
 	m_chunkInfoBuffer.unmap();
 	
@@ -116,14 +146,33 @@ void ChunkManager::processBatch(int startIndex, int batchSize) {
 	
 	m_cmdBuffer.begin();
 	
-	m_cmdBuffer.bindPipeline(m_computePipeline);
-	m_cmdBuffer.bindDescriptorSet(m_descSet);
+	m_cmdBuffer.bindPipeline(m_heightmapPipeline);
+	m_cmdBuffer.bindDescriptorSet(m_heightmapDescSet);
 	
 	m_cmdBuffer.dispatch(batchSize, 1, 1);
 	
 	m_cmdBuffer.end();
 	
+	tm.pause();
+	m_application->computeQueue->submitAndWait(&m_cmdBuffer);
+	tm.unpause();
+	
+	//m_application->computeQueue->submit(&m_cmdBuffer, VK_NULL_HANDLE, &semaphore);
+	
+	m_cmdBuffer.begin();
+	
+	//m_cmdBuffer.bufferBarrier(&m_heightmapBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	
+	m_cmdBuffer.bindPipeline(m_terrainPipeline);
+	m_cmdBuffer.bindDescriptorSet(m_terrainDescSet);
+	
+	m_cmdBuffer.dispatch(batchSize, 1, 1);
+	
+	m_cmdBuffer.end();
+	
+	tm.pause();
 	m_application->computeQueue->submit(&m_cmdBuffer, VK_NULL_HANDLE, &semaphore);
+	tm.unpause();
 	
 	m_transferCmdBuffer.begin();
 	 
@@ -138,7 +187,9 @@ void ChunkManager::processBatch(int startIndex, int batchSize) {
 	
 	VkPipelineStageFlags pipelineStageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 	
+	tm.pause();
 	m_application->transferQueue->submitAndWait(&m_transferCmdBuffer, 1, &semaphore, &pipelineStageFlags);
+	tm.unpause();
 	
 	m_application->device.destroySempahore(semaphore);
 	
@@ -154,13 +205,19 @@ void ChunkManager::processBatch(int startIndex, int batchSize) {
 
 void ChunkManager::flushQueue() {
 	Timer tm("TM");
+	Timer cpuTM("CPU");
 	
 	
 	for(int i = 0; i < m_queue.size(); i += BATCH_SIZE) {
 		tm.start();
-		processBatch(i, fmin(BATCH_SIZE, m_queue.size() - i));
+		cpuTM.start();
+		processBatch(i, fmin(BATCH_SIZE, m_queue.size() - i), cpuTM);
 		tm.stop();
+		cpuTM.stop();
 	}
+	
+	cpuTM.printLapTime();
+	cpuTM.reset();
 	
 	tm.printLapTime();
 	tm.reset();
@@ -175,9 +232,12 @@ void ChunkManager::flushQueue() {
 	tm.reset();
 	m_queue.clear();
 	
-	
-	m_facesBuffer.uploadData(m_application->transferQueue, m_facesBuff, sizeof(uint32_t) * m_faceNum, 0);
-	m_positionBuffer.uploadData(m_application->transferQueue, m_positionBuff, sizeof(uint32_t) * m_faceNum * 3, 0);
+	if(m_faceNum == 0) {
+		printf("No cube faces generated!\n");
+	} else {
+		m_facesBuffer.uploadData(m_application->transferQueue, m_facesBuff, sizeof(uint32_t) * m_faceNum, 0);
+		m_positionBuffer.uploadData(m_application->transferQueue, m_positionBuff, sizeof(uint32_t) * m_faceNum * 3, 0);
+	}
 }
 
 int ChunkManager::getChunkAt(MathUtils::Vec3i pos) {
@@ -211,20 +271,24 @@ void ChunkManager::destroy() {
 	
 	m_positionBuffer.destroy();
 	m_chunkInfoBuffer.destroy();
-	//m_positionIndexBuffer.destroy();
+	m_heightmapBuffer.destroy();
 	
 	m_transferCmdBuffer.destroy();
 	m_cmdBuffer.destroy();
 	
-	m_descSet->destroy();
-	delete m_descSet;
+	m_terrainDescSet->destroy();
+	delete m_terrainDescSet;
+	
+	m_heightmapDescSet->destroy();
+	delete m_heightmapDescSet;
+	
 
 	delete[] m_chunks;
-	delete m_heightNoise;
-	delete m_caveNoise;
-	delete m_oreNoise;
 	delete[] m_cubeNoises;
 	
-	m_computePipeline.destroy();
-	m_layout.destroy();
+	m_terrainPipeline.destroy();
+	m_terrainLayout.destroy();
+	
+	m_heightmapPipeline.destroy();
+	m_heightmapLayout.destroy();
 }

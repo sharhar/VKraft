@@ -161,7 +161,16 @@ Timer::Timer(const std::string& name) {
 	reset();
 }
 
+void Timer::pause() {
+	m_startBuffer = glfwGetTime();
+}
+
+void Timer::unpause() {
+	m_bufferTime = m_bufferTime + glfwGetTime() - m_startBuffer;
+}
+
 void Timer::reset() {
+	m_bufferTime = 0;
 	m_count = 0;
 	m_time = 0;
 }
@@ -171,8 +180,9 @@ void Timer::start() {
 }
 
 void Timer::stop() {
-	m_time = m_time + glfwGetTime() - m_startTime;
+	m_time = m_time + glfwGetTime() - m_startTime - m_bufferTime;
 	m_count++;
+	m_bufferTime = 0;
 }
 
 double Timer::getLapTime() {

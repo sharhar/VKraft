@@ -8,7 +8,6 @@
 
 #include "Chunk.h"
 
-class FastNoise;
 typedef struct CubeNoise;
 
 class ChunkManager {
@@ -26,12 +25,17 @@ public:
 private:
 	Application* m_application;
 	
-	VKLPipelineLayout m_layout;
-	VKLPipeline m_computePipeline;
+	VKLPipelineLayout m_heightmapLayout;
+	VKLPipeline m_heightmapPipeline;
+	
+	VKLPipelineLayout m_terrainLayout;
+	VKLPipeline m_terrainPipeline;
 	
 	VKLBuffer m_resultBuffer;
 	VKLBuffer m_chunkInfoBuffer;
 	VKLBuffer m_stagingBuffer;
+	
+	VKLBuffer m_heightmapBuffer;
 	
 	VKLBuffer m_facesBuffer;
 	VKLBuffer m_facesStagingBuffer;
@@ -47,19 +51,17 @@ private:
 	
 	VKLCommandBuffer m_cmdBuffer;
 	VKLCommandBuffer m_transferCmdBuffer;
-	VKLDescriptorSet* m_descSet;
+	VKLDescriptorSet* m_terrainDescSet;
+	VKLDescriptorSet* m_heightmapDescSet;
 	
 	Chunk* m_chunks;
 	uint32_t m_chunkCount;
 	
 	unsigned int m_seed;
 	
-	FastNoise* m_heightNoise;
-	FastNoise* m_caveNoise;
-	FastNoise* m_oreNoise;
 	CubeNoise* m_cubeNoises;
 	
-	void processBatch(int startIndex, int batchSize);
+	void processBatch(int startIndex, int batchSize, Timer& tm);
 	
 	friend class Chunk;
 	friend class ChunkRenderer;

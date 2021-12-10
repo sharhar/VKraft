@@ -9,8 +9,11 @@ layout(binding = 1, std430) buffer b {
 	int[] pos;
 } PC;
 
-int perm[256] = int[256](
-	151, 160, 137, 91, 90, 15, 131,
+layout(binding = 2, std430) buffer c {
+	int[] height;
+} HM;
+
+int perm[256] = int[256](151, 160, 137, 91, 90, 15, 131,
 	13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23,
 	190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33,
 	88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166,
@@ -25,98 +28,12 @@ int perm[256] = int[256](
 	138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180
 );
 
-float grad(int hash, float x, float y) {
-	int h = hash & 0x3F;  // Convert low 3 bits of hash code
-	float u = h < 4 ? x : y;  // into 8 simple gradient directions
-	float v = h < 4 ? y : x;
-	return (((h & 1) == 1) ? -u : u) + (((h & 2) == 2) ? -2.0 * v : 2.0 * v); // and compute the dot product with (x,y).
-}
-
 float grad(int hash, float x, float y, float z) {
 	int h = hash & 15;     // Convert low 4 bits of hash code into 12 simple
 	float u = h < 8 ? x : y; // gradient directions, and compute dot product.
 	float v = h < 4 ? y : h == 12 || h == 14 ? x : z; // Fix repeats at h = 12 to 15
 	return (((h & 1) == 1) ? -u : u) + (((h & 2) == 2) ? -v : v);
 }
-
-float noise(float x, float y) {
-	float n0, n1, n2;
-
-	// Skewing/Unskewing factors for 2D
-	float F2 = 0.366025403;  // F2 = (sqrt(3) - 1) / 2
-	float G2 = 0.211324865;  // G2 = (3 - sqrt(3)) / 6   = F2 / (1 + 2 * K)
-
-	// Skew the input space to determine which simplex cell we're in
-	float s = (x + y) * F2;  // Hairy factor for 2D
-	float xs = x + s;
-	float ys = y + s;
-	int i = int(floor(xs));
-	int j = int(floor(ys));
-
-	// Unskew the cell origin back to (x,y) space
-	float t = (i + j) * G2;
-	float X0 = i - t;
-	float Y0 = j - t;
-	float x0 = x - X0;  // The x,y distances from the cell origin
-	float y0 = y - Y0;
-
-	// For the 2D case, the simplex shape is an equilateral triangle.
-	// Determine which simplex we are in.
-	int i1, j1;  // Offsets for second (middle) corner of simplex in (i,j) coords
-	if (x0 > y0) {   // lower triangle, XY order: (0,0)->(1,0)->(1,1)
-		i1 = 1;
-		j1 = 0;
-	} else {   // upper triangle, YX order: (0,0)->(0,1)->(1,1)
-		i1 = 0;
-		j1 = 1;
-	}
-
-	// A step of (1,0) in (i,j) means a step of (1-c,-c) in (x,y), and
-	// a step of (0,1) in (i,j) means a step of (-c,1-c) in (x,y), where
-	// c = (3-sqrt(3))/6
-
-	float x1 = x0 - i1 + G2;            // Offsets for middle corner in (x,y) unskewed coords
-	float y1 = y0 - j1 + G2;
-	float x2 = x0 - 1.0 + 2.0 * G2;   // Offsets for last corner in (x,y) unskewed coords
-	float y2 = y0 - 1.0 + 2.0 * G2;
-
-	// Work out the hashed gradient indices of the three simplex corners
-	int gi0 = perm[i + perm[j]];
-	int gi1 = perm[i + i1 + perm[j + j1]];
-	int gi2 = perm[i + 1 + perm[j + 1]];
-
-	// Calculate the contribution from the first corner
-	float t0 = 0.5 - x0*x0 - y0*y0;
-	if (t0 < 0.0) {
-		n0 = 0.0;
-	} else {
-		t0 *= t0;
-		n0 = t0 * t0 * grad(gi0, x0, y0);
-	}
-
-	// Calculate the contribution from the second corner
-	float t1 = 0.5 - x1*x1 - y1*y1;
-	if (t1 < 0.0) {
-		n1 = 0.0;
-	} else {
-		t1 *= t1;
-		n1 = t1 * t1 * grad(gi1, x1, y1);
-	}
-
-	// Calculate the contribution from the third corner
-	float t2 = 0.5 - x2*x2 - y2*y2;
-	if (t2 < 0.0) {
-		n2 = 0.0;
-	} else {
-		t2 *= t2;
-		n2 = t2 * t2 * grad(gi2, x2, y2);
-	}
-
-	// Add contributions from each corner to get the final noise value.
-	// The result is scaled to return values in the interval [-1,1].
-	return 45.23065 * (n0 + n1 + n2);
-}
-
 float noise(float x, float y, float z) {
 	float n0, n1, n2, n3; // Noise contributions from the four corners
 
@@ -213,26 +130,8 @@ float noise(float x, float y, float z) {
 	return 32.0f*(n0 + n1 + n2 + n3);
 }
 
-float fractal(float x, float y) {
-	float result = 0.0;
-	float denom  = 0.0;
-	float frequency = 1.0 / 100.0;//mFrequency;
-	float amplitude = 5.0;//mAmplitude;
-
-	for (int i = 0; i < 4; i++) {
-		result += (amplitude * noise(x * frequency, y * frequency));
-		denom += amplitude;
-
-		frequency *= 2.0;//mLacunarity;
-		amplitude *= 0.5;//mPersistence;
-	}
-
-	return result;
-}
-
-
-uint calcCubeAt(ivec3 pos) {
-	return max(32 + int(fractal(pos.x, pos.z)) - pos.y, 0);
+uint calcCubeAt(ivec3 worldPos, ivec3 pos) {
+	return max(HM.height[256 * (gl_GlobalInvocationID.x >> 4) + 16 * pos.z + pos.x] - (worldPos.y + pos.y), 0);
 }
 
 void main() {
@@ -240,11 +139,11 @@ void main() {
 	
 	ivec3 worldPos = 16*ivec3(PC.pos[chunkNum*3 + 0], PC.pos[chunkNum*3 + 1], PC.pos[chunkNum*3 + 2]);
 	
-	ivec3 pos = ivec3((gl_GlobalInvocationID.x & 15) + worldPos.x, gl_GlobalInvocationID.z + worldPos.y, (gl_GlobalInvocationID.y * 4) + worldPos.z);
+	ivec3 pos = ivec3(gl_GlobalInvocationID.x & 15, gl_GlobalInvocationID.z, gl_GlobalInvocationID.y * 4);
 	
 	outArray.data[64 * gl_GlobalInvocationID.x + 4 * gl_GlobalInvocationID.z + gl_GlobalInvocationID.y] = (
-																										   (calcCubeAt(pos + ivec3(0, 0, 3)) << 24) |
-																										   (calcCubeAt(pos + ivec3(0, 0, 2)) << 16) |
-																										   (calcCubeAt(pos + ivec3(0, 0, 1)) << 8) |
-																										    calcCubeAt(pos + ivec3(0, 0, 0)));
+																										   (calcCubeAt(worldPos, pos + ivec3(0, 0, 3)) << 24) |
+																										   (calcCubeAt(worldPos, pos + ivec3(0, 0, 2)) << 16) |
+																										   (calcCubeAt(worldPos, pos + ivec3(0, 0, 1)) << 8) |
+																										    calcCubeAt(worldPos, pos + ivec3(0, 0, 0)));
 }

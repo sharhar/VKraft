@@ -48,6 +48,8 @@ class Timer {
 public:
 	Timer(const std::string& name);
 	
+	void pause();
+	void unpause();
 	void reset();
 	void start();
 	void stop();
@@ -60,6 +62,8 @@ public:
 private:
 	double m_startTime;
 	double m_time;
+	double m_bufferTime;
+	double m_startBuffer;
 	int m_count;
 	std::string m_name;
 };
